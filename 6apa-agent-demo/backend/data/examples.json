@@ -1,0 +1,269 @@
+{
+  "version": "2026-09-24",
+  "notice": "这是一份纯数据文件：前端把它渲染成可点击的示例问题，点一下只是把问题文本填进输入框。Agent 收到问题后仍然自己规划工具链，本文件不参与规划，也不会绑定任何工具或流程。referenceToolChain 仅供演示与验收时对照，不下发给模型。",
+  "groups": [
+    {
+      "key": "investigation",
+      "title": "工艺调查（异常溯源）",
+      "description": "从一个异常参数出发，沿本体记载的因果关系找影响因素，再用历史数据验证是不是它们引起的。",
+      "items": [
+        {
+          "id": "INV-01",
+          "question": "昨天水解罐温度异常，帮我调查一下原因",
+          "intent": "最典型的一条：Agent 需要自己把「昨天」换算成时间窗、把「水解罐温度」落到测点、查限值确认异常、再顺着因果关系找影响因素并取同期历史比对。",
+          "referenceToolChain": [
+            "query_equipment_list 或 query_relation_entities（keyword 检索，把名称换成 ID）",
+            "query_object_limits（拿到判异常的依据）",
+            "query_history_values（昨天的温度曲线，确认异常时段与最值）",
+            "query_relations（entityId + view=compact，拿全该对象的因果关系）",
+            "query_relation_entities（keyword 逐个查影响因素有没有测点）",
+            "query_history_values（逐个取影响因素的同期历史做对比）"
+          ],
+          "expectation": "结论要分三层：数据事实、本体记载的机理（带关系来源）、Agent 的分析判断。v2 的本体记载了四个影响釜内反应温度的因素——RB进料温度、硼酸溶液温度、夹套热水/蒸汽加热量、热水阀HV_1301，**四个都有现场测点**（分别 5/5/5/12 个），所以这条案例现在能把「取同期历史比对」的闭环完整走完；而三条后果（固定化酶活力稳定性、6-APA热降解损失率、酶催化水解反应速率）都没有测点，必须如实说明无法用数据验证。"
+        },
+        {
+          "id": "INV-02",
+          "question": "釜内反应温度受哪些因素影响？这些因素本体里有没有对应的测点？",
+          "intent": "把「找原因」和「能不能验证」拆开问，用来演示本体如实报告数据缺口的能力。",
+          "referenceToolChain": [
+            "query_relation_entities",
+            "query_relations（entityId）",
+            "query_measurement_anchors"
+          ],
+          "expectation": "四个影响因素全部可测、三条后果全部不可测——Agent 应该把这两半分开讲清楚，而不是笼统地说'有/没有测点'。"
+        },
+        {
+          "id": "INV-03",
+          "question": "水解罐A 昨天温度最高到了多少？超出工艺限值了吗？超了多久？",
+          "intent": "单台设备、单个参数的定量核查，历史值 + 限值两个数据源要对上。",
+          "referenceToolChain": [
+            "query_equipment_list",
+            "query_object_limits",
+            "query_history_values",
+            "query_limit_check"
+          ],
+          "expectation": "给出最高值、发生时间、对应的限值档位与偏离幅度，并说明限值状态是「待现场确认」。"
+        },
+        {
+          "id": "INV-04",
+          "question": "反应超温会带来什么后果？本体里记了哪些机理？",
+          "intent": "纯知识侧的溯因，不需要取值，检验 Agent 会不会引用关系上的工艺机理说明与来源行号。",
+          "referenceToolChain": [
+            "query_relation_entities",
+            "query_object_relations",
+            "query_causal_relations"
+          ],
+          "expectation": "两条负向影响（酶活力稳定性、6-APA 热降解损失率）加各自的工艺机理原文与来源行号。"
+        },
+        {
+          "id": "INV-05",
+          "question": "一阶段酸化 pH 昨天偏低，是不是稀硫酸加多了？",
+          "intent": "两端都有测点的因果路径，且关系是负向影响——酸加得多 pH 才会降，方向要对得上。",
+          "referenceToolChain": [
+            "query_relation_entities（拿到一阶段酸化pH 的 ID）",
+            "query_relations（entityId，看到「稀硫酸注入流量 --负向影响--> 一阶段酸化pH」与「稀硫酸浓度 --负向影响--> 一阶段酸化pH」）",
+            "query_history_values（pH 与两路稀硫酸同一时间窗）",
+            "query_process_limits（pH 的工艺区间）"
+          ],
+          "expectation": "有两个候选原因（注入流量 5 点、浓度 4 点），都可测。关系是负向影响，所以「流量/浓度上升 → pH 下降」才算对得上；两个都对不上时要说未发现支持证据，不能二选一硬凑。"
+        },
+        {
+          "id": "INV-06",
+          "question": "稀硫酸浓度偏高，可能是配制环节哪里出了问题？",
+          "intent": "跨工段溯源：结果在 S01 用，原因在 S03 稀硫酸配制，且一正一负两个因素方向相反。",
+          "referenceToolChain": [
+            "query_relation_entities",
+            "query_relations（entityId，看到「浓硫酸加入流量 --正向影响--> 稀硫酸浓度」与「配酸一次水流量 --负向影响--> 稀硫酸浓度」）",
+            "query_area_flow（S03 稀硫酸配制 → S01，确认这条物料路径）",
+            "query_history_values（三者同一时间窗）"
+          ],
+          "expectation": "两个因素方向相反：浓硫酸加多了或一次水加少了都会让浓度偏高。Agent 要分别比对，并指出这是 S03 配制工段的问题、影响到 S01 提取工段，可用 query_area_flow 佐证这条物料路径。"
+        }
+      ]
+    },
+    {
+      "key": "quality",
+      "title": "pH 与质量指标",
+      "description": "从质量指标反查工艺参数，或从 pH 出发判断是否偏离工艺要求。",
+      "items": [
+        {
+          "id": "QUA-01",
+          "question": "反应体系 pH 现在是多少？在工艺要求的范围内吗？",
+          "intent": "一个工艺属性对应 22 支 pH 计，考验 Agent 会不会用 limit-check 一次拿到逐点结论而不是自己比对。",
+          "referenceToolChain": [
+            "query_process_limits",
+            "query_limit_check"
+          ],
+          "expectation": "按状态汇总 + 逐点数值，并声明当前为模拟数据、限值为待现场确认。"
+        },
+        {
+          "id": "QUA-02",
+          "question": "水解酶解转化率偏低，本体里哪些工艺量会影响它？现在这些量是什么状态？",
+          "intent": "从质量指标往上游倒推，再落到实时值。质量指标本身没有测点，Agent 必须说清楚这一点。",
+          "referenceToolChain": [
+            "query_relation_entities",
+            "query_object_relations",
+            "query_measurement_anchors",
+            "query_realtime_values"
+          ],
+          "expectation": "先说明「水解酶解转化率」是未匹配 DCS 实例的质量指标、只能靠上游工艺量间接判断，再给出可取值的那几个量的当前状态。"
+        },
+        {
+          "id": "QUA-03",
+          "question": "昨天夜班 pH 有没有出现过越限？出现在哪几支 pH 计上？",
+          "intent": "相对时间（夜班）+ 历史值 + 限值三者结合，检验时间换算与逐点比对。",
+          "referenceToolChain": [
+            "query_process_limits",
+            "query_history_values"
+          ],
+          "expectation": "给出时间窗的换算依据（以【当前时间】为准）、越限的测点与时段；若历史数据无法支持结论要如实说。"
+        },
+        {
+          "id": "QUA-04",
+          "question": "酸化体系 pH 的上下限是多少？这个限值靠得住吗？",
+          "intent": "该条限值 targetCount 为 0，用来检验 Agent 会不会把「有限值但落不到测点」这件事说清楚。",
+          "referenceToolChain": [
+            "query_process_limits"
+          ],
+          "expectation": "给出限值区间与 basis，同时指出它当前没有匹配到任何 DCS 测点，因此无法取值验证。"
+        }
+      ]
+    },
+    {
+      "key": "equipment",
+      "title": "设备与开关量",
+      "description": "离散量（启停、故障、联锁）的调查方式，与模拟量不同：看的是状态翻转次数和时刻。",
+      "items": [
+        {
+          "id": "EQP-01",
+          "question": "一层排渣泵昨天启停了几次？分别在什么时候？",
+          "intent": "开关量历史，考验 Agent 会不会用 values 序列数翻转而不是看 stats 的平均值。",
+          "referenceToolChain": [
+            "query_equipment_list",
+            "query_history_values"
+          ],
+          "expectation": "给出翻转次数与时刻；说明判断依据是启停指令点的 0/1 序列。"
+        },
+        {
+          "id": "EQP-02",
+          "question": "水解罐A 现在在运行吗？搅拌有没有报故障？",
+          "intent": "多点位的状态汇总，实时值 + 参数语义。",
+          "referenceToolChain": [
+            "query_equipment_list",
+            "query_realtime_values"
+          ],
+          "expectation": "逐点给出启停指令、运行反馈、故障信号的当前值与含义，并声明数据来源是否为模拟。"
+        },
+        {
+          "id": "EQP-03",
+          "question": "一层排渣泵和哪些设备有关联？上游停了会影响到它吗？",
+          "intent": "结构与拓扑关系的多跳推理，答案必须全部来自本体关系，不能靠常识补。",
+          "referenceToolChain": [
+            "query_equipment_list",
+            "query_object_relations",
+            "query_ontology_graph"
+          ],
+          "expectation": "列出关联对象与关系类型；本体里没有记载的影响路径要明说没有，不得推测。"
+        }
+      ]
+    },
+    {
+      "key": "gap",
+      "title": "工艺调查缺口",
+      "description": "做工艺调查前先弄清楚：哪些数据现场还没给、哪些结论目前还不能下。",
+      "items": [
+        {
+          "id": "GAP-01",
+          "question": "哪些工艺参数还没有限值？给我一份需要现场补的清单",
+          "intent": "hasValues=false 直接取出 14 条空行，就是一份工艺调查清单。",
+          "referenceToolChain": [
+            "query_process_limits"
+          ],
+          "expectation": "按工段或参数类型整理成清单，指出每条需要现场提供什么，并说明「已确认」条目目前为 0。"
+        },
+        {
+          "id": "GAP-02",
+          "question": "本体里哪些工艺量有记载但现场没有测点？",
+          "intent": "unanchoredEntities / matchStatus=UNMATCHED 是真实数据状态，不是错误。",
+          "referenceToolChain": [
+            "query_measurement_anchors",
+            "query_relation_entities"
+          ],
+          "expectation": "给出未匹配对象的数量与清单，说明这会让哪些分析无法用数据验证。"
+        },
+        {
+          "id": "GAP-03",
+          "question": "本体里的工艺限值哪些是推断的？依据是什么？",
+          "intent": "限值的 status / basis / confidence 三个字段的用法。",
+          "referenceToolChain": [
+            "query_process_limits"
+          ],
+          "expectation": "逐条给出 basis 与置信度，并提醒这些条目只能用于工艺调查核对，不能作为报警依据。"
+        },
+        {
+          "id": "GAP-04",
+          "question": "现在取到的实时值是真实的还是模拟的？数据从哪来？",
+          "intent": "数据诚信线的直接检验。",
+          "referenceToolChain": [
+            "query_realtime_values",
+            "query_data_sources"
+          ],
+          "expectation": "明确回答当前接的是模拟数据服务，并给出上游地址与本体各类内容的数据来源。"
+        }
+      ]
+    },
+    {
+      "key": "basic",
+      "title": "本体基础问答",
+      "description": "不涉及取值的结构类问题，用于快速验证服务连通与多轮指代。",
+      "items": [
+        {
+          "id": "BAS-01",
+          "question": "6-APA 生产车间有多少设备？",
+          "referenceToolChain": [
+            "query_ontology_overview"
+          ]
+        },
+        {
+          "id": "BAS-02",
+          "question": "介绍一下一层排渣泵",
+          "referenceToolChain": [
+            "query_equipment_list",
+            "query_equipment_detail"
+          ]
+        },
+        {
+          "id": "BAS-03",
+          "question": "它有哪些参数？",
+          "intent": "多轮指代：必须依赖上一轮捕获的实体。",
+          "referenceToolChain": [
+            "query_parameters"
+          ]
+        },
+        {
+          "id": "BAS-04",
+          "question": "它和哪些设备有关联？",
+          "intent": "多轮指代 + 关系查询。",
+          "referenceToolChain": [
+            "query_object_relations"
+          ]
+        },
+        {
+          "id": "BAS-05",
+          "question": "从本体中，你能告诉我目前有哪些类型的知识吗？",
+          "referenceToolChain": [
+            "query_ontology_categories"
+          ]
+        },
+        {
+          "id": "BAS-06",
+          "question": "分析一下酶法水解工段的设备关系结构，哪些设备关联较多，这些关系主要属于什么类型？",
+          "referenceToolChain": [
+            "query_relations",
+            "query_relation_entities"
+          ]
+        }
+      ]
+    }
+  ]
+}

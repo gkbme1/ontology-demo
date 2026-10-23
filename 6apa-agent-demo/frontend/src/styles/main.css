@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #0b0f14;
+  color: #d7e0ea;
+  font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 工业软件里滚动条不该抢视线 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #2a3647;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@layer components {
+  .panel {
+    @apply bg-ink-800 border border-line rounded-md;
+  }
+  .btn {
+    @apply px-3 py-1.5 rounded text-sm border border-line bg-ink-700 hover:bg-ink-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    @apply bg-accent-dim border-accent-dim text-ink-900 font-medium hover:bg-accent;
+  }
+  .tag {
+    @apply inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-mono border border-line bg-ink-700;
+  }
+}
+
+/* 流式光标 */
+.caret::after {
+  content: '▌';
+  animation: blink 1s step-end infinite;
+  color: #38bdf8;
+}
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}

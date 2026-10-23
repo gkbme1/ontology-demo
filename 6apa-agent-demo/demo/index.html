@@ -1,0 +1,971 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>6-APA 生产车间智能 Agent</title>
+<style>
+  /* 零依赖单文件演示页：不需要 npm，不需要构建，直接双击打开即可。
+     功能与 Vue 版一致；Agent 地址默认 http://localhost:8800，可用 ?api= 覆盖。 */
+  :root{
+    --bg:#0b0f14; --panel:#111823; --panel2:#18202c; --panel3:#212b39;
+    --line:#2a3647; --text:#d7e0ea; --muted:#7c8ea3; --dim:#5a6b80;
+    --accent:#38bdf8; --accent-dim:#0ea5e9; --ok:#34d399; --warn:#fbbf24; --bad:#f87171;
+    color-scheme: dark;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{
+    background:var(--bg); color:var(--text);
+    font:14px/1.6 "Inter","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased; display:flex; flex-direction:column;
+  }
+  code,pre,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+  ::-webkit-scrollbar-track{background:transparent}
+
+  header{
+    height:48px;flex:0 0 auto;display:flex;align-items:center;gap:14px;
+    padding:0 16px;border-bottom:1px solid var(--line);background:var(--panel);
+  }
+  header h1{font-size:14px;font-weight:600;margin:0;letter-spacing:.02em;color:#f1f5f9}
+  .chips{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .tag{
+    display:inline-flex;align-items:center;gap:5px;padding:2px 7px;border-radius:4px;
+    font-size:11px;font-family:ui-monospace,monospace;border:1px solid var(--line);
+    background:var(--panel2);color:var(--muted);
+  }
+  .tag.click{cursor:pointer}
+  .tag.click:hover{border-color:var(--accent)}
+  .dot{width:6px;height:6px;border-radius:50%;display:inline-block}
+  .spacer{margin-left:auto}
+  button.btn{
+    padding:6px 12px;border-radius:4px;font-size:13px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--text);cursor:pointer;transition:background .15s;
+  }
+  button.btn:hover:not(:disabled){background:var(--panel3)}
+  button.btn:disabled{opacity:.4;cursor:not-allowed}
+  button.primary{background:var(--accent-dim);border-color:var(--accent-dim);color:#06131d;font-weight:600}
+  button.primary:hover:not(:disabled){background:var(--accent)}
+
+  main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 380px}
+  #chat{display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--line)}
+  #scroller{flex:1;min-height:0;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:14px}
+  #composer{flex:0 0 auto;border-top:1px solid var(--line);background:var(--panel);padding:12px}
+  #composer .row{display:flex;gap:8px;align-items:flex-end}
+  textarea{
+    flex:1;resize:none;background:var(--panel2);border:1px solid var(--line);border-radius:4px;
+    padding:8px 10px;color:var(--text);font:inherit;font-size:13px;outline:none;
+  }
+  textarea:focus{border-color:var(--accent)}
+  .hint{margin:6px 0 0;font-size:11px;color:var(--dim);font-family:ui-monospace,monospace}
+
+  .bubble{max-width:46rem;border-radius:6px;padding:12px 16px;font-size:13px}
+  .bubble.user{margin-left:auto;background:rgba(14,165,233,.12);border:1px solid rgba(56,189,248,.3)}
+  .bubble.agent{background:var(--panel);border:1px solid var(--line)}
+  .who{font-size:11px;font-family:ui-monospace,monospace;margin:0 0 6px;color:var(--dim)}
+  .bubble.user .who{color:var(--accent)}
+  .bubble p{margin:.25em 0}
+  .bubble ul,.bubble ol{margin:.35em 0;padding-left:1.35em}
+  .bubble strong{color:#f1f5f9}
+  .bubble code{background:var(--panel2);color:var(--accent);padding:1px 4px;border-radius:3px;font-size:12px}
+  .bubble table{border-collapse:collapse;margin:.5em 0;font-size:12px;width:auto;max-width:100%;display:block;overflow-x:auto}
+  .bubble th,.bubble td{border:1px solid var(--line);padding:4px 8px;text-align:left;vertical-align:top}
+  .bubble th{background:var(--panel2);color:#e2e8f0;font-weight:600}
+  .stats{margin:10px 0 0;padding-top:8px;border-top:1px solid var(--line);font-size:11px;color:var(--dim);font-family:ui-monospace,monospace}
+  .err{color:var(--bad);font-size:12px;margin:8px 0 0}
+  .caret::after{content:"▌";color:var(--accent);animation:blink 1s step-end infinite}
+  @keyframes blink{50%{opacity:0}}
+
+  aside{display:flex;flex-direction:column;min-height:0;background:var(--bg)}
+  .aside-head{height:36px;flex:0 0 auto;display:flex;align-items:center;padding:0 16px;border-bottom:1px solid var(--line)}
+  .aside-head h2{margin:0;font-size:12px;font-weight:600;color:#cbd5e1}
+  #trace{flex:1;min-height:0;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:6px}
+  .step{display:flex;gap:8px;align-items:flex-start;padding:4px;font-size:12px;color:var(--muted)}
+  .card{border:1px solid var(--line);border-radius:6px;background:var(--panel);overflow:hidden}
+  .card > .head{width:100%;text-align:left;padding:8px 10px;background:none;border:0;color:inherit;cursor:pointer;display:flex;gap:8px;align-items:flex-start;font:inherit}
+  .card > .head:hover{background:var(--panel2)}
+  .card .name{font-family:ui-monospace,monospace;font-size:12px;color:#e2e8f0;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .card .sub{font-size:11px;color:var(--dim);margin:1px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .card .summary{font-size:11px;color:var(--muted);margin:2px 0 0}
+  .card .ms{font-size:10px;font-family:ui-monospace,monospace;color:var(--dim);flex:0 0 auto}
+  .card .body{border-top:1px solid var(--line);background:rgba(11,15,20,.6);padding:8px 10px;display:flex;flex-direction:column;gap:8px}
+  .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin:0 0 4px}
+  pre.mini{margin:0;font-size:11px;color:#cbd5e1;white-space:pre-wrap;word-break:break-all;max-height:16rem;overflow-y:auto}
+  .ok{color:var(--ok)} .bad{color:var(--bad)} .warn{color:var(--warn)} .acc{color:var(--accent)}
+  .pulse{animation:pulse 1.2s ease-in-out infinite}
+  @keyframes pulse{50%{opacity:.35}}
+  .ctx{flex:0 0 auto;border-top:1px solid var(--line);padding:8px 12px}
+  .ctx p{margin:2px 0;font-size:11px;font-family:ui-monospace,monospace;color:#cbd5e1}
+
+  .modal{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:24px}
+  .modal .box{background:var(--panel);border:1px solid var(--line);border-radius:6px;width:100%;max-width:1100px;height:82vh;display:flex;flex-direction:column}
+  .modal .box.narrow{max-width:900px;height:80vh}
+  .modal .top{height:44px;flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px solid var(--line)}
+  .modal .top h3{margin:0;font-size:14px;font-weight:600;color:#f1f5f9}
+  .modal .content{flex:1;min-height:0;overflow:auto}
+  select,input[type=text]{background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:4px 8px;color:var(--text);font:inherit;font-size:12px;outline:none}
+  select:focus,input[type=text]:focus{border-color:var(--accent)}
+  .tool-item{border:1px solid var(--line);border-radius:6px;padding:12px;margin:0 0 8px}
+  .banner{padding:8px 16px;font-size:12px;border-bottom:1px solid rgba(248,113,113,.3);background:rgba(248,113,113,.1);color:var(--bad)}
+  .samples{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .samples button{font-size:12px;text-align:left}
+  .intro{font-size:13px;color:var(--muted);max-width:42rem}
+  .sample-group{margin-top:18px;max-width:52rem}
+  .sample-group > h4{margin:0 0 2px;font-size:12px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px}
+  .sample-group > h4 .n{font-weight:400;color:var(--muted)}
+  .sample-group > p{margin:0 0 8px;font-size:12px;color:var(--muted);line-height:1.6}
+  .sample-group .samples{margin-top:0}
+  .sample-group button{max-width:100%;white-space:normal;line-height:1.5}
+  .sample-note{margin-top:20px;max-width:52rem;font-size:11px;color:var(--muted);line-height:1.7;
+    border-top:1px solid var(--line);padding-top:10px}
+  .sample-warn{max-width:52rem;margin:0 0 14px;padding:10px 12px;border-radius:6px;font-size:12px;line-height:1.8;
+    border:1px solid rgba(250,178,25,.35);background:rgba(250,178,25,.08);color:#fcd34d}
+  .sample-warn b{color:#fde68a}
+  .sample-warn code{background:rgba(0,0,0,.35);padding:1px 5px;border-radius:3px;font-size:11px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>6-APA 生产车间智能 Agent</h1>
+  <div class="chips" id="chips"></div>
+  <div class="spacer"></div>
+  <button class="btn" id="btn-graph" disabled>查看关系图</button>
+  <button class="btn" id="btn-reset">新建会话</button>
+</header>
+
+<div id="banner" class="banner" hidden></div>
+
+<main>
+  <section id="chat">
+    <div id="scroller">
+      <div id="empty">
+        <p class="intro">用自然语言提问即可。Agent 会自己决定调用哪些本体接口、调用几次，右侧实时显示它的执行过程。</p>
+        <div class="samples" id="samples"></div>
+      </div>
+    </div>
+    <div id="composer">
+      <div class="row">
+        <textarea id="input" rows="2" placeholder="输入问题……（Enter 发送，Shift+Enter 换行）"></textarea>
+        <button class="btn" id="btn-stop" hidden>停止</button>
+        <button class="btn primary" id="btn-send">发送</button>
+      </div>
+      <p class="hint" id="hint">会话 未开始</p>
+    </div>
+  </section>
+
+  <aside>
+    <div class="aside-head">
+      <h2>Agent 执行过程</h2>
+      <span class="spacer"></span>
+      <span class="tag" id="call-count">0 次调用</span>
+    </div>
+    <div id="trace">
+      <p style="font-size:12px;color:var(--dim);padding:0 4px">
+        提问后，这里实时显示 Agent 选了哪些工具、参数是什么、返回了多少条数据。
+      </p>
+    </div>
+    <div class="ctx" id="ctx" hidden></div>
+  </aside>
+</main>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------------------------------------------------------------- 配置
+  const params = new URLSearchParams(location.search);
+  // Agent 地址解析顺序：?api= 参数 → 当前同源（页面由 Agent 服务托管时）→ localhost:8800
+  const FALLBACK_API = 'http://localhost:8800';
+  let API = (params.get('api') || '').replace(/\/$/, '');
+
+  // 页面版本：和后端版本对不上时最容易出现"改了没生效"，所以直接显示在页头
+  const PAGE_BUILD = '2026-09-24 示例问题分组版';
+
+  // 服务端 /api/examples 拿不到时的兜底；正常情况下示例问题来自 backend/data/examples.json
+  const SAMPLES = [
+    '昨天水解罐温度异常，帮我调查一下原因',
+    '6-APA 生产车间有多少设备？',
+    '介绍一下一层排渣泵',
+    '它有哪些参数？',
+    '它和哪些设备有关联？',
+    '从本体中，你能告诉我目前有哪些类型的知识吗？',
+  ];
+
+  // ---------------------------------------------------------------- 状态
+  const state = {
+    conversationId: null,
+    busy: false,
+    steps: [],
+    graphs: [],
+    context: null,
+    health: null,
+    tools: [],
+    controller: null,
+    expanded: new Set(),
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const el = (tag, cls, text) => {
+    const node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text != null) node.textContent = text;
+    return node;
+  };
+  const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  // ---------------------------------------------------------------- 极简 Markdown
+  function render(text) {
+    const lines = esc(text).split('\n');
+    const out = [];
+    let list = null;
+    const close = () => { if (list) { out.push(`</${list}>`); list = null; } };
+    const inline = (s) => s
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>');
+
+    const isRow = (l) => /^\s*\|.*\|\s*$/.test(l || '');
+    const isSep = (l) => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(l || '');
+    const cells = (l) => l.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => inline(c.trim()));
+
+    for (let i = 0; i < lines.length; i++) {
+      const raw = lines[i];
+      const line = raw.trimEnd();
+      // Markdown 表格：表头行 + 分隔行 + 数据行
+      if (isRow(line) && isSep(lines[i + 1])) {
+        close();
+        const head = cells(line);
+        const rows = [];
+        i += 2;
+        while (i < lines.length && isRow(lines[i])) { rows.push(cells(lines[i])); i++; }
+        i--;
+        out.push('<table><thead><tr>' + head.map((c) => `<th>${c}</th>`).join('') + '</tr></thead><tbody>' +
+          rows.map((r) => '<tr>' + r.map((c) => `<td>${c}</td>`).join('') + '</tr>').join('') + '</tbody></table>');
+        continue;
+      }
+      const bullet = /^\s*[-*]\s+(.*)$/.exec(line);
+      const numbered = /^\s*\d+[.)]\s+(.*)$/.exec(line);
+      const heading = /^(#{1,4})\s+(.*)$/.exec(line);
+      if (bullet) {
+        if (list !== 'ul') { close(); out.push('<ul>'); list = 'ul'; }
+        out.push(`<li>${inline(bullet[1])}</li>`);
+      } else if (numbered) {
+        if (list !== 'ol') { close(); out.push('<ol>'); list = 'ol'; }
+        out.push(`<li>${inline(numbered[1])}</li>`);
+      } else if (heading) {
+        close(); out.push(`<p><strong>${inline(heading[2])}</strong></p>`);
+      } else if (!line) {
+        close();
+      } else {
+        close(); out.push(`<p>${inline(line)}</p>`);
+      }
+    }
+    close();
+    return out.join('');
+  }
+
+  // ---------------------------------------------------------------- 顶栏
+  async function resolveApi() {
+    if (API) return;
+    const candidates = [];
+    if (location.protocol.startsWith('http')) candidates.push(location.origin);
+    candidates.push(FALLBACK_API);
+    for (const candidate of candidates) {
+      try {
+        const probe = await fetch(`${candidate}/api/health`, { method: 'GET' });
+        if (probe.ok) { API = candidate.replace(/\/$/, ''); return; }
+      } catch { /* 试下一个 */ }
+    }
+    API = FALLBACK_API;
+  }
+
+  async function loadMeta() {
+    await resolveApi();
+    try {
+      state.health = await (await fetch(`${API}/api/health`)).json();
+    } catch (error) {
+      banner(`无法连接 Agent 服务（${API}）：${error.message}。用 ?api=http://主机:端口 指定地址。`);
+    }
+    try {
+      state.tools = (await (await fetch(`${API}/api/tools`)).json()).items || [];
+    } catch { /* 工具清单拿不到不影响对话 */ }
+    drawChips();
+    loadSamples();
+  }
+
+  function banner(text) {
+    const node = $('banner');
+    node.textContent = text;
+    node.hidden = !text;
+  }
+
+  function drawChips() {
+    const box = $('chips');
+    box.innerHTML = '';
+    const health = state.health;
+    const chip = (dotColor, text, onClick) => {
+      const node = el('span', 'tag' + (onClick ? ' click' : ''));
+      if (dotColor) {
+        const dot = el('i', 'dot');
+        dot.style.background = dotColor;
+        node.appendChild(dot);
+      }
+      node.appendChild(document.createTextNode(text));
+      if (onClick) node.onclick = onClick;
+      box.appendChild(node);
+      return node;
+    };
+    chip(health?.ontology?.reachable ? 'var(--ok)' : 'var(--bad)',
+         `本体 ${health?.ontology?.reachable ? '已连接' : '未连接'}`);
+    chip(health?.config?.llm_api_key_configured ? 'var(--ok)' : 'var(--warn)',
+         health?.config?.llm_model || '模型未知');
+    chip(null, `${health?.toolCount ?? 0} 个工具`, openTools);
+    // 页面版本 + 后端示例问题数：两边对不上就说明有一侧还是旧文件
+    const backendExamples = health?.exampleCount;
+    const versionChip = chip(
+      backendExamples === undefined ? 'var(--warn)' : 'var(--ok)',
+      backendExamples === undefined ? '后端为旧版（无示例问题接口）' : `${backendExamples} 条示例`,
+    );
+    versionChip.title = `演示页版本：${PAGE_BUILD}\n`
+      + (backendExamples === undefined
+        ? 'Agent 服务的 /api/health 里没有 exampleCount，说明 backend/ 目录还是旧版本，请覆盖后重启 8800。'
+        : '页面与后端都已是新版本。');
+    if (state.context?.currentEquipment) {
+      const node = chip(null, `当前设备 ${state.context.currentEquipment.name}`);
+      node.style.color = 'var(--accent)';
+      node.style.borderColor = 'rgba(56,189,248,.4)';
+    }
+  }
+
+  // ---------------------------------------------------------------- 对话
+  function pushBubble(role, content) {
+    $('empty')?.remove();
+    const bubble = el('div', `bubble ${role === 'user' ? 'user' : 'agent'}`);
+    bubble.appendChild(el('p', 'who', role === 'user' ? '你' : 'Agent'));
+    const body = el('div', 'body-text');
+    if (content) body.innerHTML = render(content);
+    bubble.appendChild(body);
+    $('scroller').appendChild(bubble);
+    scrollDown();
+    return { bubble, body };
+  }
+
+  function scrollDown() {
+    const scroller = $('scroller');
+    scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' });
+  }
+
+  async function send(text) {
+    const question = (text ?? $('input').value).trim();
+    if (!question || state.busy) return;
+    $('input').value = '';
+    state.busy = true;
+    state.steps = [];
+    drawTrace();
+    setBusy(true);
+
+    pushBubble('user', question);
+    const reply = pushBubble('agent', '');
+    let streamed = '';
+    let finalText = '';
+    reply.body.classList.add('caret');
+    reply.body.innerHTML = '<p style="color:var(--dim);font-size:12px">正在查询本体……</p>';
+
+    state.controller = new AbortController();
+    try {
+      const response = await fetch(`${API}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: question, conversationId: state.conversationId }),
+        signal: state.controller.signal,
+      });
+      if (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`);
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let boundary;
+        while ((boundary = buffer.indexOf('\n\n')) !== -1) {
+          const frame = buffer.slice(0, boundary);
+          buffer = buffer.slice(boundary + 2);
+          const event = parseFrame(frame);
+          if (!event) continue;
+
+          if (event.type === 'answer_delta') {
+            streamed += event.data.text || '';
+            reply.body.innerHTML = render(streamed);
+            scrollDown();
+          } else if (event.type === 'answer_reset') {
+            streamed = '';
+            reply.body.innerHTML = '<p style="color:var(--dim);font-size:12px">正在查询本体……</p>';
+          } else if (event.type === 'answer') {
+            finalText = event.data.text || streamed;
+            reply.body.innerHTML = render(finalText);
+            scrollDown();
+          } else if (event.type === 'error') {
+            reply.bubble.appendChild(el('p', 'err', event.data.message));
+          } else if (event.type === 'done') {
+            const d = event.data;
+            state.steps.forEach((step) => { step.done = true; });
+            drawTrace();
+            reply.bubble.appendChild(el('p', 'stats',
+              `${d.llmRounds ?? 0} 轮模型调用 · ${d.toolCalls ?? 0} 次工具调用 · ${((d.elapsedMs || 0) / 1000).toFixed(1)}s`));
+          } else {
+            applyTraceEvent(event);
+          }
+        }
+      }
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        reply.bubble.appendChild(el('p', 'err', `请求失败：${error.message}`));
+      }
+    } finally {
+      reply.body.classList.remove('caret');
+      state.busy = false;
+      state.controller = null;
+      setBusy(false);
+      drawChips();
+    }
+  }
+
+  function parseFrame(frame) {
+    let type = '';
+    const data = [];
+    for (const line of frame.split('\n')) {
+      if (line.startsWith('event:')) type = line.slice(6).trim();
+      else if (line.startsWith('data:')) data.push(line.slice(5).trim());
+    }
+    if (!type || !data.length) return null;
+    try { return { type, data: JSON.parse(data.join('\n')) }; } catch { return null; }
+  }
+
+  function setBusy(busy) {
+    $('btn-send').disabled = busy;
+    $('btn-stop').hidden = !busy;
+  }
+
+  // ---------------------------------------------------------------- 执行过程
+  function applyTraceEvent(event) {
+    const d = event.data;
+    if (event.type === 'turn_start') {
+      state.conversationId = d.conversationId;
+      $('hint').textContent = `会话 ${d.conversationId} · 第 ${d.turn} 轮`;
+    } else if (event.type === 'status') {
+      const existing = state.steps.find((s) => s.kind === 'status' && s.text === d.text);
+      if (existing) existing.done = !!d.done;
+      else state.steps.push({ kind: 'status', id: `s${state.steps.length}`, text: d.text, done: !!d.done });
+    } else if (event.type === 'tool_call') {
+      state.steps.push({ kind: 'tool', id: d.callId, text: d.label, done: false, tool: { ...d, status: 'running' } });
+    } else if (event.type === 'tool_result') {
+      const step = state.steps.find((s) => s.id === d.callId);
+      if (step) { Object.assign(step.tool, d); step.done = true; }
+    } else if (event.type === 'graph') {
+      state.graphs.push(d);
+      $('btn-graph').disabled = false;
+      $('btn-graph').textContent = `查看关系图 (${state.graphs.length})`;
+    } else if (event.type === 'context') {
+      state.context = d;
+      drawContext();
+      drawChips();
+    }
+    drawTrace();
+  }
+
+  function drawTrace() {
+    const box = $('trace');
+    box.innerHTML = '';
+    $('call-count').textContent = `${state.steps.filter((s) => s.kind === 'tool').length} 次调用`;
+
+    if (!state.steps.length) {
+      const hint = el('p', null, '提问后，这里实时显示 Agent 选了哪些工具、参数是什么、返回了多少条数据。');
+      hint.style.cssText = 'font-size:12px;color:var(--dim);padding:0 4px';
+      box.appendChild(hint);
+      return;
+    }
+
+    for (const step of state.steps) {
+      if (step.kind === 'status') {
+        const row = el('div', 'step');
+        const icon = el('span', step.done ? 'ok' : 'acc pulse', step.done ? '✓' : '●');
+        row.append(icon, el('span', null, step.text));
+        box.appendChild(row);
+        continue;
+      }
+
+      const tool = step.tool || {};
+      const card = el('div', 'card');
+      const head = el('button', 'head');
+      const iconClass = tool.status === 'error' ? 'bad' : tool.status === 'empty' ? 'warn' : step.done ? 'ok' : 'acc pulse';
+      const iconText = !step.done ? '●' : tool.status === 'error' ? '✕' : tool.status === 'empty' ? '○' : '✓';
+      head.appendChild(el('span', iconClass, iconText));
+
+      const middle = el('div');
+      middle.style.cssText = 'min-width:0;flex:1';
+      middle.appendChild(el('p', 'name', tool.tool || ''));
+      middle.appendChild(el('p', 'sub', step.text || ''));
+      if (tool.resultSummary) {
+        const summary = el('p', 'summary', tool.resultSummary);
+        if (tool.truncated) {
+          const flag = el('span', 'warn', ' · 已裁剪');
+          summary.appendChild(flag);
+        }
+        middle.appendChild(summary);
+      }
+      if (tool.error) {
+        const error = el('p', 'summary bad', tool.error);
+        error.style.cssText += 'white-space:normal';
+        middle.appendChild(error);
+      }
+      head.appendChild(middle);
+      if (tool.durationMs != null) head.appendChild(el('span', 'ms', `${tool.durationMs}ms`));
+
+      head.onclick = () => {
+        if (state.expanded.has(step.id)) state.expanded.delete(step.id);
+        else state.expanded.add(step.id);
+        drawTrace();
+      };
+      card.appendChild(head);
+
+      if (state.expanded.has(step.id)) {
+        const body = el('div', 'body');
+
+        const request = el('div');
+        request.appendChild(el('p', 'lbl', '请求'));
+        const url = el('p', 'mono', tool.url || '—');
+        url.style.cssText = 'font-size:11px;color:var(--muted);margin:0;word-break:break-all';
+        request.appendChild(url);
+        const args = el('pre', 'mini mono');
+        args.textContent = JSON.stringify(tool.arguments || {}, null, 2);
+        args.style.marginTop = '4px';
+        request.appendChild(args);
+        body.appendChild(request);
+
+        if (tool.truncationNote) {
+          const note = el('div');
+          const label = el('p', 'lbl warn', '裁剪说明');
+          note.appendChild(label);
+          const text = el('p', 'warn', tool.truncationNote);
+          text.style.cssText = 'font-size:11px;margin:0';
+          note.appendChild(text);
+          body.appendChild(note);
+        }
+
+        if (tool.resultPreview) {
+          const result = el('div');
+          result.appendChild(el('p', 'lbl',
+            `返回结果摘要（原始 ${tool.rawBytes ?? '?'} 字节，HTTP ${tool.httpStatus ?? '-'}）`));
+          const pre = el('pre', 'mini mono');
+          pre.textContent = tool.resultPreview;
+          result.appendChild(pre);
+          body.appendChild(result);
+        }
+        card.appendChild(body);
+      }
+      box.appendChild(card);
+    }
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function drawContext() {
+    const box = $('ctx');
+    const context = state.context;
+    if (!context) { box.hidden = true; return; }
+    box.hidden = false;
+    box.innerHTML = '';
+    box.appendChild(el('p', 'lbl', '会话上下文'));
+    if (context.currentEquipment) {
+      box.appendChild(el('p', null, `设备 · ${context.currentEquipment.name}  ${context.currentEquipment.id}`));
+    }
+    if (context.currentProcessArea) {
+      box.appendChild(el('p', null, `工段 · ${context.currentProcessArea.name}`));
+    }
+    if (!context.currentEquipment && !context.currentProcessArea) {
+      const none = el('p', null, '暂无锁定实体');
+      none.style.color = 'var(--dim)';
+      box.appendChild(none);
+    }
+  }
+
+  // ---------------------------------------------------------------- 关系图（内置 SVG 力导向，零依赖）
+  const PALETTE = ['#38bdf8', '#34d399', '#fbbf24', '#f87171', '#a78bfa', '#f472b6', '#22d3ee'];
+
+  function openGraph() {
+    if (!state.graphs.length) return;
+    let index = state.graphs.length - 1;
+
+    const modal = el('div', 'modal');
+    const box = el('div', 'box');
+    const top = el('div', 'top');
+    top.appendChild(el('h3', null, '关系图'));
+
+    const picker = el('select');
+    state.graphs.forEach((graph, position) => {
+      const option = el('option', null,
+        `#${position + 1} ${graph.tool}（${(graph.nodes || []).length} 节点）`);
+      option.value = String(position);
+      picker.appendChild(option);
+    });
+    picker.value = String(index);
+    if (state.graphs.length > 1) top.appendChild(picker);
+
+    const meta = el('span', 'tag');
+    top.appendChild(meta);
+    const spacer = el('span', 'spacer');
+    top.appendChild(spacer);
+    const close = el('button', 'btn', '关闭');
+    close.onclick = () => modal.remove();
+    top.appendChild(close);
+
+    const content = el('div', 'content');
+    content.style.position = 'relative';
+    box.append(top, content);
+
+    const foot = el('p', null, '滚轮缩放、拖拽平移；节点大小表示关联关系数量，箭头方向为关系主体 → 客体。');
+    foot.style.cssText = 'flex:0 0 auto;margin:0;padding:8px 16px;font-size:11px;color:var(--dim);border-top:1px solid var(--line)';
+    box.appendChild(foot);
+
+    modal.appendChild(box);
+    modal.onclick = (event) => { if (event.target === modal) modal.remove(); };
+    document.body.appendChild(modal);
+
+    const draw = () => {
+      const graph = state.graphs[index];
+      meta.textContent = `${(graph.nodes || []).length} 节点 / ${(graph.edges || []).length} 边` +
+        (graph.truncated ? ' · 已截断' : '');
+      content.innerHTML = '';
+      content.appendChild(renderGraph(graph, content.clientWidth || 1000, content.clientHeight || 560));
+    };
+    picker.onchange = () => { index = Number(picker.value); draw(); };
+    requestAnimationFrame(draw);
+  }
+
+  /** 极简力导向布局 + SVG 渲染。够用即可，不追求学术级效果。
+   *  布局在无边界空间里跑，跑完再按实际包围盒设置 viewBox，
+   *  避免节点被视口边界挤成一条线（71 个节点时尤其明显）。 */
+  function renderGraph(graph, width, height) {
+    const count = Math.max(1, (graph.nodes || []).length);
+    // 节点越多，初始半径越大，力的作用距离也相应放大
+    const radius0 = 120 + count * 9;
+    const ideal = 95 + Math.min(150, count * 2.0);   // 期望边长
+    const repulsion = 3400 + count * 240;            // 斥力强度
+
+    const nodes = (graph.nodes || []).map((node, i) => {
+      const angle = (i / count) * Math.PI * 2;
+      // 双环起始布局比单环更快收敛
+      const ring = i % 2 === 0 ? radius0 : radius0 * 0.62;
+      return { ...node, x: Math.cos(angle) * ring, y: Math.sin(angle) * ring, vx: 0, vy: 0 };
+    });
+    const byId = new Map(nodes.map((node) => [node.id, node]));
+    const edges = (graph.edges || [])
+      .map((edge) => ({ ...edge, s: byId.get(edge.source), t: byId.get(edge.target) }))
+      .filter((edge) => edge.s && edge.t);
+
+    for (let step = 0; step < 420; step++) {
+      const cooling = 1 - step / 460;
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const a = nodes[i], b = nodes[j];
+          let dx = b.x - a.x, dy = b.y - a.y;
+          const distance = Math.max(12, Math.hypot(dx, dy));
+          const force = repulsion / (distance * distance);
+          dx /= distance; dy /= distance;
+          a.vx -= dx * force; a.vy -= dy * force;
+          b.vx += dx * force; b.vy += dy * force;
+        }
+      }
+      for (const edge of edges) {
+        let dx = edge.t.x - edge.s.x, dy = edge.t.y - edge.s.y;
+        const distance = Math.max(1, Math.hypot(dx, dy));
+        const force = (distance - ideal) * 0.02;
+        dx /= distance; dy /= distance;
+        edge.s.vx += dx * force; edge.s.vy += dy * force;
+        edge.t.vx -= dx * force; edge.t.vy -= dy * force;
+      }
+      for (const node of nodes) {
+        // 只有很弱的向心力，防止整图飘走；不做边界钳制
+        node.vx -= node.x * 0.0009;
+        node.vy -= node.y * 0.0009;
+        node.x += Math.max(-26, Math.min(26, node.vx * cooling));
+        node.y += Math.max(-26, Math.min(26, node.vy * cooling));
+        node.vx *= 0.8; node.vy *= 0.8;
+      }
+    }
+
+    const types = [...new Set(nodes.map((node) => node.type || '未分类'))];
+    const NS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', '100%');
+
+    // 按实际结果自适应视口，并保持画布宽高比，避免拉伸
+    const pad = 70;
+    const minX = Math.min(...nodes.map((n) => n.x)) - pad;
+    const maxX = Math.max(...nodes.map((n) => n.x)) + pad;
+    const minY = Math.min(...nodes.map((n) => n.y)) - pad;
+    const maxY = Math.max(...nodes.map((n) => n.y)) + pad;
+    let boxW = Math.max(1, maxX - minX);
+    let boxH = Math.max(1, maxY - minY);
+    const aspect = width / Math.max(1, height);
+    if (boxW / boxH < aspect) boxW = boxH * aspect;
+    else boxH = boxW / aspect;
+    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+    svg.setAttribute('viewBox', `${cx - boxW / 2} ${cy - boxH / 2} ${boxW} ${boxH}`);
+    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    svg.style.cursor = 'grab';
+    // 图例画在左上角，坐标跟随 viewBox
+    const legendX = cx - boxW / 2 + 14;
+    const legendY = cy - boxH / 2 + 18;
+    // 边多的时候谓词文字会糊成一片，只在稀疏图上显示
+    const showEdgeLabels = edges.length <= 36;
+    const labelScale = Math.max(1, boxW / Math.max(1, width));
+
+    const defs = document.createElementNS(NS, 'defs');
+    defs.innerHTML = `<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6"
+      orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#3b4a5e"/></marker>`;
+    svg.appendChild(defs);
+
+    const root = document.createElementNS(NS, 'g');
+    svg.appendChild(root);
+
+    for (const edge of edges) {
+      const line = document.createElementNS(NS, 'line');
+      line.setAttribute('x1', edge.s.x); line.setAttribute('y1', edge.s.y);
+      line.setAttribute('x2', edge.t.x); line.setAttribute('y2', edge.t.y);
+      line.setAttribute('stroke', '#2a3647');
+      line.setAttribute('stroke-width', String(Math.max(1, Math.min(3, (edge.weight || 1) * 2))));
+      line.setAttribute('marker-end', 'url(#arrow)');
+      const title = document.createElementNS(NS, 'title');
+      title.textContent = `${edge.predicate || ''}${edge.category ? ' · ' + edge.category : ''}`;
+      line.appendChild(title);
+      root.appendChild(line);
+
+      if (edge.predicate && showEdgeLabels) {
+        const label = document.createElementNS(NS, 'text');
+        label.setAttribute('x', (edge.s.x + edge.t.x) / 2);
+        label.setAttribute('y', (edge.s.y + edge.t.y) / 2 - 3);
+        label.setAttribute('fill', '#5a6b80');
+        label.setAttribute('font-size', String(10 * labelScale));
+        label.setAttribute('text-anchor', 'middle');
+        label.textContent = edge.predicate;
+        root.appendChild(label);
+      }
+    }
+
+    for (const node of nodes) {
+      const group = document.createElementNS(NS, 'g');
+      const radius = (node.isRoot ? 20 : Math.min(17, 7 + (node.relationCount || 0) * 1.2)) * labelScale;
+      const circle = document.createElementNS(NS, 'circle');
+      circle.setAttribute('cx', node.x); circle.setAttribute('cy', node.y);
+      circle.setAttribute('r', String(radius));
+      circle.setAttribute('fill', PALETTE[Math.max(0, types.indexOf(node.type || '未分类')) % PALETTE.length]);
+      if (node.isRoot) { circle.setAttribute('stroke', '#fff'); circle.setAttribute('stroke-width', '2'); }
+      const title = document.createElementNS(NS, 'title');
+      title.textContent = `${node.label}\n${node.type || ''} · 关联 ${node.relationCount ?? 0}`;
+      circle.appendChild(title);
+      group.appendChild(circle);
+
+      const text = document.createElementNS(NS, 'text');
+      text.setAttribute('x', node.x); text.setAttribute('y', node.y + radius + 13 * labelScale);
+      text.setAttribute('fill', '#d7e0ea'); text.setAttribute('font-size', String(11 * labelScale));
+      text.setAttribute('text-anchor', 'middle');
+      text.textContent = node.label;
+      group.appendChild(text);
+      root.appendChild(group);
+    }
+
+    // 图例
+    types.forEach((type, position) => {
+      const rowY = legendY + position * 20 * labelScale;
+      const swatch = document.createElementNS(NS, 'circle');
+      swatch.setAttribute('cx', legendX); swatch.setAttribute('cy', rowY);
+      swatch.setAttribute('r', String(5 * labelScale));
+      swatch.setAttribute('fill', PALETTE[position % PALETTE.length]);
+      svg.appendChild(swatch);
+      const label = document.createElementNS(NS, 'text');
+      label.setAttribute('x', legendX + 13 * labelScale); label.setAttribute('y', rowY + 4 * labelScale);
+      label.setAttribute('fill', '#94a3b8'); label.setAttribute('font-size', String(11 * labelScale));
+      label.textContent = type;
+      svg.appendChild(label);
+    });
+
+    // 缩放 / 平移
+    let scale = 1, panX = 0, panY = 0, dragging = false, lastX = 0, lastY = 0;
+    const apply = () => root.setAttribute('transform', `translate(${panX},${panY}) scale(${scale})`);
+    svg.addEventListener('wheel', (event) => {
+      event.preventDefault();
+      scale = Math.max(0.3, Math.min(3, scale * (event.deltaY < 0 ? 1.12 : 0.89)));
+      apply();
+    }, { passive: false });
+    svg.addEventListener('mousedown', (event) => { dragging = true; lastX = event.clientX; lastY = event.clientY; svg.style.cursor = 'grabbing'; });
+    window.addEventListener('mouseup', () => { dragging = false; svg.style.cursor = 'grab'; });
+    svg.addEventListener('mousemove', (event) => {
+      if (!dragging) return;
+      panX += event.clientX - lastX; panY += event.clientY - lastY;
+      lastX = event.clientX; lastY = event.clientY;
+      apply();
+    });
+
+    return svg;
+  }
+
+  // ---------------------------------------------------------------- 工具清单
+  function openTools() {
+    const modal = el('div', 'modal');
+    const box = el('div', 'box narrow');
+    const top = el('div', 'top');
+    top.appendChild(el('h3', null, `Agent 可用工具（${state.tools.length}）`));
+    const filter = el('input');
+    filter.type = 'text';
+    filter.placeholder = '过滤……';
+    top.appendChild(filter);
+    top.appendChild(el('span', 'spacer'));
+    const close = el('button', 'btn', '关闭');
+    close.onclick = () => modal.remove();
+    top.appendChild(close);
+
+    const content = el('div', 'content');
+    content.style.padding = '12px';
+
+    const draw = () => {
+      const keyword = filter.value.trim();
+      content.innerHTML = '';
+      for (const tool of state.tools) {
+        if (keyword && !tool.name.includes(keyword) && !tool.description.includes(keyword)) continue;
+        const item = el('div', 'tool-item');
+        const head = el('div');
+        const name = el('code', 'acc', tool.name);
+        name.style.fontSize = '12px';
+        head.appendChild(name);
+        const endpoint = el('span', 'mono', `  ${tool.method} ${tool.endpoint}`);
+        endpoint.style.cssText = 'font-size:10px;color:var(--dim)';
+        head.appendChild(endpoint);
+        item.appendChild(head);
+        const description = el('p', null, tool.description);
+        description.style.cssText = 'font-size:12px;color:var(--muted);margin:6px 0 0';
+        item.appendChild(description);
+        if (tool.parameters?.length) {
+          const row = el('div');
+          row.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;margin-top:8px';
+          for (const param of tool.parameters) {
+            const tag = el('span', 'tag', `${param.name}:${param.type}${param.required ? ' *' : ''}`);
+            tag.title = param.description;
+            if (param.required) { tag.style.color = 'var(--accent)'; tag.style.borderColor = 'rgba(56,189,248,.5)'; }
+            row.appendChild(tag);
+          }
+          item.appendChild(row);
+        }
+        content.appendChild(item);
+      }
+    };
+    filter.oninput = draw;
+    draw();
+
+    box.append(top, content);
+    modal.appendChild(box);
+    modal.onclick = (event) => { if (event.target === modal) modal.remove(); };
+    document.body.appendChild(modal);
+  }
+
+  // ---------------------------------------------------------------- 示例问题
+  // 点一下只是把问题文本填进输入框；Agent 收到后照常自己规划工具链，这里不绑定任何工具。
+  const samplesBox = $('samples');
+
+  function sampleButton(question, title) {
+    const button = el('button', 'btn', question);
+    if (title) button.title = title;
+    button.onclick = () => { $('input').value = question; $('input').focus(); };
+    return button;
+  }
+
+  function drawFlatSamples(reason) {
+    samplesBox.innerHTML = '';
+    samplesBox.style.display = 'block';
+    if (reason) {
+      const warn = el('div', 'sample-warn');
+      warn.innerHTML = `<b>没看到工艺调查案例？</b>${reason}<br>`
+        + '内置的 23 条示例问题由 Agent 服务的 <code>/api/examples</code> 提供，'
+        + '下面是页面自带的兜底清单。<br>'
+        + '排查：浏览器打开 <code>' + API + '/api/examples</code>，'
+        + '返回 404 说明 <code>backend/</code> 目录还是旧版——用新包覆盖后重启 8800（注意 '
+        + '<code>backend\\data\\</code> 是新增目录，别被"跳过已存在文件"略过）。';
+      samplesBox.appendChild(warn);
+    }
+    const row = el('div', 'samples');
+    for (const sample of SAMPLES) row.appendChild(sampleButton(sample));
+    samplesBox.appendChild(row);
+  }
+
+  function drawGroupedSamples(data) {
+    samplesBox.innerHTML = '';
+    samplesBox.style.display = 'block';
+    for (const group of data.groups) {
+      const box = el('div', 'sample-group');
+      const title = el('h4');
+      title.appendChild(document.createTextNode(group.title || group.key));
+      const count = el('span', 'n', `${group.count} 个`);
+      title.appendChild(count);
+      box.appendChild(title);
+      if (group.description) box.appendChild(el('p', '', group.description));
+      const row = el('div', 'samples');
+      for (const item of group.items) {
+        row.appendChild(sampleButton(item.question, item.intent || ''));
+      }
+      box.appendChild(row);
+      samplesBox.appendChild(box);
+    }
+    if (data.notice) samplesBox.appendChild(el('div', 'sample-note', data.notice));
+  }
+
+  async function loadSamples() {
+    let reason = '';
+    try {
+      const response = await fetch(`${API}/api/examples`);
+      if (!response.ok) {
+        reason = `Agent 服务返回 HTTP ${response.status}。`;
+      } else {
+        const data = await response.json();
+        if (data && data.available && (data.groups || []).length) {
+          drawGroupedSamples(data);
+          return;
+        }
+        reason = data?.emptyReason || '示例问题文件为空。';
+      }
+    } catch (error) {
+      reason = `无法访问 ${API}/api/examples（${error.message}）。`;
+    }
+    drawFlatSamples(reason);
+  }
+
+  // ---------------------------------------------------------------- 绑定
+
+  $('btn-send').onclick = () => send();
+  $('btn-stop').onclick = () => { state.controller?.abort(); };
+  $('btn-graph').onclick = openGraph;
+  $('btn-reset').onclick = async () => {
+    if (state.conversationId) {
+      try { await fetch(`${API}/api/conversations/${state.conversationId}`, { method: 'DELETE' }); } catch {}
+    }
+    state.conversationId = null; state.steps = []; state.graphs = []; state.context = null;
+    $('scroller').innerHTML = '';
+    $('btn-graph').disabled = true;
+    $('btn-graph').textContent = '查看关系图';
+    $('hint').textContent = '会话 未开始';
+    drawTrace(); drawContext(); drawChips();
+    location.reload();
+  };
+  $('input').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); send(); }
+  });
+
+  loadMeta();
+})();
+</script>
+</body>
+</html>

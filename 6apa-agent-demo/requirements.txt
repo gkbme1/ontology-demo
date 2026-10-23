@@ -1,0 +1,10 @@
+# Agent 服务运行依赖
+fastapi>=0.110
+uvicorn[standard]>=0.27
+pydantic>=2.5
+httpx>=0.27
+
+# 说明：
+# - 不依赖任何 Agent Framework（LangChain / LangGraph / Dify / AutoGen / CrewAI / Semantic Kernel）
+# - 不依赖任何 LLM 厂商 SDK，OpenAI 兼容协议直接用 httpx 调
+# - FastAPI 不可用时 backend/main.py 自动回退到 Starlette（uvicorn 自带），API 契约不变

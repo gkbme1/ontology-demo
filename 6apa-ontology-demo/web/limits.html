@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>工艺限值</title>
+<link rel="icon" href="data:," />
+<style>
+  /* 工艺限值展示页：零依赖单文件，由本体服务提供 URL，也可直接双击打开（需 ?api= 指向本体服务）。
+     展示哪个对象、哪个工段、哪种状态的限值，全部由 URL 参数决定，便于被别的系统 iframe 嵌入。 */
+  :root{
+    --bg:#0b0f14; --panel:#111823; --panel2:#18202c; --panel3:#212b39; --line:#2a3647;
+    --text:#d7e0ea; --muted:#7c8ea3; --dim:#5a6b80; --accent:#38bdf8; --accent-dim:#0ea5e9;
+    --band:#2a3647;              /* 限值条底色（recessive） */
+    color-scheme: dark;
+  }
+  :root[data-theme="light"]{
+    --bg:#f6f8fa; --panel:#ffffff; --panel2:#eef2f6; --panel3:#e2e8f0; --line:#d3dbe4;
+    --text:#1f2933; --muted:#52616b; --dim:#7b8794; --accent:#0369a1; --accent-dim:#0284c7;
+    --band:#dfe6ed;
+    color-scheme: light;
+  }
+  /* 状态色：good / warning / serious / critical，两种主题通用；
+     一律与文字标签成对出现，颜色不单独承担含义 */
+  :root{ --ok:#0ca30c; --warn:#fab219; --serious:#ec835a; --critical:#d03b3b; }
+
+  *{box-sizing:border-box}
+  [hidden]{display:none !important}
+  html,body{height:100%;margin:0}
+  body{background:var(--bg);color:var(--text);display:flex;flex-direction:column;
+       font:14px/1.6 "Inter","PingFang SC","Microsoft YaHei",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+
+  header{flex:0 0 auto;border-bottom:1px solid var(--line);background:var(--panel);padding:8px 14px;
+         display:flex;flex-direction:column;gap:8px}
+  .row1{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  h1{margin:0;font-size:14px;font-weight:600}
+  .sub{font-size:12px;color:var(--muted)}
+  .spacer{margin-left:auto}
+  .row2{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  label.f{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--muted)}
+  select,input[type=text]{background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:3px 6px;
+       color:var(--text);font:inherit;font-size:12px;outline:none;max-width:200px}
+  select:focus,input:focus{border-color:var(--accent)}
+  button{padding:4px 10px;border-radius:4px;font-size:12px;border:1px solid var(--line);
+         background:var(--panel2);color:var(--text);cursor:pointer}
+  button:hover{background:var(--panel3)}
+
+  main{flex:1;min-height:0;overflow:auto;padding:12px 14px}
+  table{border-collapse:collapse;width:100%;font-size:12px}
+  th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);position:sticky;top:0;z-index:1;white-space:nowrap}
+  tbody tr.main:hover{background:var(--panel2);cursor:pointer}
+  td.num{text-align:right;font-family:ui-monospace,monospace;white-space:nowrap}
+  .name{font-weight:600}
+  .muted{color:var(--muted)}
+  .dim{color:var(--dim)}
+  .pill{display:inline-flex;align-items:center;gap:4px;padding:1px 7px;border-radius:10px;font-size:11px;
+        border:1px solid var(--line);white-space:nowrap}
+  .pill.ok{color:var(--ok);border-color:var(--ok)}
+  .pill.warn{color:var(--warn);border-color:var(--warn)}
+  .pill.serious{color:var(--serious);border-color:var(--serious)}
+  .pill.critical{color:var(--critical);border-color:var(--critical)}
+  .detail td{background:var(--panel);padding:10px 12px}
+  .kv{display:grid;grid-template-columns:86px 1fr;gap:4px 10px;font-size:12px;margin-bottom:10px}
+  .kv .k{color:var(--dim)}
+  .tags{width:100%;font-size:11px}
+  .tags th,.tags td{padding:3px 6px}
+  .center{text-align:center;color:var(--muted);padding:28px}
+  .banner{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:16px;margin-bottom:12px;font-size:13px}
+  .banner h3{margin:0 0 6px;font-size:13px}
+  .banner code{background:var(--panel2);padding:1px 5px;border-radius:3px}
+  .notice{font-size:12px;color:var(--muted);margin:0 0 10px}
+  footer{flex:0 0 auto;border-top:1px solid var(--line);background:var(--panel);padding:5px 14px;
+         font-size:11px;color:var(--dim);display:flex;gap:14px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+
+<header id="topbar">
+  <div class="row1">
+    <h1 id="title">工艺限值</h1>
+    <span class="sub" id="scope"></span>
+    <span class="spacer"></span>
+    <button id="btn-link" title="复制当前视图链接（含全部参数）">复制链接</button>
+    <button id="btn-theme" title="切换深色 / 浅色">☾</button>
+  </div>
+  <div class="row2" id="filters"></div>
+</header>
+
+<main id="main"><div class="center">加载中……</div></main>
+
+<footer><span id="stat"></span><span id="src"></span></footer>
+
+<script>
+(() => {
+  'use strict';
+
+  const P = new URLSearchParams(location.search);
+  const val = (k, d = '') => (P.get(k) ?? d).trim();
+  const state = {
+    api: val('api').replace(/\/$/, ''),
+    object: val('object') || val('objectId'),
+    area: val('area'), appliesToType: val('appliesToType'), status: val('status'),
+    hasValues: val('hasValues'), keyword: val('keyword'),
+    embed: ['1', 'true', 'yes'].includes(val('embed').toLowerCase()),
+    theme: val('theme', 'dark').toLowerCase() === 'light' ? 'light' : 'dark',
+    title: val('title'),
+    data: null, error: '', open: new Set(), checks: {},
+  };
+  const FILTERS = ['area', 'appliesToType', 'status', 'hasValues', 'keyword'];
+
+  const $ = (id) => document.getElementById(id);
+  const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+  const num = (v) => (v === null || v === undefined || v === '' ? '—' : v);
+
+  document.documentElement.dataset.theme = state.theme;
+  if (state.embed) $('topbar').hidden = true;
+  if (state.title) { $('title').textContent = state.title; document.title = state.title; }
+
+  async function resolveApi() {
+    if (state.api) return;
+    const candidates = location.protocol.startsWith('http') ? [location.origin, 'http://localhost:8700'] : ['http://localhost:8700'];
+    for (const c of candidates) {
+      try { if ((await fetch(`${c}/api/health`)).ok) { state.api = c.replace(/\/$/, ''); return; } } catch { /* 下一个 */ }
+    }
+    state.api = 'http://localhost:8700';
+  }
+
+  async function getJson(path, query) {
+    const qs = new URLSearchParams(Object.entries(query || {}).filter(([, v]) => v !== '' && v != null)).toString();
+    const response = await fetch(`${state.api}${path}${qs ? `?${qs}` : ''}`);
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.detail || `HTTP ${response.status}`);
+    return body;
+  }
+
+  async function load() {
+    state.error = ''; state.checks = {};
+    try {
+      state.data = state.object
+        ? await getJson(`/api/ontology/${encodeURIComponent(state.object)}/limits`)
+        : await getJson('/api/ontology/process-limits', {
+            area: state.area, appliesToType: state.appliesToType, status: state.status,
+            hasValues: state.hasValues, keyword: state.keyword,
+          });
+    } catch (error) { state.error = error.message; }
+    render();
+  }
+
+  function syncUrl() {
+    const q = new URLSearchParams();
+    const put = (k, v, skip) => { if (v && String(v) !== skip) q.set(k, v); };
+    put('object', state.object); FILTERS.forEach((k) => put(k, state[k]));
+    put('embed', state.embed ? '1' : ''); put('theme', state.theme, 'dark'); put('title', state.title);
+    if (P.get('api')) q.set('api', P.get('api'));
+    history.replaceState(null, '', `${location.pathname}${q.toString() ? `?${q}` : ''}`);
+  }
+
+  // ------------------------------------------------------------ 限值区间条
+  // 状态色只做底衬，数值与状态一律有文字；条上叠当前值指针
+  function band(limit, value) {
+    const keys = ['lowLow', 'low', 'normalLow', 'normalHigh', 'high', 'highHigh'];
+    const pts = keys.map((k) => limit[k]).filter((v) => typeof v === 'number');
+    if (!pts.length) return el('span', 'dim', '未填写');
+
+    let lo = Math.min(...pts), hi = Math.max(...pts);
+    if (typeof value === 'number') { lo = Math.min(lo, value); hi = Math.max(hi, value); }
+    const pad = (hi - lo || 1) * 0.12;
+    lo -= pad; hi += pad;
+    const W = 190, H = 24, x = (v) => ((v - lo) / (hi - lo)) * W;
+
+    const NS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('width', W); svg.setAttribute('height', H); svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+    const css = getComputedStyle(document.documentElement);
+    const seg = (from, to, color, label) => {
+      if (from == null || to == null || to <= from) return;
+      const r = document.createElementNS(NS, 'rect');
+      r.setAttribute('x', x(from)); r.setAttribute('y', 5);
+      r.setAttribute('width', Math.max(1, x(to) - x(from) - 2));  // 2px 间隙分隔相邻色带
+      r.setAttribute('height', 10); r.setAttribute('rx', 2);
+      r.setAttribute('fill', color); r.setAttribute('fill-opacity', '0.55');
+      const t = document.createElementNS(NS, 'title');
+      t.textContent = `${label}：${from} ~ ${to}`;
+      r.appendChild(t);
+      svg.appendChild(r);
+    };
+    const c = (name) => css.getPropertyValue(name).trim();
+    const base = document.createElementNS(NS, 'rect');
+    base.setAttribute('x', 0); base.setAttribute('y', 5); base.setAttribute('width', W);
+    base.setAttribute('height', 10); base.setAttribute('rx', 2); base.setAttribute('fill', c('--band'));
+    svg.appendChild(base);
+
+    seg(lo, limit.lowLow, c('--critical'), '低于低低限');
+    seg(limit.lowLow, limit.low, c('--serious'), '低低限~低限');
+    seg(limit.low, limit.normalLow, c('--warn'), '低限~正常下限');
+    seg(limit.normalLow, limit.normalHigh, c('--ok'), '正常区间');
+    seg(limit.normalHigh, limit.high, c('--warn'), '正常上限~高限');
+    seg(limit.high, limit.highHigh, c('--serious'), '高限~高高限');
+    seg(limit.highHigh, hi, c('--critical'), '高于高高限');
+
+    if (typeof value === 'number') {
+      const px = Math.max(1, Math.min(W - 1, x(value)));
+      const line = document.createElementNS(NS, 'line');
+      line.setAttribute('x1', px); line.setAttribute('x2', px);
+      line.setAttribute('y1', 2); line.setAttribute('y2', 18);
+      line.setAttribute('stroke', c('--text')); line.setAttribute('stroke-width', '2');
+      const t = document.createElementNS(NS, 'title');
+      t.textContent = `当前值 ${value}`;
+      line.appendChild(t);
+      svg.appendChild(line);
+    }
+    return svg;
+  }
+
+  const PILL = {
+    NORMAL: 'ok', OUT_OF_NORMAL: 'warn', LOW: 'warn', HIGH: 'warn',
+    LOW_LOW: 'critical', HIGH_HIGH: 'critical', UNKNOWN: '',
+  };
+
+  // ------------------------------------------------------------ 渲染
+  function render() {
+    drawFilters();
+    const main = $('main');
+    main.innerHTML = '';
+
+    if (state.error) { main.appendChild(el('div', 'center', `加载失败：${state.error}`)); return; }
+    const data = state.data || {};
+    $('scope').textContent = state.object
+      ? `对象：${(data.scope && data.scope.objectName) || state.object}`
+      : '全部工艺限值';
+
+    if (data.available === false) {
+      const box = el('div', 'banner');
+      box.appendChild(el('h3', null, '本体中暂无工艺限值数据源'));
+      box.appendChild(el('p', null, data.emptyReason || ''));
+      if (data.expectedSource) {
+        const p = el('p', null, '期望的数据源文件：');
+        p.appendChild(el('code', null, data.expectedSource));
+        box.appendChild(p);
+      }
+      if (data.templateColumns) {
+        box.appendChild(el('p', 'muted', '模板列：' + data.templateColumns.join(' / ')));
+      }
+      main.appendChild(box);
+      $('stat').textContent = '';
+      return;
+    }
+
+    const items = data.items || [];
+    if (data.notice) main.appendChild(el('p', 'notice', '说明：' + data.notice));
+    if (!items.length) { main.appendChild(el('div', 'center', '没有符合条件的限值。')); return; }
+
+    const cols = ['适用对象', '工况', '参数', '单位', '限值区间', 'LL', 'L', '正常', 'H', 'HH', '覆盖测点', '置信度', '状态'];
+    const table = el('table');
+    const thead = el('thead'); const tr = el('tr');
+    cols.forEach((c) => tr.appendChild(el('th', null, c)));
+    thead.appendChild(tr); table.appendChild(thead);
+    const tbody = el('tbody');
+
+    for (const limit of items) {
+      const row = el('tr', 'main');
+      row.onclick = () => toggle(limit.id);
+      const name = el('td');
+      name.appendChild(el('div', 'name', limit.appliesTo));
+      name.appendChild(el('div', 'dim', `${limit.appliesToType} · ${limit.area || '—'}`));
+      row.appendChild(name);
+      row.appendChild(el('td', null, limit.operatingMode || '—'));
+      row.appendChild(el('td', null, limit.parameter || '—'));
+      row.appendChild(el('td', null, limit.unit || '—'));
+      const bandCell = el('td');
+      bandCell.appendChild(band(limit, null));
+      row.appendChild(bandCell);
+      row.appendChild(el('td', 'num', num(limit.lowLow)));
+      row.appendChild(el('td', 'num', num(limit.low)));
+      row.appendChild(el('td', 'num',
+        limit.normalLow === null && limit.normalHigh === null ? '—' : `${num(limit.normalLow)} ~ ${num(limit.normalHigh)}`));
+      row.appendChild(el('td', 'num', num(limit.high)));
+      row.appendChild(el('td', 'num', num(limit.highHigh)));
+      const count = limit.matchedTargetCount ?? limit.targetCount ?? 0;
+      row.appendChild(el('td', 'num', count));
+      row.appendChild(el('td', null, limit.confidence || '—'));
+      const st = el('td');
+      st.appendChild(el('span', 'pill ' + (limit.confirmed ? 'ok' : ''), limit.status || '未填写'));
+      row.appendChild(st);
+      tbody.appendChild(row);
+
+      if (state.open.has(limit.id)) tbody.appendChild(detailRow(limit, cols.length));
+    }
+    table.appendChild(tbody);
+    main.appendChild(table);
+
+    const summary = data.statusSummary;
+    $('stat').textContent = `共 ${items.length} 条限值` +
+      (summary ? ` · 带数值 ${summary.withValues} 条 · 已确认 ${summary.confirmed} 条` : '');
+    $('src').textContent = data.source ? `数据来自 ${data.source.file} / ${data.source.sheet}` : '';
+  }
+
+  function detailRow(limit, span) {
+    const tr = el('tr', 'detail');
+    const td = el('td'); td.colSpan = span;
+
+    const kv = el('div', 'kv');
+    const put = (k, v) => { if (v) { kv.appendChild(el('div', 'k', k)); kv.appendChild(el('div', null, v)); } };
+    put('限值依据', limit.basis);
+    put('依据类型', limit.basisType);
+    put('备注', limit.note);
+    put('数据来源', limit.source ? `${limit.source.file} / ${limit.source.sheet} / 第 ${limit.source.row} 行` : '');
+    if (limit.notes && limit.notes.length) put('提示', limit.notes.join('；'));
+    td.appendChild(kv);
+
+    const targets = limit.matchedTargets || limit.targets || [];
+    const check = state.checks[limit.id];
+
+    if (!targets.length && !check) {
+      td.appendChild(el('div', 'muted', '该限值未落到具体测点。'));
+    } else {
+      const bar = el('div');
+      bar.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:6px';
+      const btn = el('button', null, check ? '刷新当前值' : '取当前值并判断是否越限');
+      btn.onclick = (ev) => { ev.stopPropagation(); runCheck(limit.id); };
+      bar.appendChild(btn);
+      if (check && check.summary) {
+        bar.appendChild(el('span', 'muted', Object.entries(check.summary)
+          .map(([k, v]) => `${({NORMAL:'正常',OUT_OF_NORMAL:'超出正常区间',LOW:'低于低限',HIGH:'高于高限',LOW_LOW:'低于低低限',HIGH_HIGH:'高于高高限',UNKNOWN:'无法判断'})[k] || k} ${v}`)
+          .join(' · ')));
+      }
+      if (check && check.dataSource && check.dataSource.simulated) {
+        bar.appendChild(el('span', 'pill warn', '当前值来自模拟数据服务'));
+      }
+      td.appendChild(bar);
+
+      const rows = check ? check.results : targets;
+      const table = el('table', 'tags');
+      const head = el('tr');
+      ['位号', '设备', '现场描述', '单位', ...(check ? ['当前值', '时间', '判断'] : [])]
+        .forEach((h) => head.appendChild(el('th', null, h)));
+      table.appendChild(head);
+      for (const t of rows.slice(0, 40)) {
+        const r = el('tr');
+        r.appendChild(el('td', 'mono', t.tagName));
+        r.appendChild(el('td', null, t.equipmentName || '—'));
+        r.appendChild(el('td', null, t.description || '—'));
+        r.appendChild(el('td', null, t.unit || limit.unit || '—'));
+        if (check) {
+          r.appendChild(el('td', 'num', t.value ?? '—'));
+          r.appendChild(el('td', 'dim', t.timeText || '—'));
+          const v = el('td');
+          v.appendChild(el('span', 'pill ' + (PILL[t.status] || ''), t.statusLabel || '—'));
+          if (t.deviation != null) v.appendChild(el('span', 'dim', ` 偏差 ${t.deviation}`));
+          v.appendChild(document.createTextNode(' '));
+          if (typeof t.value === 'number') v.appendChild(band(limit, t.value));
+          r.appendChild(v);
+        }
+        table.appendChild(r);
+      }
+      td.appendChild(table);
+      // 取过当前值时 rows 就是全部检查结果，不能再叠列表接口的截断数
+      const extra = check ? Math.max(0, rows.length - 40) : (limit.targetsTruncated || 0);
+      if (extra) td.appendChild(el('div', 'dim', `另有 ${extra} 个测点未列出`));
+      if (check && check.notice) td.appendChild(el('div', 'muted', check.notice));
+    }
+    tr.appendChild(td);
+    return tr;
+  }
+
+  function toggle(id) {
+    if (state.open.has(id)) state.open.delete(id); else state.open.add(id);
+    render();
+  }
+
+  async function runCheck(id) {
+    try {
+      state.checks[id] = await getJson(`/api/ontology/process-limits/${encodeURIComponent(id)}/check`);
+      if (state.checks[id].available === false) {
+        alert(state.checks[id].emptyReason || '无法取当前值');
+        delete state.checks[id];
+      }
+    } catch (error) {
+      alert(`取当前值失败：${error.message}`);
+    }
+    render();
+  }
+
+  // ------------------------------------------------------------ 顶栏
+  function drawFilters() {
+    const box = $('filters');
+    box.innerHTML = '';
+    if (state.object) {
+      const back = el('button', null, '查看全部限值');
+      back.onclick = () => { state.object = ''; syncUrl(); load(); };
+      box.appendChild(back);
+      return;
+    }
+    const facets = (state.data && state.data.facets) || {};
+    const pick = (key, label, options) => {
+      const wrap = el('label', 'f');
+      wrap.appendChild(document.createTextNode(label));
+      const sel = el('select');
+      sel.appendChild(new Option('全部', ''));
+      for (const v of options || []) sel.appendChild(new Option(v, v));
+      sel.value = state[key] || '';
+      sel.onchange = () => { state[key] = sel.value; syncUrl(); load(); };
+      wrap.appendChild(sel);
+      box.appendChild(wrap);
+    };
+    pick('area', '工段', facets.area);
+    pick('appliesToType', '对象类型', facets.appliesToType);
+    pick('status', '确认状态', facets.status);
+
+    const only = el('label', 'f');
+    only.appendChild(document.createTextNode('数值'));
+    const sel = el('select');
+    sel.appendChild(new Option('全部', ''));
+    sel.appendChild(new Option('只看已填数值', 'true'));
+    sel.appendChild(new Option('只看待填清单', 'false'));
+    sel.value = state.hasValues || '';
+    sel.onchange = () => { state.hasValues = sel.value; syncUrl(); load(); };
+    only.appendChild(sel);
+    box.appendChild(only);
+
+    const search = el('input');
+    search.type = 'text'; search.placeholder = '搜索对象 / 依据……'; search.value = state.keyword;
+    search.onchange = () => { state.keyword = search.value; syncUrl(); load(); };
+    box.appendChild(search);
+  }
+
+  $('btn-theme').onclick = () => {
+    state.theme = state.theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = state.theme;
+    $('btn-theme').textContent = state.theme === 'dark' ? '☾' : '☀';
+    syncUrl(); render();
+  };
+  $('btn-link').onclick = async () => {
+    try { await navigator.clipboard.writeText(location.href); $('btn-link').textContent = '已复制'; }
+    catch { $('btn-link').textContent = location.href; }
+    setTimeout(() => { $('btn-link').textContent = '复制链接'; }, 1500);
+  };
+
+  (async () => { await resolveApi(); await load(); })();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root { color-scheme: dark; }
+  html, body, #app { height: 100%; }
+  body {
+    @apply bg-ink text-fg font-sans text-[13px] leading-relaxed antialiased;
+  }
+  ::selection { background: rgba(53, 196, 215, 0.3); }
+}
+
+@layer components {
+  .panel { @apply border border-line rounded-[11px] bg-ink-panel overflow-hidden; }
+  .panel-head { @apply flex items-center gap-2.5 px-4 py-3 border-b border-line-soft bg-ink-panel2; }
+  .panel-head h3 { @apply text-[13px] font-semibold; }
+  .panel-body { @apply px-4 py-3.5; }
+
+  .tbl { @apply w-full border-collapse text-[12.5px]; }
+  .tbl th {
+    @apply sticky top-0 bg-ink-panel2 text-fg-mute font-medium text-[11px] tracking-wider
+           uppercase text-left px-3 py-2 border-b border-line whitespace-nowrap;
+  }
+  .tbl td { @apply px-3 py-2 border-b border-line-soft align-top; }
+  .tbl tbody tr { @apply cursor-pointer; }
+  .tbl tbody tr:hover { @apply bg-ink-panel2; }
+
+  .pill { @apply inline-flex items-center gap-1.5 px-1.5 py-px rounded border text-[10.5px] whitespace-nowrap; }
+  .pill-ok { @apply text-ok border-ok/40 bg-ok/10; }
+  .pill-warn { @apply text-warn border-warn/40 bg-warn/10; }
+  .pill-err { @apply text-err border-err/40 bg-err/10; }
+  .pill-info { @apply text-info border-info/40 bg-info/10; }
+  .pill-mute { @apply text-fg-mute border-line bg-ink-panel2 border-dashed; }
+  .pill-plain { @apply text-fg-dim border-line bg-ink-panel2; }
+
+  .ctl {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 border border-line rounded-md
+           bg-ink-panel2 text-fg-dim text-xs cursor-pointer hover:border-brand hover:text-fg;
+  }
+  .ctl-on { @apply bg-brand/[0.13] border-brand text-fg; }
+
+  .stat-row {
+    @apply grid gap-px bg-line-soft border border-line rounded-[11px] overflow-hidden;
+    grid-template-columns: repeat(auto-fit, minmax(126px, 1fr));
+  }
+  .stat { @apply bg-ink-panel px-4 py-3; }
+  .stat-k { @apply text-fg-mute text-[10.5px] tracking-wider uppercase; }
+  .stat-v { @apply mt-0.5 text-[23px] font-semibold tabular-nums tracking-tight; }
+
+  .kv { @apply grid gap-y-1.5 gap-x-2.5 text-[12.5px]; grid-template-columns: 96px 1fr; }
+  .kv dt { @apply text-fg-mute; }
+  .kv dd { @apply m-0 break-words; }
+
+  .empty {
+    @apply px-4 py-6 text-center text-fg-mute border border-dashed border-line
+           rounded-md bg-ink-panel2 text-[12.5px];
+  }
+}

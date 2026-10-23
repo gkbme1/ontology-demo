@@ -1,0 +1,3218 @@
+<title>6-APA 工业本体</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* 6-APA 生产线工业本体 · 深色工业风格
+   单一深色主题：控制室环境下使用，不随系统主题切换，
+   所有颜色显式定义，不依赖宿主背景。 */
+
+:root {
+  color-scheme: dark;
+
+  --bg: #0a111d;
+  --panel: #101a2b;
+  --panel-2: #16233a;
+  --raised: #1c2c46;
+  --line: #23344f;
+  --line-soft: #1a2940;
+
+  --text: #dde7f7;
+  --text-2: #9fb0cc;
+  --muted: #6f819e;
+
+  --accent: #35c4d7;
+  --accent-ink: #0a111d;
+  --accent-soft: rgba(53, 196, 215, 0.13);
+
+  --ok: #3fcf8e;
+  --warn: #f2c744;
+  --err: #f2557a;
+  --info: #4c8dff;
+  --equip: #ff9f45;
+  --part: #b07cff;
+  --prop: #3fcf8e;
+  --tag: #f2c744;
+  --unmatched: #6b7a90;
+
+  --r-sm: 4px;
+  --r-md: 7px;
+  --r-lg: 11px;
+
+  --font-sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--accent); text-decoration: none; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+::selection { background: rgba(53, 196, 215, 0.3); }
+
+.mono { font-family: var(--font-mono); font-size: 0.92em; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------ 骨架 */
+
+.app {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  height: 100%;
+  min-height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0 20px;
+  height: 54px;
+  background: linear-gradient(180deg, #14213a, #0e1729);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 30;
+}
+
+.brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.brand h1 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.brand .sub {
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.topbar-spacer { flex: 1; }
+
+.svc {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(63, 207, 142, 0.07);
+  font-size: 11.5px;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.svc .dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--ok);
+  box-shadow: 0 0 0 3px rgba(63, 207, 142, 0.16);
+}
+
+.src-chips { display: flex; gap: 7px; flex-wrap: wrap; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--panel-2);
+  color: var(--text-2);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.chip .tick { color: var(--ok); }
+.chip.is-missing { color: var(--muted); border-style: dashed; }
+.chip.is-missing .tick { color: var(--muted); }
+
+.layout {
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr) 392px;
+  min-height: 0;
+}
+
+/* ------------------------------------------------------------ 左栏 */
+
+.rail {
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+  padding: 14px 0 32px;
+  overflow-y: auto;
+  max-height: calc(100vh - 54px);
+  position: sticky;
+  top: 54px;
+}
+
+.rail-group + .rail-group { margin-top: 18px; }
+.rail-title {
+  padding: 0 16px 7px;
+  color: var(--muted);
+  font-size: 10.5px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.rail-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 16px;
+  border: 0;
+  border-left: 2px solid transparent;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+.rail-item:hover { background: var(--panel-2); color: var(--text); }
+.rail-item.is-active {
+  background: var(--accent-soft);
+  border-left-color: var(--accent);
+  color: var(--text);
+  font-weight: 500;
+}
+.rail-item .idx {
+  width: 17px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
+.rail-item .count {
+  margin-left: auto;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+.rail-item.is-core .idx { color: var(--accent); }
+
+/* ------------------------------------------------------------ 中栏 */
+
+.canvas {
+  min-width: 0;
+  padding: 18px 22px 48px;
+  overflow-y: auto;
+  max-height: calc(100vh - 54px);
+}
+
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.crumbs button {
+  border: 0; background: none; padding: 0; cursor: pointer;
+  color: var(--text-2);
+}
+.crumbs button:hover { color: var(--accent); }
+.crumbs .sep { color: var(--line); }
+.crumbs .now { color: var(--text); }
+
+.view-head { margin-bottom: 16px; }
+.view-head h2 {
+  margin: 0 0 4px;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-wrap: balance;
+}
+.view-head p { margin: 0; color: var(--text-2); max-width: 78ch; }
+
+/* 统计砖 */
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(126px, 1fr));
+  gap: 1px;
+  background: var(--line-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  margin-bottom: 18px;
+}
+.stat {
+  background: var(--panel);
+  padding: 13px 15px;
+}
+.stat .k {
+  color: var(--muted);
+  font-size: 10.5px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.stat .v {
+  margin-top: 3px;
+  font-size: 23px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.stat .u { color: var(--muted); font-size: 11px; margin-left: 4px; font-weight: 400; }
+.stat.is-accent .v { color: var(--accent); }
+.stat.is-warn .v { color: var(--warn); }
+
+.panel {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  margin-bottom: 18px;
+  overflow: hidden;
+}
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 15px;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--panel-2);
+}
+.panel-head h3 { margin: 0; font-size: 13px; font-weight: 600; }
+.panel-head .note { color: var(--muted); font-size: 11.5px; }
+.panel-head .right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.panel-body { padding: 14px 15px; }
+.panel-body.flush { padding: 0; }
+
+/* 表格 */
+.tbl-wrap { overflow-x: auto; }
+table.tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+table.tbl th {
+  position: sticky; top: 0;
+  background: var(--panel-2);
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+table.tbl td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line-soft);
+  vertical-align: top;
+}
+table.tbl tbody tr { cursor: pointer; }
+table.tbl tbody tr:hover { background: var(--panel-2); }
+table.tbl tbody tr.is-active { background: var(--accent-soft); }
+table.tbl td.num, table.tbl th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.scroll-y { max-height: 460px; overflow-y: auto; }
+
+/* 徽标 */
+.tag-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 1px 7px;
+  border-radius: var(--r-sm);
+  border: 1px solid;
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+.tag-pill .swatch { width: 7px; height: 7px; border-radius: 2px; }
+.pill-ok { color: var(--ok); border-color: rgba(63, 207, 142, 0.4); background: rgba(63, 207, 142, 0.09); }
+.pill-warn { color: var(--warn); border-color: rgba(242, 199, 68, 0.4); background: rgba(242, 199, 68, 0.09); }
+.pill-err { color: var(--err); border-color: rgba(242, 85, 122, 0.4); background: rgba(242, 85, 122, 0.09); }
+.pill-info { color: var(--info); border-color: rgba(76, 141, 255, 0.4); background: rgba(76, 141, 255, 0.09); }
+.pill-mute { color: var(--muted); border-color: var(--line); background: var(--panel-2); border-style: dashed; }
+.pill-plain { color: var(--text-2); border-color: var(--line); background: var(--panel-2); }
+
+/* 控件 */
+.ctl {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel-2);
+  color: var(--text-2);
+  font-size: 12px;
+  cursor: pointer;
+}
+.ctl:hover { border-color: var(--accent); color: var(--text); }
+.ctl.is-on { background: var(--accent-soft); border-color: var(--accent); color: var(--text); }
+
+select.ctl, input.ctl { cursor: auto; min-width: 0; }
+select.ctl { cursor: pointer; padding-right: 7px; }
+input.ctl::placeholder { color: var(--muted); }
+
+.filters {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  padding: 12px 15px;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--panel);
+}
+.filters label {
+  display: inline-flex; flex-direction: column; gap: 3px;
+  font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+}
+
+/* 关系图 */
+.graph-shell { position: relative; height: 560px; background: radial-gradient(circle at 50% 42%, #132139 0%, #0b1322 72%); }
+.graph-svg { display: block; touch-action: none; cursor: grab; }
+.graph-node { cursor: pointer; }
+.graph-node.is-selected > :first-child { stroke-width: 3.4; filter: drop-shadow(0 0 7px currentColor); }
+.graph-node-label { fill: var(--text-2); font-size: 10.5px; font-family: var(--font-sans); pointer-events: none; }
+.graph-node.is-root .graph-node-label { fill: var(--text); font-weight: 600; font-size: 12px; }
+.graph-edge { cursor: pointer; }
+.graph-edge:hover line:first-child { stroke-opacity: 1; }
+.graph-edge.is-selected line:first-child { stroke-width: 3.6; stroke-opacity: 1; }
+.graph-edge-label {
+  font-size: 9.5px; font-family: var(--font-sans);
+  fill-opacity: 0.88; cursor: pointer; paint-order: stroke;
+  stroke: #0b1322; stroke-width: 3px; stroke-linejoin: round;
+}
+.graph-legend {
+  position: absolute; left: 12px; bottom: 12px;
+  display: flex; flex-wrap: wrap; gap: 4px 12px;
+  max-width: 62%;
+  padding: 9px 11px;
+  background: rgba(10, 17, 29, 0.86);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  font-size: 10.5px; color: var(--text-2);
+}
+.graph-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.graph-legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.graph-hint {
+  position: absolute; right: 12px; bottom: 12px;
+  color: var(--muted); font-size: 10.5px;
+  background: rgba(10, 17, 29, 0.86);
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  padding: 6px 10px;
+}
+.graph-depth { position: absolute; right: 12px; top: 12px; display: flex; gap: 5px; }
+
+/* 三层语义链 */
+.chain { display: flex; flex-direction: column; gap: 0; }
+.chain-node {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel-2);
+}
+.chain-node .lbl { color: var(--muted); font-size: 10.5px; letter-spacing: 0.07em; text-transform: uppercase; min-width: 74px; }
+.chain-node .val { font-weight: 500; }
+.chain-arrow { height: 16px; margin-left: 30px; border-left: 1px dashed var(--line); }
+.chain-arrow + .chain-node { margin-top: 0; }
+
+/* 树 */
+.tree { font-size: 12.5px; }
+.tree-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 10px; border-radius: var(--r-sm); cursor: pointer;
+}
+.tree-row:hover { background: var(--panel-2); }
+.tree-row.is-active { background: var(--accent-soft); }
+.tree-row .bullet { width: 7px; height: 7px; border-radius: 2px; flex: none; }
+.tree-row .meta { margin-left: auto; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.tree-children { margin-left: 15px; border-left: 1px solid var(--line-soft); padding-left: 9px; }
+
+/* 右栏 */
+.inspector {
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+  padding: 16px 16px 48px;
+  overflow-y: auto;
+  max-height: calc(100vh - 54px);
+  position: sticky;
+  top: 54px;
+}
+.insp-kicker {
+  color: var(--muted);
+  font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase;
+}
+.insp-title { margin: 3px 0 10px; font-size: 16px; font-weight: 600; text-wrap: balance; }
+.insp-section { margin-top: 16px; }
+.insp-section > h4 {
+  margin: 0 0 8px;
+  font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted);
+  padding-bottom: 5px; border-bottom: 1px solid var(--line-soft);
+}
+
+dl.kv { margin: 0; display: grid; grid-template-columns: 96px 1fr; gap: 5px 10px; font-size: 12.5px; }
+dl.kv dt { color: var(--muted); }
+dl.kv dd { margin: 0; word-break: break-word; }
+
+.source-box {
+  border: 1px dashed var(--line);
+  border-radius: var(--r-md);
+  background: rgba(76, 141, 255, 0.05);
+  padding: 9px 11px;
+  font-size: 11.5px;
+}
+.source-box .hd { color: var(--info); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 5px; }
+
+.empty {
+  padding: 26px 18px;
+  text-align: center;
+  color: var(--muted);
+  border: 1px dashed var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel-2);
+  font-size: 12.5px;
+}
+.empty strong { display: block; color: var(--text-2); margin-bottom: 5px; font-weight: 500; }
+
+.note-line { color: var(--text-2); font-size: 12px; margin: 0 0 10px; }
+.warn-line {
+  display: flex; gap: 8px; align-items: flex-start;
+  padding: 9px 11px;
+  border-left: 2px solid var(--warn);
+  background: rgba(242, 199, 68, 0.07);
+  color: var(--text-2);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+
+.bar { height: 5px; border-radius: 3px; background: var(--line-soft); overflow: hidden; min-width: 54px; }
+.bar > i { display: block; height: 100%; border-radius: 3px; }
+
+.list-plain { list-style: none; margin: 0; padding: 0; }
+.list-plain li { padding: 6px 0; border-bottom: 1px solid var(--line-soft); }
+.list-plain li:last-child { border-bottom: 0; }
+
+.loading { padding: 60px 20px; text-align: center; color: var(--muted); }
+
+@media (max-width: 1400px) {
+  .layout { grid-template-columns: 208px minmax(0, 1fr) 340px; }
+}
+
+@media (max-width: 1100px) {
+  .layout { grid-template-columns: 1fr; }
+  .rail, .inspector, .canvas { position: static; max-height: none; }
+  .rail { border-right: 0; border-bottom: 1px solid var(--line); }
+  .inspector { border-left: 0; border-top: 1px solid var(--line); }
+  .topbar { height: auto; flex-wrap: wrap; padding: 10px 16px; gap: 10px; }
+  .canvas { padding: 16px; }
+  .graph-shell { height: 440px; }
+  .graph-legend { max-width: none; position: static; margin: 8px 12px 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+
+</style>
+
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <h1>6-APA 生产线工业本体</h1>
+      <span class="sub">Industrial Ontology · 6-APA Production Line</span>
+    </div>
+    <div class="topbar-spacer"></div>
+    <div class="src-chips" id="src-chips"></div>
+    <div class="svc"><span class="dot"></span><span id="svc-label">本体服务</span></div>
+  </header>
+  <div class="layout">
+    <aside class="rail" id="rail"></aside>
+    <main class="canvas" id="canvas">
+      <div class="loading">正在加载本体数据…</div>
+    </main>
+    <aside class="inspector" id="inspector"></aside>
+  </div>
+</div>
+
+<script src="data/meta.js"></script>
+<script src="data/overview.js"></script>
+<script src="data/categories.js"></script>
+<script src="data/areas.js"></script>
+<script src="data/classes.js"></script>
+<script src="data/properties.js"></script>
+<script src="data/predicates.js"></script>
+<script src="data/relationOverview.js"></script>
+<script src="data/relations.js"></script>
+<script src="data/relationEntities.js"></script>
+<script src="data/entityDetails.js"></script>
+<script src="data/matchIndex.js"></script>
+<script src="data/dataSources.js"></script>
+<script src="data/dataQuality.js"></script>
+<script src="data/rules.js"></script>
+<script src="data/emptySets.js"></script>
+<script src="data/turtle.js"></script>
+<script src="data/equipment.js"></script>
+<script src="data/parameters.js"></script>
+<script src="data/tags.js"></script>
+<script>
+/* ===== api.js ===== */
+/*
+ * 本体 API 客户端。
+ *
+ * 两种模式，对外接口完全一致：
+ *   · live   —— window.__API_BASE__ 指向 FastAPI 本体服务，走真实 REST 请求
+ *   · static —— 读取由 backend/tools/build_static_demo_data.py 导出的 API 快照，
+ *               在浏览器内按同一份契约合成响应体
+ *
+ * 页面组件只调用本模块，不直接触碰任何数据表，
+ * 满足“前端只能通过 API 获取本体数据和关系数据”的要求。
+ */
+(function (global) {
+  'use strict';
+
+  var D = global.__ONTO__ || {};
+  var BASE = global.__API_BASE__ || null;
+  var MODE = BASE ? 'live' : 'static';
+
+  // ------------------------------------------------------------- 索引
+
+  var idx = {
+    areaById: {},
+    equipById: {},
+    paramById: {},
+    tagById: {},
+    relById: {},
+    entityById: {},
+    paramsByEquip: {},
+    tagsByParam: {},
+    tagsByEquip: {},
+    equipByArea: {}
+  };
+
+  function buildIndexes() {
+    (D.areas || []).forEach(function (a) { idx.areaById[a.id] = a; });
+    (D.equipment || []).forEach(function (e) {
+      idx.equipById[e.id] = e;
+      (idx.equipByArea[e.a] = idx.equipByArea[e.a] || []).push(e);
+    });
+    (D.parameters || []).forEach(function (p) {
+      idx.paramById[p.id] = p;
+      (idx.paramsByEquip[p.e] = idx.paramsByEquip[p.e] || []).push(p);
+    });
+    (D.tags || []).forEach(function (t) {
+      idx.tagById[t.id] = t;
+      (idx.tagsByParam[t.p] = idx.tagsByParam[t.p] || []).push(t);
+      (idx.tagsByEquip[t.e] = idx.tagsByEquip[t.e] || []).push(t);
+    });
+    (D.relations || []).forEach(function (r) { idx.relById[r.id] = r; });
+    (D.relationEntities || []).forEach(function (e) { idx.entityById[e.id] = e; });
+  }
+
+  // ------------------------------------------------------------- 展开器
+  // 紧凑表 → 与 REST 响应体一致的对象
+
+  var DCS_FILE = (D.meta && D.meta.sourceFiles && D.meta.sourceFiles[0]) || '6APA_DCS.xlsx';
+  var SHEET_TAGS = 'DCS点位明细';
+  var SHEET_STATS = '设备统计';
+
+  function equipOut(e) {
+    if (!e) return null;
+    var area = idx.areaById[e.a] || {};
+    return {
+      id: e.id, owlSubject: e.o, name: e.n,
+      areaId: e.a, areaName: area.name, station: e.sn,
+      tagCount: e.tc, parameterCount: e.pc,
+      stats: e.s, statsFromSheet1: e.s1, overview: e.ov,
+      sourceType: 'DCS_EXCEL',
+      source: { file: DCS_FILE, sheet: SHEET_TAGS, row: e.r, field: '生产设备/装置 (Equipment Entity)', value: e.n },
+      statsSource: e.r1 ? { file: DCS_FILE, sheet: SHEET_STATS, row: e.r1 } : null
+    };
+  }
+
+  function paramOut(p) {
+    if (!p) return null;
+    var e = idx.equipById[p.e] || {};
+    var area = idx.areaById[e.a] || {};
+    return {
+      id: p.id, name: p.n,
+      equipmentId: p.e, equipmentName: e.n, owlSubject: e.o,
+      areaId: e.a, areaName: area.name, station: e.sn,
+      categories: p.c, units: p.u, blockTypes: p.b,
+      tagCount: (p.t || []).length, tagIds: p.t,
+      sourceType: 'DCS_EXCEL',
+      source: { file: DCS_FILE, sheet: SHEET_TAGS, row: p.r, field: '参数语义名称 (Parameter Name)', value: p.n }
+    };
+  }
+
+  function tagOut(t) {
+    if (!t) return null;
+    var e = idx.equipById[t.e] || {};
+    var p = idx.paramById[t.p] || {};
+    var area = idx.areaById[e.a] || {};
+    return {
+      id: t.id, name: t.n, rawDescription: t.d,
+      station: e.sn, areaId: e.a, areaName: area.name,
+      equipmentId: t.e, equipmentName: e.n,
+      parameterId: t.p, parameterName: p.n,
+      parameterType: t.pt, unit: t.u, blockType: t.b,
+      owlSubject: e.o,
+      sourceType: 'DCS_EXCEL',
+      source: { file: DCS_FILE, sheet: SHEET_TAGS, row: t.r }
+    };
+  }
+
+  function page(items, q) {
+    var offset = +(q && q.offset) || 0;
+    var limit = q && q.limit ? +q.limit : null;
+    return {
+      items: limit ? items.slice(offset, offset + limit) : items.slice(offset),
+      total: items.length,
+      offset: offset
+    };
+  }
+
+  // ------------------------------------------------------------- 关系筛选
+
+  function filterRelations(q) {
+    q = q || {};
+    var items = (D.relations || []).slice();
+    function eq(field, key) {
+      if (q[key]) items = items.filter(function (r) { return r[field] === q[key]; });
+    }
+    eq('area', 'area'); eq('category', 'category'); eq('predicate', 'predicate');
+    eq('scenario', 'scenario'); eq('subjectType', 'subjectType'); eq('objectType', 'objectType');
+    if (q.entityId) {
+      items = items.filter(function (r) {
+        return r.subject.id === q.entityId || r.object.id === q.entityId;
+      });
+    }
+    if (q.minWeight != null && q.minWeight !== '') {
+      items = items.filter(function (r) { return r.weight != null && r.weight >= +q.minWeight; });
+    }
+    if (q.maxWeight != null && q.maxWeight !== '') {
+      items = items.filter(function (r) { return r.weight != null && r.weight <= +q.maxWeight; });
+    }
+    if (q.matched === true || q.matched === false) {
+      items = items.filter(function (r) { return (r.matchStatus === 'MATCHED') === q.matched; });
+    }
+    if (q.causal) items = items.filter(function (r) { return r.isCausal; });
+    if (q.keyword) {
+      var k = q.keyword;
+      items = items.filter(function (r) {
+        return (r.subjectEntity || '').indexOf(k) >= 0 || (r.objectEntity || '').indexOf(k) >= 0 ||
+          (r.predicate || '').indexOf(k) >= 0 || (r.domainDescription || '').indexOf(k) >= 0;
+      });
+    }
+    return items;
+  }
+
+  // ------------------------------------------------------------- 关系图
+
+  var MAX_NODES = 220;
+
+  function styleFor(type, matched) {
+    var list = (D.categories && D.categories.nodeStyles) || [];
+    var found = null;
+    for (var i = 0; i < list.length; i++) if (list[i].type === type) { found = list[i]; break; }
+    var fallback = null;
+    for (var j = 0; j < list.length; j++) if (list[j].type === '外部对象') { fallback = list[j]; break; }
+    var s = found || fallback || { color: '#6B7A90', shape: 'circle' };
+    return { color: matched ? s.color : (fallback ? fallback.color : '#6B7A90'), shape: s.shape };
+  }
+
+  function edgeStyleFor(category, matched, weight) {
+    var list = (D.categories && D.categories.edgeStyles) || [];
+    var s = null, un = null;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].category === category) s = list[i];
+      if (list[i].category === '未匹配关系') un = list[i];
+    }
+    s = matched ? (s || list[0]) : (un || s || list[0]);
+    if (!s) s = { color: '#8FA6C4', lineStyle: 'solid', width: 1.6 };
+    var w = weight == null ? 1 : weight;
+    return {
+      color: s.color,
+      lineStyle: s.lineStyle,
+      width: +(s.width * (0.7 + 0.45 * w)).toFixed(2),
+      opacity: +Math.min(1, 0.55 + 0.22 * w).toFixed(2)
+    };
+  }
+
+  function entityNode(id, isRoot) {
+    var e = idx.entityById[id];
+    if (!e) return null;
+    var matched = e.matchStatus === 'MATCHED';
+    return {
+      id: id, label: e.name, type: e.type, nodeKind: 'relationEntity',
+      matchStatus: e.matchStatus, matchStatusLabel: e.matchStatusLabel,
+      matchCount: e.matchCount, tagCount: e.tagCount, relationCount: e.relationCount,
+      areas: e.areas, isRoot: !!isRoot, sourceType: 'RELATION_EXCEL',
+      style: styleFor(e.type, matched)
+    };
+  }
+
+  function equipNode(id, isRoot) {
+    var e = idx.equipById[id];
+    if (!e) return null;
+    var area = idx.areaById[e.a] || {};
+    return {
+      id: id, label: e.n, type: '生产设备', nodeKind: 'equipment',
+      owlSubject: e.o, areaName: area.name, station: e.sn, tagCount: e.tc,
+      matchStatus: 'MATCHED', isRoot: !!isRoot, sourceType: 'DCS_EXCEL',
+      style: styleFor('生产设备', true)
+    };
+  }
+
+  function paramNode(id, isRoot) {
+    var p = idx.paramById[id];
+    if (!p) return null;
+    var e = idx.equipById[p.e] || {};
+    return {
+      id: id, label: p.n, type: '参数', nodeKind: 'parameter',
+      equipmentName: e.n, categories: p.c, units: p.u, tagCount: (p.t || []).length,
+      matchStatus: 'MATCHED', isRoot: !!isRoot, sourceType: 'DCS_EXCEL',
+      style: styleFor('参数', true)
+    };
+  }
+
+  function tagNode(id) {
+    var t = idx.tagById[id];
+    if (!t) return null;
+    return {
+      id: id, label: t.n, type: 'DCS点', nodeKind: 'tag',
+      rawDescription: t.d, blockType: t.b, unit: t.u,
+      matchStatus: 'MATCHED', sourceType: 'DCS_EXCEL',
+      style: styleFor('DCS点', true)
+    };
+  }
+
+  function areaNode(id, isRoot) {
+    var a = idx.areaById[id];
+    if (!a) return null;
+    return {
+      id: id, label: a.nameZh, type: '生产工段', nodeKind: 'area',
+      fullName: a.name, tagCount: a.tagCount,
+      matchStatus: 'MATCHED', isRoot: !!isRoot, sourceType: 'DCS_EXCEL',
+      style: styleFor('生产工段', true)
+    };
+  }
+
+  function structEdge(id, source, target, label, kind, color) {
+    return {
+      id: id, source: source, target: target, label: label,
+      category: '本体结构', edgeKind: kind, weight: 1, matchStatus: 'MATCHED',
+      sourceType: 'DCS_EXCEL',
+      style: { color: color, lineStyle: 'solid', width: 1.4, opacity: 0.75 }
+    };
+  }
+
+  function addRelation(rel, nodes, edges) {
+    var sid = rel.subject.id, oid = rel.object.id;
+    if (!sid || !oid) return;
+    [sid, oid].forEach(function (nid) {
+      if (!nodes[nid]) { var n = entityNode(nid); if (n) nodes[nid] = n; }
+    });
+    edges[rel.id] = {
+      id: rel.id, source: sid, target: oid, label: rel.predicate,
+      category: rel.category, area: rel.area, scenario: rel.scenario,
+      weight: rel.weight, domainDescription: rel.domainDescription,
+      matchStatus: rel.matchStatus, edgeKind: 'relation',
+      // source/target 已用于图的端点，来源信息放在 provenance 字段
+      sourceType: rel.sourceType, provenance: rel.source,
+      style: edgeStyleFor(rel.category, rel.matchStatus === 'MATCHED', rel.weight)
+    };
+  }
+
+  function buildGraph(q) {
+    q = q || {};
+    var depth = Math.max(1, Math.min(3, +(q.depth || 1)));
+    var pool = filterRelations(q);
+    var nodes = {}, edges = {}, truncated = false;
+    var rootId = q.rootId || null;
+
+    if (rootId && rootId.indexOf('robj-') === 0) {
+      var root = entityNode(rootId, true);
+      if (root) {
+        nodes[rootId] = root;
+        var byEntity = {};
+        pool.forEach(function (r) {
+          ['subject', 'object'].forEach(function (side) {
+            var eid = r[side].id;
+            if (eid) (byEntity[eid] = byEntity[eid] || []).push(r);
+          });
+        });
+        var frontier = [rootId];
+        for (var d = 0; d < depth && !truncated; d++) {
+          var next = {};
+          frontier.forEach(function (eid) {
+            (byEntity[eid] || []).forEach(function (rel) {
+              if (edges[rel.id]) return;
+              addRelation(rel, nodes, edges);
+              ['subject', 'object'].forEach(function (side) {
+                var other = rel[side].id;
+                if (other && other !== eid) next[other] = 1;
+              });
+              if (Object.keys(nodes).length > MAX_NODES) truncated = true;
+            });
+          });
+          frontier = Object.keys(next);
+        }
+        if (q.includeDcs) attachAnchors(rootId, nodes, edges);
+      }
+    } else if (rootId && rootId.indexOf('equip-') === 0) {
+      truncated = expandEquipment(rootId, nodes, edges, pool, depth);
+    } else if (rootId && rootId.indexOf('param-') === 0) {
+      expandParameter(rootId, nodes, edges, pool);
+    } else if (rootId && rootId.indexOf('area-') === 0) {
+      truncated = expandArea(rootId, nodes, edges, pool);
+    } else {
+      for (var i = 0; i < pool.length; i++) {
+        addRelation(pool[i], nodes, edges);
+        if (Object.keys(nodes).length > MAX_NODES) { truncated = true; break; }
+      }
+    }
+
+    return {
+      rootId: rootId, rootType: q.rootType || null, depth: depth,
+      nodes: Object.keys(nodes).map(function (k) { return nodes[k]; }),
+      edges: Object.keys(edges).map(function (k) { return edges[k]; }),
+      nodeCount: Object.keys(nodes).length,
+      edgeCount: Object.keys(edges).length,
+      truncated: truncated, maxNodes: MAX_NODES,
+      nodeStyles: (D.categories || {}).nodeStyles,
+      edgeStyles: (D.categories || {}).edgeStyles
+    };
+  }
+
+  function attachAnchors(entityId, nodes, edges) {
+    var detail = (D.entityDetails || {})[entityId];
+    if (!detail) return;
+    (detail.matches || []).slice(0, 8).forEach(function (m) {
+      var nid, n;
+      if (m.objectType === 'equipment') {
+        n = equipNode(m.id);
+        if (!n) return;
+        nid = 'dcs::' + m.id; n.id = nid; nodes[nid] = n;
+        edges['map::' + entityId + '::' + nid] =
+          structEdge('map::' + entityId + '::' + nid, entityId, nid, '匹配本体实例', 'mapping', '#6B7A90');
+      } else if (m.objectType === 'parameter') {
+        n = paramNode(m.id);
+        if (!n) return;
+        nid = 'dcs::' + m.id; n.id = nid; nodes[nid] = n;
+        edges['map::' + entityId + '::' + nid] =
+          structEdge('map::' + entityId + '::' + nid, entityId, nid, '测量锚点', 'anchor', '#F2C744');
+        (m.tagIds || []).slice(0, 3).forEach(function (tid) {
+          var t = tagNode(tid);
+          if (!t) return;
+          var tnid = 'dcs::' + tid; t.id = tnid; nodes[tnid] = t;
+          edges['tag::' + nid + '::' + tnid] =
+            structEdge('tag::' + nid + '::' + tnid, nid, tnid, 'boundToTag', 'tag', '#F2C744');
+        });
+      }
+    });
+  }
+
+  function expandEquipment(equipmentId, nodes, edges, pool, depth) {
+    var e = idx.equipById[equipmentId];
+    if (!e) return false;
+    nodes[equipmentId] = equipNode(equipmentId, true);
+    if (e.a) {
+      var a = areaNode(e.a);
+      if (a) {
+        nodes[a.id] = a;
+        edges['has::' + a.id + '::' + equipmentId] =
+          structEdge('has::' + a.id + '::' + equipmentId, a.id, equipmentId, 'hasEquipment', 'structure', '#4C8DFF');
+      }
+    }
+    var truncated = false;
+    (e.p || []).forEach(function (pid) {
+      if (Object.keys(nodes).length > MAX_NODES) { truncated = true; return; }
+      var n = paramNode(pid);
+      if (!n) return;
+      nodes[pid] = n;
+      edges['has::' + equipmentId + '::' + pid] =
+        structEdge('has::' + equipmentId + '::' + pid, equipmentId, pid, 'hasParameter', 'structure', '#35C4D7');
+      if (depth >= 2) {
+        ((idx.paramById[pid] || {}).t || []).forEach(function (tid) {
+          if (Object.keys(nodes).length > MAX_NODES) { truncated = true; return; }
+          var t = tagNode(tid);
+          if (!t) return;
+          nodes[tid] = t;
+          edges['tag::' + pid + '::' + tid] =
+            structEdge('tag::' + pid + '::' + tid, pid, tid, 'boundToTag', 'tag', '#F2C744');
+        });
+      }
+    });
+    linkEntities(equipmentId, nodes, edges, pool, '匹配本体实例', 'mapping', '#6B7A90');
+    return truncated;
+  }
+
+  function expandParameter(parameterId, nodes, edges, pool) {
+    var p = idx.paramById[parameterId];
+    if (!p) return false;
+    nodes[parameterId] = paramNode(parameterId, true);
+    if (p.e) {
+      var e = equipNode(p.e);
+      if (e) {
+        nodes[e.id] = e;
+        edges['has::' + e.id + '::' + parameterId] =
+          structEdge('has::' + e.id + '::' + parameterId, e.id, parameterId, 'hasParameter', 'structure', '#35C4D7');
+      }
+    }
+    (p.t || []).forEach(function (tid) {
+      var t = tagNode(tid);
+      if (!t) return;
+      nodes[tid] = t;
+      edges['tag::' + parameterId + '::' + tid] =
+        structEdge('tag::' + parameterId + '::' + tid, parameterId, tid, 'boundToTag', 'tag', '#F2C744');
+    });
+    linkEntities(parameterId, nodes, edges, pool, '测量锚点', 'anchor', '#F2C744');
+    return false;
+  }
+
+  function linkEntities(objectId, nodes, edges, pool, label, kind, color) {
+    var entityIds = (D.matchIndex || {})[objectId] || [];
+    var relIds = {};
+    entityIds.forEach(function (eid) {
+      var n = entityNode(eid);
+      if (!n) return;
+      nodes[eid] = n;
+      edges['map::' + eid + '::' + objectId] =
+        structEdge('map::' + eid + '::' + objectId, eid, objectId, label, kind, color);
+      var detail = (D.entityDetails || {})[eid];
+      if (detail) {
+        (detail.outgoingRelations || []).concat(detail.incomingRelations || [])
+          .forEach(function (r) { relIds[r.id] = 1; });
+      }
+    });
+    pool.forEach(function (r) { if (relIds[r.id]) addRelation(r, nodes, edges); });
+  }
+
+  function expandArea(areaId, nodes, edges, pool) {
+    var a = idx.areaById[areaId];
+    if (!a) return false;
+    nodes[areaId] = areaNode(areaId, true);
+    var list = (idx.equipByArea[areaId] || []).slice()
+      .sort(function (x, y) { return y.tc - x.tc; }).slice(0, 24);
+    list.forEach(function (e) {
+      var n = equipNode(e.id);
+      if (!n) return;
+      nodes[e.id] = n;
+      edges['has::' + areaId + '::' + e.id] =
+        structEdge('has::' + areaId + '::' + e.id, areaId, e.id, 'hasEquipment', 'structure', '#4C8DFF');
+    });
+    pool.forEach(function (r) { if (r.dcsAreaId === areaId) addRelation(r, nodes, edges); });
+    return (idx.equipByArea[areaId] || []).length > list.length;
+  }
+
+  // ------------------------------------------------------------- 静态实现
+
+  var staticApi = {
+    getOverview: function () { return D.overview; },
+    getCategories: function () { return D.categories; },
+    getProcessAreas: function () { return { items: D.areas, total: (D.areas || []).length }; },
+
+    getProcessArea: function (areaId) {
+      var area = idx.areaById[areaId];
+      if (!area) return null;
+      var equipment = (idx.equipByArea[areaId] || []).slice()
+        .sort(function (a, b) { return b.tc - a.tc; }).map(equipOut);
+      var rels = (D.relations || []).filter(function (r) { return r.dcsAreaId === areaId; });
+      var byCategory = {};
+      rels.forEach(function (r) {
+        var k = r.category || '未标注';
+        byCategory[k] = (byCategory[k] || 0) + 1;
+      });
+      return Object.assign({}, area, {
+        equipment: equipment,
+        relations: rels,
+        relationCategoryCounts: byCategory
+      });
+    },
+
+    getEquipment: function (q) {
+      q = q || {};
+      var items = D.equipment || [];
+      if (q.sn) items = items.filter(function (e) { return String(e.sn) === String(q.sn); });
+      if (q.areaId) items = items.filter(function (e) { return e.a === q.areaId; });
+      if (q.keyword) items = items.filter(function (e) {
+        return e.n.indexOf(q.keyword) >= 0 || (e.o || '').indexOf(q.keyword) >= 0;
+      });
+      items = items.slice().sort(function (a, b) { return b.tc - a.tc; });
+      var p = page(items, q);
+      p.items = p.items.map(equipOut);
+      return p;
+    },
+
+    getEquipmentDetail: function (equipmentId) {
+      var e = idx.equipById[equipmentId];
+      if (!e) return null;
+      var out = equipOut(e);
+      var entityIds = (D.matchIndex || {})[equipmentId] || [];
+      var relIds = {}, entities = [];
+      entityIds.forEach(function (eid) {
+        var brief = idx.entityById[eid];
+        if (brief) entities.push(brief);
+        var detail = (D.entityDetails || {})[eid];
+        if (detail) {
+          (detail.outgoingRelations || []).concat(detail.incomingRelations || [])
+            .forEach(function (r) { relIds[r.id] = 1; });
+        }
+      });
+      out.area = idx.areaById[e.a] || null;
+      out.parameters = (idx.paramsByEquip[equipmentId] || []).map(paramOut);
+      out.tags = (idx.tagsByEquip[equipmentId] || []).map(tagOut);
+      out.relationEntities = entities;
+      out.relations = (D.relations || []).filter(function (r) { return relIds[r.id]; });
+      out.rules = rulesFor(e.n);
+      return out;
+    },
+
+    getParameters: function (q) {
+      q = q || {};
+      var items = D.parameters || [];
+      if (q.equipmentId) items = items.filter(function (p) { return p.e === q.equipmentId; });
+      if (q.areaId) items = items.filter(function (p) {
+        var e = idx.equipById[p.e]; return e && e.a === q.areaId;
+      });
+      if (q.category) items = items.filter(function (p) { return (p.c || []).indexOf(q.category) >= 0; });
+      if (q.keyword) items = items.filter(function (p) { return p.n.indexOf(q.keyword) >= 0; });
+      var pg = page(items, q);
+      pg.items = pg.items.map(paramOut);
+      return pg;
+    },
+
+    getParameterDetail: function (parameterId) {
+      var p = idx.paramById[parameterId];
+      if (!p) return null;
+      var out = paramOut(p);
+      var tags = (idx.tagsByParam[parameterId] || []).map(tagOut);
+      out.equipment = equipOut(idx.equipById[p.e]);
+      out.tags = tags;
+      out.measurementAnchors = tags.map(function (t) { return anchorFrom(out, t); });
+      var entityIds = (D.matchIndex || {})[parameterId] || [];
+      var relIds = {}, entities = [];
+      entityIds.forEach(function (eid) {
+        var brief = idx.entityById[eid];
+        if (brief) entities.push(brief);
+        var detail = (D.entityDetails || {})[eid];
+        if (detail) {
+          (detail.outgoingRelations || []).concat(detail.incomingRelations || [])
+            .forEach(function (r) { relIds[r.id] = 1; });
+        }
+      });
+      out.relationEntities = entities;
+      out.relations = (D.relations || []).filter(function (r) { return relIds[r.id]; });
+      out.rules = rulesFor(p.n);
+      return out;
+    },
+
+    getTags: function (q) {
+      q = q || {};
+      var items = D.tags || [];
+      if (q.equipmentId) items = idx.tagsByEquip[q.equipmentId] || [];
+      if (q.parameter) items = idx.tagsByParam[q.parameter] || [];
+      if (q.areaId) items = items.filter(function (t) {
+        var e = idx.equipById[t.e]; return e && e.a === q.areaId;
+      });
+      if (q.type) items = items.filter(function (t) { return t.pt === q.type; });
+      if (q.blockType) items = items.filter(function (t) { return t.b === q.blockType; });
+      if (q.keyword) items = items.filter(function (t) {
+        return t.n.indexOf(q.keyword) >= 0 || (t.d || '').indexOf(q.keyword) >= 0;
+      });
+      var pg = page(items, q);
+      pg.items = pg.items.map(tagOut);
+      return pg;
+    },
+
+    getClasses: function () { return { items: D.classes, total: (D.classes || []).length }; },
+    getProperties: function () { return { items: D.properties, total: (D.properties || []).length }; },
+    getPredicates: function () { return { items: D.predicates, total: (D.predicates || []).length }; },
+
+    getRelations: function (q) { return page(filterRelations(q), q); },
+
+    getRelationDetail: function (relationId) {
+      var rel = idx.relById[relationId];
+      if (!rel) return null;
+      return Object.assign({}, rel, {
+        subjectDetail: idx.entityById[rel.subject.id] || null,
+        objectDetail: idx.entityById[rel.object.id] || null,
+        sameCategoryRelationIds: (D.relations || [])
+          .filter(function (r) { return r.category === rel.category && r.id !== relationId; })
+          .map(function (r) { return r.id; }),
+        sameAreaRelationIds: (D.relations || [])
+          .filter(function (r) { return r.area === rel.area && r.id !== relationId; })
+          .map(function (r) { return r.id; }),
+        sourceTypeLabel: '工业关系 Excel'
+      });
+    },
+
+    getRelationEntities: function (q) {
+      q = q || {};
+      var items = (D.relationEntities || []).slice();
+      if (q.type) items = items.filter(function (e) { return e.type === q.type; });
+      if (q.matched === true || q.matched === false) {
+        var want = q.matched ? 'MATCHED' : 'UNMATCHED';
+        items = items.filter(function (e) { return e.matchStatus === want; });
+      }
+      if (q.keyword) items = items.filter(function (e) { return e.name.indexOf(q.keyword) >= 0; });
+      items.sort(function (a, b) { return b.relationCount - a.relationCount; });
+      return { items: items, total: items.length };
+    },
+
+    getRelationEntityDetail: function (entityId) { return (D.entityDetails || {})[entityId] || null; },
+
+    getGraph: function (q) { return buildGraph(q); },
+
+    getRules: function () { return D.rules; },
+    getConstraints: function () { return (D.emptySets || {}).constraints; },
+    getCapabilities: function () { return (D.emptySets || {}).capabilities; },
+    getModelRegistry: function () { return (D.emptySets || {}).modelRegistry; },
+
+    getSemantics: function (q) {
+      q = q || {};
+      var tags = D.tags || [];
+      if (q.areaId) tags = tags.filter(function (t) {
+        var e = idx.equipById[t.e]; return e && e.a === q.areaId;
+      });
+      if (q.keyword) tags = tags.filter(function (t) { return (t.d || '').indexOf(q.keyword) >= 0; });
+      var limit = q.limit ? +q.limit : 200;
+      return {
+        dcsSemantics: tags.slice(0, limit).map(function (t) {
+          var full = tagOut(t);
+          return {
+            id: full.id, rawDescription: full.rawDescription,
+            parameterSemantic: full.parameterName, parameterId: full.parameterId,
+            industrialObject: full.equipmentName, equipmentId: full.equipmentId,
+            owlSubject: full.owlSubject, areaName: full.areaName,
+            tagName: full.name, blockType: full.blockType,
+            kind: 'DCS语义提升', sourceType: 'DCS_EXCEL', source: full.source
+          };
+        }),
+        dcsSemanticTotal: tags.length,
+        relationSemantics: (D.relations || []).map(function (r) {
+          return {
+            id: r.id, subjectEntity: r.subjectEntity, subjectType: r.subjectType,
+            predicate: r.predicate, objectEntity: r.objectEntity, objectType: r.objectType,
+            domainDescription: r.domainDescription, kind: '关系语义',
+            sourceType: 'RELATION_EXCEL', source: r.source
+          };
+        }),
+        relationSemanticTotal: (D.relations || []).length
+      };
+    },
+
+    getMeasurementAnchors: function (q) {
+      q = q || {};
+      var items = [];
+      Object.keys(D.entityDetails || {}).forEach(function (eid) {
+        (D.entityDetails[eid].measurementAnchors || []).forEach(function (a) {
+          if (q.areaId && a.areaId !== q.areaId) return;
+          items.push(a);
+        });
+      });
+      if (q.keyword) items = items.filter(function (a) {
+        return (a.semanticName || '').indexOf(q.keyword) >= 0 || (a.tagName || '').indexOf(q.keyword) >= 0;
+      });
+      return {
+        items: q.limit ? items.slice(0, +q.limit) : items,
+        total: items.length,
+        unanchoredEntities: (D.relationEntities || []).filter(function (e) { return !e.tagCount; })
+      };
+    },
+
+    getCausalRelations: function () {
+      var items = (D.relations || []).filter(function (r) { return r.isCausal; });
+      return { items: items, total: items.length, categories: ['因果关系', '影响关系', '质量关系'] };
+    },
+
+    getObjectRelations: function (objectId) {
+      if (objectId.indexOf(':') === 0) {
+        var hit = (D.equipment || []).filter(function (e) { return e.o === objectId; })[0];
+        if (hit) objectId = hit.id;
+      }
+      if (objectId.indexOf('equip-') === 0) return staticApi.getEquipmentDetail(objectId);
+      if (objectId.indexOf('param-') === 0) return staticApi.getParameterDetail(objectId);
+      if (objectId.indexOf('robj-') === 0) return staticApi.getRelationEntityDetail(objectId);
+      if (objectId.indexOf('area-') === 0) return staticApi.getProcessArea(objectId);
+      return null;
+    },
+
+    getDataSources: function () { return D.dataSources; },
+    getDataQuality: function () { return D.dataQuality; },
+    getTurtle: function () { return D.turtle; },
+    getRelationOverview: function () { return D.relationOverview; },
+    getMeta: function () { return D.meta; }
+  };
+
+  function anchorFrom(param, tag) {
+    return {
+      id: 'anchor-' + tag.id.slice(4),
+      semanticName: param.name, parameterId: param.id,
+      equipmentId: param.equipmentId, equipmentName: param.equipmentName,
+      owlSubject: param.owlSubject, areaId: param.areaId, areaName: param.areaName,
+      parameterType: tag.parameterType, tagId: tag.id, tagName: tag.name,
+      rawDescription: tag.rawDescription, blockType: tag.blockType,
+      unit: tag.unit, station: tag.station,
+      sourceType: 'DCS_EXCEL', source: tag.source
+    };
+  }
+
+  function rulesFor(name) {
+    var rules = (D.rules && D.rules.items) || [];
+    if (!name) return [];
+    return rules.filter(function (r) { return (r.appliesTo || '').indexOf(name) >= 0; });
+  }
+
+  // ------------------------------------------------------------- live 模式
+
+  function qs(q) {
+    if (!q) return '';
+    var parts = [];
+    Object.keys(q).forEach(function (k) {
+      if (q[k] === null || q[k] === undefined || q[k] === '') return;
+      parts.push(encodeURIComponent(k) + '=' + encodeURIComponent(q[k]));
+    });
+    return parts.length ? '?' + parts.join('&') : '';
+  }
+
+  function live(path, q) {
+    return fetch(BASE + path + qs(q)).then(function (r) {
+      return r.ok ? r.json() : null;
+    });
+  }
+
+  var liveApi = {
+    getOverview: function () { return live('/api/ontology/overview'); },
+    getCategories: function () { return live('/api/ontology/categories'); },
+    getProcessAreas: function () { return live('/api/ontology/process-areas'); },
+    getProcessArea: function (id) { return live('/api/ontology/process-areas/' + id); },
+    getEquipment: function (q) { return live('/api/ontology/equipment', q); },
+    getEquipmentDetail: function (id) { return live('/api/ontology/equipment/' + id); },
+    getParameters: function (q) { return live('/api/ontology/parameters', q); },
+    getParameterDetail: function (id) { return live('/api/ontology/parameters/' + id); },
+    getTags: function (q) { return live('/api/ontology/tags', q); },
+    getClasses: function () { return live('/api/ontology/classes'); },
+    getProperties: function () { return live('/api/ontology/properties'); },
+    getPredicates: function () { return live('/api/ontology/properties'); },
+    getRelations: function (q) { return live('/api/ontology/relations', q); },
+    getRelationDetail: function (id) { return live('/api/ontology/relations/' + id); },
+    getRelationEntities: function (q) { return live('/api/ontology/relation-entities', q); },
+    getRelationEntityDetail: function (id) { return live('/api/ontology/relation-entities/' + id); },
+    getGraph: function (q) { return live('/api/ontology/graph', q); },
+    getRules: function (q) { return live('/api/ontology/rules', q); },
+    getConstraints: function () { return live('/api/ontology/constraints'); },
+    getCapabilities: function () { return live('/api/ontology/capabilities'); },
+    getModelRegistry: function () { return live('/api/ontology/model-registry'); },
+    getSemantics: function (q) { return live('/api/ontology/semantics', q); },
+    getMeasurementAnchors: function (q) { return live('/api/ontology/measurement-anchors', q); },
+    getCausalRelations: function () { return live('/api/ontology/causal-relations'); },
+    getObjectRelations: function (id) { return live('/api/ontology/' + encodeURIComponent(id) + '/relations'); },
+    getDataSources: function () { return live('/api/ontology/data-sources'); },
+    getDataQuality: function () { return live('/api/ontology/data-quality'); },
+    getTurtle: function () { return live('/api/ontology/turtle'); },
+    getRelationOverview: function () { return live('/api/ontology/relations', { limit: 1 }); },
+    getMeta: function () { return Promise.resolve({ generatedAt: null }); }
+  };
+
+  // 统一成 Promise 接口，页面代码在两种模式下写法一致
+  function wrap(impl) {
+    var out = {};
+    Object.keys(impl).forEach(function (k) {
+      out[k] = function () {
+        var r = impl[k].apply(null, arguments);
+        return (r && typeof r.then === 'function') ? r : Promise.resolve(r);
+      };
+    });
+    return out;
+  }
+
+  buildIndexes();
+
+  global.OntologyApi = Object.assign(wrap(MODE === 'live' ? liveApi : staticApi), {
+    mode: MODE,
+    baseUrl: BASE,
+    endpoints: [
+      '/api/ontology/overview', '/api/ontology/categories', '/api/ontology/process-areas',
+      '/api/ontology/process-areas/{id}', '/api/ontology/equipment', '/api/ontology/equipment/{id}',
+      '/api/ontology/parameters', '/api/ontology/parameters/{id}', '/api/ontology/tags',
+      '/api/ontology/classes', '/api/ontology/properties', '/api/ontology/relations',
+      '/api/ontology/relations/{id}', '/api/ontology/relation-entities',
+      '/api/ontology/relation-entities/{id}', '/api/ontology/graph', '/api/ontology/rules',
+      '/api/ontology/capabilities', '/api/ontology/constraints', '/api/ontology/model-registry',
+      '/api/ontology/semantics', '/api/ontology/measurement-anchors',
+      '/api/ontology/causal-relations', '/api/ontology/{id}/relations',
+      '/api/ontology/data-sources', '/api/ontology/data-quality'
+    ]
+  });
+})(window);
+
+
+/* ===== graph.js ===== */
+/*
+ * 局部语义图渲染器（零依赖 SVG 力导向布局）。
+ *
+ * 只负责把 /api/ontology/graph 返回的 nodes / edges 画出来，
+ * 节点颜色、边样式、线型与边宽全部取自接口返回的 style 字段，
+ * 不在此处推断任何语义。
+ */
+(function (global) {
+  'use strict';
+
+  var NS = 'http://www.w3.org/2000/svg';
+
+  function el(name, attrs) {
+    var node = document.createElementNS(NS, name);
+    if (attrs) Object.keys(attrs).forEach(function (k) { node.setAttribute(k, attrs[k]); });
+    return node;
+  }
+
+  function dashFor(lineStyle) {
+    if (lineStyle === 'dashed') return '7 5';
+    if (lineStyle === 'dotted') return '2 4';
+    return null;
+  }
+
+  function radiusFor(node) {
+    if (node.isRoot) return 26;
+    if (node.nodeKind === 'tag') return 11;
+    if (node.nodeKind === 'area') return 20;
+    return 15;
+  }
+
+  function RelationGraph(container, options) {
+    this.container = container;
+    this.options = options || {};
+    this.onNodeClick = this.options.onNodeClick || function () {};
+    this.onEdgeClick = this.options.onEdgeClick || function () {};
+    this.transform = { x: 0, y: 0, k: 1 };
+    this.selected = null;
+    this._raf = null;
+    this._build();
+  }
+
+  RelationGraph.prototype._build = function () {
+    var self = this;
+    this.container.innerHTML = '';
+    this.svg = el('svg', { class: 'graph-svg', width: '100%', height: '100%' });
+    var defs = el('defs');
+    ['#8FA6C4', '#4C8DFF', '#5FD0A8', '#3FCF8E', '#FFB86B', '#F2557A', '#E77CC0', '#6B7A90', '#F2C744', '#35C4D7']
+      .forEach(function (color) {
+        var m = el('marker', {
+          id: 'arrow-' + color.slice(1), viewBox: '0 0 10 10', refX: 10, refY: 5,
+          markerWidth: 6, markerHeight: 6, orient: 'auto-start-reverse'
+        });
+        m.appendChild(el('path', { d: 'M 0 0 L 10 5 L 0 10 z', fill: color }));
+        defs.appendChild(m);
+      });
+    this.svg.appendChild(defs);
+
+    this.viewport = el('g', { class: 'graph-viewport' });
+    this.edgeLayer = el('g', { class: 'graph-edges' });
+    this.edgeLabelLayer = el('g', { class: 'graph-edge-labels' });
+    this.nodeLayer = el('g', { class: 'graph-nodes' });
+    this.viewport.appendChild(this.edgeLayer);
+    this.viewport.appendChild(this.edgeLabelLayer);
+    this.viewport.appendChild(this.nodeLayer);
+    this.svg.appendChild(this.viewport);
+    this.container.appendChild(this.svg);
+
+    this.svg.addEventListener('wheel', function (e) {
+      e.preventDefault();
+      var factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+      var next = Math.max(0.3, Math.min(3, self.transform.k * factor));
+      var rect = self.svg.getBoundingClientRect();
+      var mx = e.clientX - rect.left, my = e.clientY - rect.top;
+      self.transform.x = mx - (mx - self.transform.x) * (next / self.transform.k);
+      self.transform.y = my - (my - self.transform.y) * (next / self.transform.k);
+      self.transform.k = next;
+      self._applyTransform();
+    }, { passive: false });
+
+    var dragging = false, last = null;
+    this.svg.addEventListener('pointerdown', function (e) {
+      // 命中节点或关系边时不启动平移：setPointerCapture 会把随后的 click
+      // 事件改派给 svg 本身，导致节点/边的点击回调收不到事件。
+      if (e.target.closest('.graph-node, .graph-edge, .graph-edge-label')) return;
+      dragging = true; last = { x: e.clientX, y: e.clientY };
+      self.svg.setPointerCapture(e.pointerId);
+      self.svg.style.cursor = 'grabbing';
+    });
+    this.svg.addEventListener('pointermove', function (e) {
+      if (!dragging) return;
+      self.transform.x += e.clientX - last.x;
+      self.transform.y += e.clientY - last.y;
+      last = { x: e.clientX, y: e.clientY };
+      self._applyTransform();
+    });
+    ['pointerup', 'pointercancel'].forEach(function (ev) {
+      self.svg.addEventListener(ev, function () { dragging = false; self.svg.style.cursor = ''; });
+    });
+  };
+
+  RelationGraph.prototype._applyTransform = function () {
+    var t = this.transform;
+    this.viewport.setAttribute('transform', 'translate(' + t.x + ',' + t.y + ') scale(' + t.k + ')');
+  };
+
+  RelationGraph.prototype.render = function (graph) {
+    var self = this;
+    this.graph = graph;
+    var rect = this.container.getBoundingClientRect();
+    var W = Math.max(360, rect.width), H = Math.max(320, rect.height);
+
+    var nodes = graph.nodes.map(function (n) { return Object.assign({}, n); });
+    var byId = {};
+    nodes.forEach(function (n) { byId[n.id] = n; });
+    var edges = graph.edges.filter(function (e) { return byId[e.source] && byId[e.target]; });
+
+    var degree = {};
+    edges.forEach(function (e) {
+      degree[e.source] = (degree[e.source] || 0) + 1;
+      degree[e.target] = (degree[e.target] || 0) + 1;
+    });
+
+    // 初始位置：根节点居中，其余按度数分环排布，布局更快收敛
+    var ring = nodes.filter(function (n) { return !n.isRoot; });
+    nodes.forEach(function (n, i) {
+      if (n.isRoot) { n.x = W / 2; n.y = H / 2; n.fixed = true; return; }
+      var k = ring.indexOf(n);
+      var angle = (k / Math.max(1, ring.length)) * Math.PI * 2;
+      var r = Math.min(W, H) * (n.nodeKind === 'tag' ? 0.40 : 0.34) + (i % 5) * 22;
+      n.x = W / 2 + Math.cos(angle) * r;
+      n.y = H / 2 + Math.sin(angle) * r;
+    });
+
+    this._simulate(nodes, edges, W, H, degree);
+    this._draw(nodes, edges, byId);
+
+    // 适配视口
+    var xs = nodes.map(function (n) { return n.x; }), ys = nodes.map(function (n) { return n.y; });
+    var pad = 74;
+    var minX = Math.min.apply(null, xs) - pad, maxX = Math.max.apply(null, xs) + pad;
+    var minY = Math.min.apply(null, ys) - pad, maxY = Math.max.apply(null, ys) + pad;
+    // 下限 0.62：全局图谱铺得很开时宁可留给用户平移，也不缩到标签不可读
+    var k = Math.max(0.62, Math.min(W / Math.max(1, maxX - minX), H / Math.max(1, maxY - minY), 1.4));
+    this.transform.k = k;
+    this.transform.x = (W - (maxX - minX) * k) / 2 - minX * k;
+    this.transform.y = (H - (maxY - minY) * k) / 2 - minY * k;
+    this._applyTransform();
+    return self;
+  };
+
+  RelationGraph.prototype._simulate = function (nodes, edges, W, H, degree) {
+    // 无中心对象时是全局图谱，需要更大的斥力与更弱的向心力才能铺开
+    var noRoot = !nodes.some(function (x) { return x.isRoot; });
+    var iterations = nodes.length > 120 ? 220 : nodes.length > 60 ? 320 : 420;
+    var linkDist = noRoot ? 128 : nodes.length > 60 ? 88 : 116;
+    var charge = noRoot ? 10500 : nodes.length > 60 ? 5200 : 7200;
+    var gravity = noRoot ? 0.0016 : 0.006;
+
+    // 预解析边两端的节点引用，避免在迭代内做线性查找
+    var byId = {};
+    nodes.forEach(function (n) { byId[n.id] = n; });
+    var links = [];
+    edges.forEach(function (e) {
+      var s = byId[e.source], t = byId[e.target];
+      if (s && t) links.push({ s: s, t: t, want: e.edgeKind === 'tag' ? linkDist * 0.55 : linkDist });
+    });
+
+    for (var it = 0; it < iterations; it++) {
+      var alpha = 1 - it / iterations;
+      // 斥力
+      for (var i = 0; i < nodes.length; i++) {
+        var a = nodes[i];
+        a.vx = a.vx || 0; a.vy = a.vy || 0;
+        for (var j = i + 1; j < nodes.length; j++) {
+          var b = nodes[j];
+          var dx = a.x - b.x, dy = a.y - b.y;
+          var d2 = dx * dx + dy * dy || 0.01;
+          var d = Math.sqrt(d2);
+          var f = charge / d2;
+          var fx = (dx / d) * f, fy = (dy / d) * f;
+          a.vx += fx; a.vy += fy;
+          b.vx -= fx; b.vy -= fy;
+        }
+      }
+      // 弹簧
+      for (var L = 0; L < links.length; L++) {
+        var lk = links[L], s = lk.s, t = lk.t;
+        var ldx = t.x - s.x, ldy = t.y - s.y;
+        var ld = Math.sqrt(ldx * ldx + ldy * ldy) || 0.01;
+        var lf = (ld - lk.want) * 0.055;
+        var lfx = (ldx / ld) * lf, lfy = (ldy / ld) * lf;
+        s.vx += lfx; s.vy += lfy;
+        t.vx -= lfx; t.vy -= lfy;
+      }
+      // 向心 + 阻尼
+      nodes.forEach(function (n) {
+        if (n.fixed) { n.vx = 0; n.vy = 0; return; }
+        n.vx += (W / 2 - n.x) * gravity * (1 + 1 / (1 + (degree[n.id] || 0)));
+        n.vy += (H / 2 - n.y) * gravity * (1 + 1 / (1 + (degree[n.id] || 0)));
+        var damp = 0.62 * alpha + 0.12;
+        n.x += Math.max(-24, Math.min(24, n.vx * damp));
+        n.y += Math.max(-24, Math.min(24, n.vy * damp));
+        n.vx *= 0.5; n.vy *= 0.5;
+      });
+    }
+  };
+
+  RelationGraph.prototype._draw = function (nodes, edges, byId) {
+    var self = this;
+    this.edgeLayer.innerHTML = '';
+    this.edgeLabelLayer.innerHTML = '';
+    this.nodeLayer.innerHTML = '';
+    this._edgeEls = {};
+    this._nodeEls = {};
+
+    edges.forEach(function (e) {
+      var s = byId[e.source], t = byId[e.target];
+      var style = e.style || {};
+      var r = radiusFor(t) + 7;
+      var dx = t.x - s.x, dy = t.y - s.y;
+      var d = Math.sqrt(dx * dx + dy * dy) || 1;
+      var x2 = t.x - (dx / d) * r, y2 = t.y - (dy / d) * r;
+      var rs = radiusFor(s) + 3;
+      var x1 = s.x + (dx / d) * rs, y1 = s.y + (dy / d) * rs;
+
+      var g = el('g', { class: 'graph-edge', 'data-id': e.id });
+      var hit = el('line', { x1: x1, y1: y1, x2: x2, y2: y2, stroke: 'transparent', 'stroke-width': 14 });
+      var line = el('line', {
+        x1: x1, y1: y1, x2: x2, y2: y2,
+        stroke: style.color || '#8FA6C4',
+        'stroke-width': style.width || 1.5,
+        'stroke-opacity': style.opacity == null ? 0.8 : style.opacity,
+        'stroke-linecap': 'round',
+        'marker-end': 'url(#arrow-' + String(style.color || '#8FA6C4').slice(1) + ')'
+      });
+      var dash = dashFor(style.lineStyle);
+      if (dash) line.setAttribute('stroke-dasharray', dash);
+      g.appendChild(line); g.appendChild(hit);
+      g.addEventListener('click', function (ev) { ev.stopPropagation(); self.onEdgeClick(e); self.select(e.id); });
+      self.edgeLayer.appendChild(g);
+      self._edgeEls[e.id] = { g: g, line: line };
+
+      // 对象映射边数量可能很多（一个工艺抽象对象对应多台现场设备），
+      // 重复标签会淹没关系谓词，故只为其余边绘制标签。
+      if (e.label && e.edgeKind !== 'mapping') {
+        var mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+        var label = el('text', {
+          x: mx, y: my - 4, class: 'graph-edge-label',
+          'text-anchor': 'middle', fill: style.color || '#8FA6C4'
+        });
+        label.textContent = e.label;
+        label.addEventListener('click', function (ev) { ev.stopPropagation(); self.onEdgeClick(e); self.select(e.id); });
+        self.edgeLabelLayer.appendChild(label);
+      }
+    });
+
+    nodes.forEach(function (n) {
+      var style = n.style || {};
+      var r = radiusFor(n);
+      var g = el('g', {
+        class: 'graph-node' + (n.isRoot ? ' is-root' : ''),
+        transform: 'translate(' + n.x + ',' + n.y + ')',
+        'data-id': n.id
+      });
+      var unmatched = n.matchStatus === 'UNMATCHED';
+      var shape;
+      if (style.shape === 'roundRect') {
+        shape = el('rect', { x: -r - 6, y: -r * 0.72, width: (r + 6) * 2, height: r * 1.44, rx: 6 });
+      } else if (style.shape === 'diamond') {
+        shape = el('path', { d: 'M0,' + -r + 'L' + r + ',0L0,' + r + 'L' + -r + ',0Z' });
+      } else {
+        shape = el('circle', { r: r });
+      }
+      shape.setAttribute('fill', unmatched ? 'transparent' : style.color || '#6B7A90');
+      shape.setAttribute('fill-opacity', unmatched ? '0' : n.isRoot ? '1' : '0.86');
+      shape.setAttribute('stroke', style.color || '#6B7A90');
+      shape.setAttribute('stroke-width', n.isRoot ? 3 : 1.6);
+      if (unmatched) shape.setAttribute('stroke-dasharray', '5 4');
+      g.appendChild(shape);
+
+      var label = el('text', {
+        y: r + 15, class: 'graph-node-label', 'text-anchor': 'middle'
+      });
+      label.textContent = n.label && n.label.length > 14 ? n.label.slice(0, 13) + '…' : n.label;
+      g.appendChild(label);
+
+      var title = el('title');
+      title.textContent = [n.label, n.type, n.matchStatusLabel || '', n.owlSubject || '']
+        .filter(Boolean).join(' · ');
+      g.appendChild(title);
+
+      g.addEventListener('click', function (ev) { ev.stopPropagation(); self.onNodeClick(n); self.select(n.id); });
+      self.nodeLayer.appendChild(g);
+      self._nodeEls[n.id] = g;
+    });
+  };
+
+  RelationGraph.prototype.select = function (id) {
+    this.selected = id;
+    Object.keys(this._nodeEls || {}).forEach(function (k) {
+      this._nodeEls[k].classList.toggle('is-selected', k === id);
+    }, this);
+    Object.keys(this._edgeEls || {}).forEach(function (k) {
+      this._edgeEls[k].g.classList.toggle('is-selected', k === id);
+    }, this);
+  };
+
+  RelationGraph.prototype.destroy = function () {
+    if (this._raf) cancelAnimationFrame(this._raf);
+    this.container.innerHTML = '';
+  };
+
+  global.RelationGraph = RelationGraph;
+})(window);
+
+
+/* ===== app.js ===== */
+/*
+ * 6-APA 生产线工业本体 Demo · 视图层
+ *
+ * 所有数据均通过 OntologyApi 获取（static 快照或 live REST），
+ * 页面不内置任何设备、点位、关系或规则数据。
+ */
+(function (global) {
+  'use strict';
+
+  var api = global.OntologyApi;
+  var $ = function (sel, root) { return (root || document).querySelector(sel); };
+
+  // ------------------------------------------------------------ 工具
+
+  function esc(v) {
+    if (v === null || v === undefined) return '';
+    return String(v).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function n(v) { return (v === null || v === undefined) ? '—' : Number(v).toLocaleString('zh-CN'); }
+  function dash(v) { return (v === null || v === undefined || v === '') ? '—' : esc(v); }
+
+  var NODE_COLORS = {};
+  var CATEGORIES = [];
+  var CORE = [];
+  var EDGE_STYLES = [];
+
+  function colorFor(type) { return NODE_COLORS[type] || '#6b7a90'; }
+
+  function matchPill(status, label) {
+    var cls = status === 'MATCHED' ? 'pill-ok' : 'pill-mute';
+    return '<span class="tag-pill ' + cls + '">' + esc(label || (status === 'MATCHED' ? '已匹配本体实例' : '未匹配DCS实例')) + '</span>';
+  }
+
+  function typePill(type) {
+    var c = colorFor(type);
+    return '<span class="tag-pill pill-plain"><i class="swatch" style="background:' + c + '"></i>' + esc(type || '未标注') + '</span>';
+  }
+
+  function sourceBox(title, source, sourceType) {
+    if (!source) return '';
+    var rows = [];
+    if (source.file) rows.push(['文件', source.file]);
+    if (source.sheet) rows.push(['Sheet', source.sheet]);
+    if (source.row) rows.push(['行号', source.row]);
+    if (source.field) rows.push(['原始字段', source.field]);
+    if (source.value) rows.push(['原始值', source.value]);
+    if (sourceType) rows.unshift(['sourceType', sourceType]);
+    return '<div class="source-box"><div class="hd">' + esc(title || '数据来源') + '</div><dl class="kv">' +
+      rows.map(function (r) {
+        return '<dt>' + esc(r[0]) + '</dt><dd class="mono">' + esc(r[1]) + '</dd>';
+      }).join('') + '</dl></div>';
+  }
+
+  function emptyState(title, body) {
+    return '<div class="empty"><strong>' + esc(title) + '</strong>' + esc(body || '') + '</div>';
+  }
+
+  // ------------------------------------------------------------ 状态
+
+  var S = {
+    view: 'overview',
+    areaId: null,
+    equipmentId: null,
+    parameterId: null,
+    entityId: null,
+    relationId: null,
+    categoryKey: null,
+    depth: 1,
+    showDcs: false,
+    graphFilters: {},
+    relFilters: {},
+    inspector: null,
+    crumbs: []
+  };
+
+  var graph = null;
+
+  function go(patch) {
+    Object.assign(S, patch);
+    render();
+    var canvas = $('#canvas');
+    if (canvas) canvas.scrollTop = 0;
+  }
+
+  // ------------------------------------------------------------ 导航
+
+  function railHtml() {
+    function item(view, label, count, opts) {
+      opts = opts || {};
+      var active = (opts.activeWhen ? opts.activeWhen() : S.view === view);
+      return '<button class="rail-item' + (active ? ' is-active' : '') + (opts.core ? ' is-core' : '') +
+        '" data-nav="' + esc(view) + '"' + (opts.categoryKey ? ' data-cat="' + esc(opts.categoryKey) + '"' : '') + '>' +
+        (opts.idx ? '<span class="idx">' + esc(opts.idx) + '</span>' : '') +
+        '<span>' + esc(label) + '</span>' +
+        (count != null ? '<span class="count">' + n(count) + '</span>' : '') +
+        '</button>';
+    }
+
+    var nav = [
+      '<div class="rail-group"><div class="rail-title">生产线</div>',
+      item('overview', '本体总览'),
+      item('areas', '工段与设备', null, {
+        activeWhen: function () { return ['areas', 'area', 'equipment', 'parameter'].indexOf(S.view) >= 0; }
+      }),
+      item('graph', '关系图谱', null, {
+        activeWhen: function () { return S.view === 'graph' || S.view === 'entity'; }
+      }),
+      item('relations', '关系清单'),
+      item('entities', '关系对象'),
+      '</div>'
+    ].join('');
+
+    var cats = ['<div class="rail-group"><div class="rail-title">本体分类 · 12 项</div>'];
+    CATEGORIES.forEach(function (c) {
+      cats.push(
+        '<button class="rail-item' + (S.view === 'category' && S.categoryKey === c.key ? ' is-active' : '') +
+        (c.core ? ' is-core' : '') + '" data-nav="category" data-cat="' + esc(c.key) + '">' +
+        '<span class="idx">' + String(c.index) + '</span>' +
+        '<span>' + esc(c.name) + '</span>' +
+        '<span class="count">' + n(c.count) + '</span></button>'
+      );
+    });
+    cats.push('</div>');
+
+    var gov = [
+      '<div class="rail-group"><div class="rail-title">数据治理</div>',
+      item('sources', '数据源管理'),
+      item('quality', '数据质量'),
+      item('api', 'API 接口'),
+      '</div>'
+    ].join('');
+
+    return nav + cats.join('') + gov;
+  }
+
+  function crumbsHtml() {
+    if (!S.crumbs.length) return '';
+    var parts = S.crumbs.map(function (c, i) {
+      var last = i === S.crumbs.length - 1;
+      if (last) return '<span class="now">' + esc(c.label) + '</span>';
+      return '<button data-crumb="' + i + '">' + esc(c.label) + '</button><span class="sep">/</span>';
+    });
+    return '<nav class="crumbs">' + parts.join('') + '</nav>';
+  }
+
+  // ------------------------------------------------------------ 视图：总览
+
+  function viewOverview(done) {
+    Promise.all([api.getOverview(), api.getProcessAreas(), api.getRelations({}), api.getDataSources()])
+      .then(function (r) {
+        var o = r[0], areas = r[1].items, rels = r[2].items, sources = r[3];
+        var byCat = {};
+        rels.forEach(function (x) { byCat[x.category] = (byCat[x.category] || 0) + 1; });
+
+        var stats = [
+          ['生产工段', o.processAreaCount, '', 'is-accent'],
+          ['控制站', o.controlStationCount, '', ''],
+          ['设备 / 装置', o.equipmentCount, '', ''],
+          ['参数语义', o.parameterCount, '', ''],
+          ['DCS 点位', o.tagCount, '', 'is-accent'],
+          ['工业关系', o.relationCount, '', ''],
+          ['关系对象', o.relationObjectCount, '', ''],
+          ['测量锚点', o.measurementAnchorCount, '', '']
+        ].map(function (s) {
+          return '<div class="stat ' + s[3] + '"><div class="k">' + esc(s[0]) + '</div>' +
+            '<div class="v">' + n(s[1]) + '<span class="u">' + esc(s[2]) + '</span></div></div>';
+        }).join('');
+
+        var t = o.tagStats;
+        var tagStats = [
+          ['过程测量 PV', t.pv, '#35c4d7'], ['控制输出 OP', t.op, '#4c8dff'],
+          ['电机控制 MOT', t.mot, '#ff9f45'], ['阀门控制 VAL', t.val, '#b07cff'],
+          ['开关/状态 DI·DO', t.dido, '#6f819e']
+        ];
+        var maxTag = Math.max.apply(null, tagStats.map(function (x) { return x[1]; }));
+        var tagBars = tagStats.map(function (x) {
+          return '<tr><td>' + esc(x[0]) + '</td><td class="num mono">' + n(x[1]) + '</td>' +
+            '<td style="width:44%"><div class="bar"><i style="width:' +
+            (100 * x[1] / maxTag).toFixed(1) + '%;background:' + x[2] + '"></i></div></td></tr>';
+        }).join('');
+
+        var areaRows = areas.map(function (a) {
+          return '<tr data-area="' + esc(a.id) + '">' +
+            '<td><strong>' + esc(a.nameZh) + '</strong><div class="mono" style="color:var(--muted);font-size:11px">' +
+            esc(a.nameEn || '') + '</div></td>' +
+            '<td class="mono">' + esc(a.stations.join('、')) + '</td>' +
+            '<td class="num mono">' + n(a.equipmentCount) + '</td>' +
+            '<td class="num mono">' + n(a.parameterCount) + '</td>' +
+            '<td class="num mono">' + n(a.tagCount) + '</td>' +
+            '<td class="num mono">' + (a.relationCount ? n(a.relationCount) : '<span style="color:var(--muted)">—</span>') + '</td>' +
+            '</tr>';
+        }).join('');
+
+        var catRows = Object.keys(byCat).sort(function (a, b) { return byCat[b] - byCat[a]; }).map(function (k) {
+          var style = EDGE_STYLES.filter(function (s) { return s.category === k; })[0] || {};
+          return '<tr data-relcat="' + esc(k) + '"><td><span class="tag-pill pill-plain">' +
+            '<i class="swatch" style="background:' + (style.color || '#8fa6c4') + '"></i>' + esc(k) + '</span></td>' +
+            '<td class="num mono">' + n(byCat[k]) + '</td>' +
+            '<td style="width:52%"><div class="bar"><i style="width:' +
+            (100 * byCat[k] / rels.length).toFixed(1) + '%;background:' + (style.color || '#8fa6c4') + '"></i></div></td></tr>';
+        }).join('');
+
+        var srcCards = sources.sources.map(function (s) {
+          var sheets = (s.sheets || []).map(function (sh) {
+            return '<li><span class="mono">' + esc(sh.sheet) + '</span>' +
+              '<span style="color:var(--muted);float:right" class="mono">' + n(sh.rows) + ' 行</span></li>';
+          }).join('');
+          return '<div class="panel" style="margin:0">' +
+            '<div class="panel-head"><h3>' + esc(s.sourceTypeLabel) + '</h3>' +
+            '<div class="right">' + (s.available
+              ? '<span class="tag-pill pill-ok">已加载</span>'
+              : '<span class="tag-pill pill-mute">未提供</span>') + '</div></div>' +
+            '<div class="panel-body"><div class="mono" style="margin-bottom:6px">' + esc(s.file) + '</div>' +
+            '<p class="note-line">' + esc(s.note || '') + '</p>' +
+            (sheets ? '<ul class="list-plain">' + sheets + '</ul>' : '') + '</div></div>';
+        }).join('');
+
+        done(
+          '<div class="view-head"><h2>6-APA 生产线工业本体</h2>' +
+          '<p>以下全部数字由现场 DCS 点表与工业关系 Excel 实时统计得出，' +
+          '不含任何示例或 Mock 数据。数据加载时间 ' + esc(o.loadedAt) + '。</p></div>' +
+          '<div class="stat-row">' + stats + '</div>' +
+
+          '<div class="panel"><div class="panel-head"><h3>生产工段</h3>' +
+          '<span class="note">点击进入工段 → 设备 → 参数 → DCS 点</span></div>' +
+          '<div class="panel-body flush"><div class="tbl-wrap"><table class="tbl"><thead><tr>' +
+          '<th>工段</th><th>控制站</th><th class="num">设备</th><th class="num">参数语义</th>' +
+          '<th class="num">DCS 点</th><th class="num">关系</th></tr></thead><tbody>' + areaRows +
+          '</tbody></table></div></div></div>' +
+
+          '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px;margin-bottom:18px">' +
+          '<div class="panel" style="margin:0"><div class="panel-head"><h3>DCS 点位构成</h3>' +
+          '<span class="note">共 ' + n(o.tagCount) + ' 点</span></div><div class="panel-body flush">' +
+          '<table class="tbl"><tbody>' + tagBars + '</tbody></table></div></div>' +
+          '<div class="panel" style="margin:0"><div class="panel-head"><h3>关系大类分布</h3>' +
+          '<span class="note">共 ' + n(rels.length) + ' 条关系</span></div><div class="panel-body flush">' +
+          '<table class="tbl"><tbody>' + catRows + '</tbody></table></div></div>' +
+          '</div>' +
+
+          '<div class="panel-head" style="background:none;border:0;padding:0 0 10px"><h3>数据源</h3>' +
+          '<span class="note">DCS 事实 / 关系事实 / 对象对齐 / 推理规则 四类数据源相互独立</span></div>' +
+          '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(272px,1fr));gap:14px">' +
+          srcCards + '</div>'
+        );
+      });
+  }
+
+  // ------------------------------------------------------------ 视图：工段
+
+  function viewAreas(done) {
+    api.getProcessAreas().then(function (res) {
+      var rows = res.items.map(function (a) {
+        return '<tr data-area="' + esc(a.id) + '">' +
+          '<td><strong>' + esc(a.nameZh) + '</strong></td>' +
+          '<td class="mono" style="color:var(--muted)">' + esc(a.nameEn || '') + '</td>' +
+          '<td class="mono">' + esc(a.stations.join('、')) + '</td>' +
+          '<td class="num mono">' + n(a.equipmentCount) + '</td>' +
+          '<td class="num mono">' + n(a.tagCount) + '</td>' +
+          '<td class="num mono">' + (a.relationCount || '—') + '</td></tr>';
+      }).join('');
+      done('<div class="view-head"><h2>生产工段</h2><p>工段实例来自 DCS 点表「所属工段」字段，' +
+        '共 ' + res.total + ' 个工段。关系列统计的是工业关系 Excel 中经对象映射对齐到该工段的关系数。</p></div>' +
+        '<div class="panel"><div class="panel-body flush"><div class="tbl-wrap"><table class="tbl"><thead><tr>' +
+        '<th>工段</th><th>英文名</th><th>控制站</th><th class="num">设备</th>' +
+        '<th class="num">DCS 点</th><th class="num">关系</th></tr></thead><tbody>' + rows +
+        '</tbody></table></div></div></div>');
+    });
+  }
+
+  function viewArea(done) {
+    Promise.all([api.getProcessArea(S.areaId), api.getRelationEntities({})]).then(function (r) {
+      var a = r[0], allEntities = r[1].items;
+      if (!a) return done(emptyState('未找到该工段', ''));
+
+      var relNames = a.relationAreaNames || [];
+      var entities = allEntities.filter(function (e) {
+        return e.areas.some(function (x) { return relNames.indexOf(x) >= 0; });
+      });
+
+      var equipRows = a.equipment.slice(0, 400).map(function (e) {
+        var s = e.stats;
+        return '<tr data-equip="' + esc(e.id) + '">' +
+          '<td><strong>' + esc(e.name) + '</strong></td>' +
+          '<td class="mono" style="color:var(--muted);font-size:11px">' + esc(e.owlSubject) + '</td>' +
+          '<td class="num mono">' + n(e.tagCount) + '</td>' +
+          '<td class="num mono">' + n(e.parameterCount) + '</td>' +
+          '<td class="num mono">' + n(s.pv) + '</td><td class="num mono">' + n(s.op) + '</td>' +
+          '<td class="num mono">' + n(s.val) + '</td><td class="num mono">' + n(s.dido) + '</td></tr>';
+      }).join('');
+
+      var catCounts = a.relationCategoryCounts || {};
+      var catChips = Object.keys(catCounts).map(function (k) {
+        var st = EDGE_STYLES.filter(function (s) { return s.category === k; })[0] || {};
+        return '<span class="tag-pill pill-plain"><i class="swatch" style="background:' +
+          (st.color || '#8fa6c4') + '"></i>' + esc(k) + ' · ' + catCounts[k] + '</span>';
+      }).join(' ');
+
+      var entRows = entities.map(function (e) {
+        return '<tr data-entity="' + esc(e.id) + '">' +
+          '<td><strong>' + esc(e.name) + '</strong></td>' +
+          '<td>' + typePill(e.type) + '</td>' +
+          '<td class="num mono">' + n(e.relationCount) + '</td>' +
+          '<td>' + matchPill(e.matchStatus, e.matchStatusLabel) + '</td>' +
+          '<td class="num mono">' + (e.tagCount ? n(e.tagCount) : '—') + '</td></tr>';
+      }).join('');
+
+      done(
+        '<div class="view-head"><h2>' + esc(a.nameZh) + '</h2>' +
+        '<p class="mono" style="color:var(--muted)">' + esc(a.name) + '</p></div>' +
+        '<div class="stat-row">' +
+        '<div class="stat"><div class="k">控制站</div><div class="v">' + esc(a.stations.join('、')) + '</div></div>' +
+        '<div class="stat"><div class="k">设备 / 装置</div><div class="v">' + n(a.equipmentCount) + '</div></div>' +
+        '<div class="stat"><div class="k">参数语义</div><div class="v">' + n(a.parameterCount) + '</div></div>' +
+        '<div class="stat is-accent"><div class="k">DCS 点位</div><div class="v">' + n(a.tagCount) + '</div></div>' +
+        '<div class="stat"><div class="k">工业关系</div><div class="v">' + n(a.relationCount || 0) + '</div></div>' +
+        '</div>' +
+
+        (entities.length
+          ? '<div class="panel"><div class="panel-head"><h3>工艺对象</h3>' +
+            '<span class="note">来自工业关系 Excel · ' + esc(relNames.join('、')) + '</span>' +
+            '<div class="right">' + catChips + '</div></div>' +
+            '<div class="panel-body flush"><div class="tbl-wrap"><table class="tbl"><thead><tr>' +
+            '<th>对象语义名称</th><th>对象类型</th><th class="num">关系数</th><th>匹配状态</th>' +
+            '<th class="num">测点</th></tr></thead><tbody>' + entRows + '</tbody></table></div></div></div>'
+          : '<div class="panel"><div class="panel-head"><h3>工艺对象</h3></div><div class="panel-body">' +
+            emptyState('该工段暂无工业关系数据', '当前工业关系 Excel 覆盖水解工段、萃取工段与跨工段协同三个范围。') +
+            '</div></div>') +
+
+        '<div class="panel"><div class="panel-head"><h3>设备 / 装置</h3>' +
+        '<span class="note">来自 DCS 点表 · 按点位数排序' +
+        (a.equipment.length > 400 ? '（显示前 400 台，共 ' + n(a.equipment.length) + ' 台）' : '') + '</span></div>' +
+        '<div class="panel-body flush"><div class="tbl-wrap scroll-y"><table class="tbl"><thead><tr>' +
+        '<th>设备名称</th><th>OWL Subject</th><th class="num">点位</th><th class="num">参数</th>' +
+        '<th class="num">PV</th><th class="num">OP</th><th class="num">VAL</th><th class="num">DI/DO</th>' +
+        '</tr></thead><tbody>' + equipRows + '</tbody></table></div></div></div>'
+      );
+    });
+  }
+
+  // ------------------------------------------------------------ 视图：设备
+
+  function viewEquipment(done) {
+    api.getEquipmentDetail(S.equipmentId).then(function (e) {
+      if (!e) return done(emptyState('未找到该设备', ''));
+      var s = e.stats, s1 = e.statsFromSheet1 || {};
+
+      var paramRows = e.parameters.map(function (p) {
+        var tags = e.tags.filter(function (t) { return t.parameterId === p.id; });
+        return '<tr data-param="' + esc(p.id) + '">' +
+          '<td><strong>' + esc(p.name) + '</strong></td>' +
+          '<td>' + (p.categories || []).map(function (c) {
+            return '<span class="tag-pill pill-plain">' + esc(c) + '</span>';
+          }).join(' ') + '</td>' +
+          '<td class="mono">' + dash((p.units || []).join('、')) + '</td>' +
+          '<td class="mono">' + dash((p.blockTypes || []).join('、')) + '</td>' +
+          '<td class="mono">' + tags.map(function (t) { return esc(t.name); }).join('、') + '</td></tr>';
+      }).join('');
+
+      var relRows = e.relations.length ? e.relations.map(function (r) {
+        return '<tr data-rel="' + esc(r.id) + '">' +
+          '<td>' + esc(r.subjectEntity) + '</td>' +
+          '<td><span class="tag-pill pill-info">' + esc(r.predicate) + '</span></td>' +
+          '<td>' + esc(r.objectEntity) + '</td>' +
+          '<td>' + esc(r.category) + '</td>' +
+          '<td style="color:var(--text-2)">' + esc(r.domainDescription) + '</td></tr>';
+      }).join('') : '';
+
+      var mismatch = (s1.totalPoints != null && s1.totalPoints !== s.total)
+        ? '<div class="warn-line"><span>⚠</span><div>Sheet1「设备统计」声明 <b>' + n(s1.totalPoints) +
+          '</b> 点，Sheet2「DCS点位明细」实际 <b>' + n(s.total) + '</b> 点，已记入数据质量报告，未做任何修正。</div></div>'
+        : '';
+
+      done(
+        '<div class="view-head"><h2>' + esc(e.name) + '</h2>' +
+        '<p>所属工段 ' + esc((e.area || {}).nameZh || '') + ' · 控制站 ' + esc(e.station) +
+        ' · <span class="mono">' + esc(e.owlSubject) + '</span></p></div>' +
+        mismatch +
+        '<div class="stat-row">' +
+        '<div class="stat is-accent"><div class="k">总点位</div><div class="v">' + n(s.total) + '</div></div>' +
+        '<div class="stat"><div class="k">过程测量 PV</div><div class="v">' + n(s.pv) + '</div></div>' +
+        '<div class="stat"><div class="k">控制输出 OP</div><div class="v">' + n(s.op) + '</div></div>' +
+        '<div class="stat"><div class="k">电机控制 MOT</div><div class="v">' + n(s.mot) + '</div></div>' +
+        '<div class="stat"><div class="k">阀门控制 VAL</div><div class="v">' + n(s.val) + '</div></div>' +
+        '<div class="stat"><div class="k">开关反馈 DI/DO</div><div class="v">' + n(s.dido) + '</div></div>' +
+        '<div class="stat"><div class="k">参数语义</div><div class="v">' + n(e.parameterCount) + '</div></div>' +
+        '</div>' +
+
+        (e.overview ? '<p class="note-line"><b style="color:var(--text-2)">核心参数/测点概览：</b>' + esc(e.overview) + '</p>' : '') +
+
+        '<div class="panel"><div class="panel-head"><h3>设备参数 → DCS 点</h3>' +
+        '<span class="note">设备 / 参数语义 / DCS 点三层语义模型</span>' +
+        '<div class="right"><button class="ctl" data-graph-equip="' + esc(e.id) + '">查看关系图</button></div></div>' +
+        '<div class="panel-body flush"><div class="tbl-wrap scroll-y"><table class="tbl"><thead><tr>' +
+        '<th>参数语义名称</th><th>参数分类</th><th>工程单位</th><th>DCS 块</th><th>DCS 点名</th>' +
+        '</tr></thead><tbody>' + paramRows + '</tbody></table></div></div></div>' +
+
+        '<div class="panel"><div class="panel-head"><h3>设备关系</h3>' +
+        '<span class="note">经对象映射对齐到本设备的工业关系</span></div>' +
+        '<div class="panel-body' + (relRows ? ' flush' : '') + '">' +
+        (relRows
+          ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>起始对象</th><th>关系谓词</th>' +
+            '<th>目标对象</th><th>关系大类</th><th>工艺机理与业务因果说明</th></tr></thead><tbody>' +
+            relRows + '</tbody></table></div>'
+          : emptyState('该设备当前无关联工业关系',
+              '工业关系 Excel 覆盖水解工段与萃取工段的核心工艺对象；关系不会根据设备名称自动推断。')) +
+        '</div></div>' +
+
+        '<div class="panel"><div class="panel-head"><h3>关联规则</h3></div><div class="panel-body">' +
+        (e.rules && e.rules.length ? '' : emptyState('当前暂无规则数据源',
+          '规则必须来自独立规则 Excel / 规则文件，系统不会根据参数名称自动生成生产判断规则。')) +
+        '</div></div>'
+      );
+    });
+  }
+
+  // ------------------------------------------------------------ 视图：参数
+
+  function viewParameter(done) {
+    api.getParameterDetail(S.parameterId).then(function (p) {
+      if (!p) return done(emptyState('未找到该参数', ''));
+
+      var anchors = p.measurementAnchors.map(function (a) {
+        return '<div class="chain">' +
+          '<div class="chain-node"><span class="lbl">工业语义</span><span class="val">' + esc(a.semanticName) + '</span>' +
+          '<span class="tag-pill pill-plain" style="margin-left:auto">' + esc(a.parameterType || '') + '</span></div>' +
+          '<div class="chain-arrow"></div>' +
+          '<div class="chain-node"><span class="lbl">DCS Tag</span><span class="val mono">' + esc(a.tagName) + '</span>' +
+          '<span style="margin-left:auto;color:var(--muted)">' + esc(a.rawDescription || '') + '</span></div>' +
+          '<div class="chain-arrow"></div>' +
+          '<div class="chain-node"><span class="lbl">DCS 块</span><span class="val mono">' + esc(a.blockType) + '</span>' +
+          '<span style="margin-left:auto;color:var(--muted)">工程单位 ' + dash(a.unit) + ' · 控制站 ' + esc(a.station) + '</span></div>' +
+          '</div>';
+      }).join('<div style="height:14px"></div>');
+
+      var entRows = p.relationEntities.length ? p.relationEntities.map(function (e) {
+        return '<tr data-entity="' + esc(e.id) + '"><td><strong>' + esc(e.name) + '</strong></td>' +
+          '<td>' + typePill(e.type) + '</td><td class="num mono">' + n(e.relationCount) + '</td>' +
+          '<td>' + esc(e.matchStrategyLabel || '') + '</td></tr>';
+      }).join('') : '';
+
+      done(
+        '<div class="view-head"><h2>' + esc(p.name) + '</h2>' +
+        '<p>所属设备 ' + esc(p.equipmentName) + ' · 工段 ' + esc(p.areaName || '') +
+        ' · <span class="mono">' + esc(p.owlSubject) + '</span></p></div>' +
+
+        '<div class="panel"><div class="panel-head"><h3>参数语义</h3></div><div class="panel-body">' +
+        '<dl class="kv" style="grid-template-columns:120px 1fr">' +
+        '<dt>名称</dt><dd>' + esc(p.name) + '</dd>' +
+        '<dt>参数分类</dt><dd>' + (p.categories || []).join('、') + '</dd>' +
+        '<dt>工程单位</dt><dd class="mono">' + dash((p.units || []).join('、')) + '</dd>' +
+        '<dt>DCS 块类型</dt><dd class="mono">' + dash((p.blockTypes || []).join('、')) + '</dd>' +
+        '<dt>所属设备</dt><dd>' + esc(p.equipmentName) + '</dd>' +
+        '<dt>OWL Subject</dt><dd class="mono">' + esc(p.owlSubject) + '</dd>' +
+        '<dt>绑定 DCS 点</dt><dd class="mono">' + p.tags.map(function (t) { return esc(t.name); }).join('、') + '</dd>' +
+        '</dl></div></div>' +
+
+        '<div class="panel"><div class="panel-head"><h3>测量锚点</h3>' +
+        '<span class="note">工业语义 → DCS Tag → DCS 块</span></div>' +
+        '<div class="panel-body">' + (anchors || emptyState('当前暂无对应 DCS 测点', '')) + '</div></div>' +
+
+        '<div class="panel"><div class="panel-head"><h3>关联工艺对象</h3>' +
+        '<span class="note">哪些关系对象以本参数作为测量锚点</span></div>' +
+        '<div class="panel-body' + (entRows ? ' flush' : '') + '">' +
+        (entRows
+          ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>对象语义名称</th><th>对象类型</th>' +
+            '<th class="num">关系数</th><th>匹配方式</th></tr></thead><tbody>' + entRows + '</tbody></table></div>'
+          : emptyState('本参数暂未被工业关系 Excel 引用', '')) +
+        '</div></div>'
+      );
+    });
+  }
+
+  // ------------------------------------------------------------ 视图：关系对象 / 关系图
+
+  function graphToolbar(rootLabel) {
+    var depths = [1, 2, 3].map(function (d) {
+      return '<button class="ctl' + (S.depth === d ? ' is-on' : '') + '" data-depth="' + d + '">' + d + ' 跳</button>';
+    }).join('');
+    return '<div class="graph-depth">' + depths +
+      '<button class="ctl' + (S.showDcs ? ' is-on' : '') + '" data-showdcs="1">DCS 实例</button></div>' +
+      '<div class="graph-hint">滚轮缩放 · 拖拽平移 · 点击节点或关系边查看详情' +
+      (rootLabel ? ' · 当前中心：' + esc(rootLabel) : '') + '</div>';
+  }
+
+  function legendHtml() {
+    var nodes = (CORE_STYLES.nodes || []).map(function (s) {
+      return '<span><i style="background:' + s.color + '"></i>' + esc(s.type) + '</span>';
+    }).join('');
+    return '<div class="graph-legend">' + nodes +
+      '<span><i style="background:transparent;border:1px dashed var(--unmatched)"></i>未匹配 DCS 实例</span></div>';
+  }
+
+  var CORE_STYLES = { nodes: [], edges: [] };
+
+  function viewEntity(done) {
+    Promise.all([api.getRelationEntityDetail(S.entityId), api.getRelations({ entityId: S.entityId })])
+      .then(function (r) {
+        var e = r[0], rels = r[1].items;
+        if (!e) return done(emptyState('未找到该关系对象', ''));
+
+        var parts = e.outgoingRelations.filter(function (x) { return x.objectType === '设备部件'; });
+        var props = e.outgoingRelations.filter(function (x) { return x.objectType === '工艺属性'; });
+
+        function relTable(list, empty) {
+          if (!list.length) return emptyState(empty, '');
+          return '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>关系谓词</th><th>对象</th>' +
+            '<th>类型</th><th>子场景</th><th class="num">权重</th><th>工艺机理与业务因果说明</th>' +
+            '</tr></thead><tbody>' + list.map(function (x) {
+              var other = x.subject.id === S.entityId ? x.object : x.subject;
+              return '<tr data-rel="' + esc(x.id) + '">' +
+                '<td><span class="tag-pill pill-info">' + esc(x.predicate) + '</span></td>' +
+                '<td data-entity-jump="' + esc(other.id) + '"><strong>' + esc(other.entity) + '</strong></td>' +
+                '<td>' + typePill(other.type) + '</td>' +
+                '<td>' + esc(x.scenario) + '</td>' +
+                '<td class="num mono">' + esc(x.weight) + '</td>' +
+                '<td style="color:var(--text-2)">' + esc(x.domainDescription) + '</td></tr>';
+            }).join('') + '</tbody></table></div>';
+        }
+
+        var matchRows = e.matches.length ? e.matches.map(function (m) {
+          return '<tr' + (m.objectType === 'equipment' ? ' data-equip="' + esc(m.id) + '"' :
+            m.objectType === 'parameter' ? ' data-param="' + esc(m.id) + '"' : '') + '>' +
+            '<td><strong>' + esc(m.name) + '</strong></td>' +
+            '<td>' + esc({ equipment: '设备', parameter: '参数', area: '工段' }[m.objectType] || m.objectType) + '</td>' +
+            '<td class="mono" style="font-size:11px">' + esc(m.owlSubject || m.equipmentName || '') + '</td>' +
+            '<td>' + esc(m.strategyLabel) + '</td>' +
+            '<td>' + (m.confidence
+              ? '<span class="tag-pill ' + (m.confidence === '高' ? 'pill-ok' : m.confidence === '中' ? 'pill-warn' : 'pill-err') +
+                '">' + esc(m.confidence) + '</span>' : '—') + '</td>' +
+            '<td>' + (m.status ? '<span class="tag-pill pill-warn">' + esc(m.status) + '</span>' : '—') + '</td>' +
+            '<td style="color:var(--text-2)">' + esc(m.note || '') + '</td></tr>';
+        }).join('') : '';
+
+        var anchorRows = e.measurementAnchors.length ? e.measurementAnchors.map(function (a) {
+          return '<tr data-param="' + esc(a.parameterId) + '">' +
+            '<td>' + esc(a.equipmentName) + '</td><td>' + esc(a.semanticName) + '</td>' +
+            '<td class="mono">' + esc(a.tagName) + '</td><td class="mono">' + esc(a.blockType) + '</td>' +
+            '<td class="mono">' + dash(a.unit) + '</td>' +
+            '<td style="color:var(--text-2)">' + esc(a.rawDescription) + '</td></tr>';
+        }).join('') : '';
+
+        done(
+          '<div class="view-head"><h2>' + esc(e.name) + '</h2>' +
+          '<p>' + typePill(e.type) + ' ' + matchPill(e.matchStatus, e.matchStatusLabel) +
+          (e.pendingConfirmation ? ' <span class="tag-pill pill-warn">映射待现场确认</span>' : '') +
+          ' · 关系 ' + e.relationCount + ' 条 · 工段 ' + esc(e.areas.join('、')) + '</p></div>' +
+
+          '<div class="panel"><div class="panel-head"><h3>局部语义图</h3>' +
+          '<span class="note">默认展开一跳，可继续展开到二跳、三跳</span></div>' +
+          '<div class="panel-body flush"><div class="graph-shell"><div id="graph-host" style="position:absolute;inset:0"></div>' +
+          graphToolbar(e.name) + legendHtml() + '</div></div></div>' +
+
+          '<div class="panel"><div class="panel-head"><h3>设备部件</h3>' +
+          '<span class="note">predicate = 具有部件</span></div>' +
+          '<div class="panel-body' + (parts.length ? ' flush' : '') + '">' +
+          relTable(parts, '本对象无部件关系') + '</div></div>' +
+
+          '<div class="panel"><div class="panel-head"><h3>工艺属性</h3>' +
+          '<span class="note">predicate = 具有属性</span></div>' +
+          '<div class="panel-body' + (props.length ? ' flush' : '') + '">' +
+          relTable(props, '本对象无属性关系') + '</div></div>' +
+
+          '<div class="panel"><div class="panel-head"><h3>全部关系</h3>' +
+          '<span class="note">' + e.outgoingCount + ' 条出边 · ' + e.incomingCount + ' 条入边</span></div>' +
+          '<div class="panel-body flush">' + relTable(rels, '无关系') + '</div></div>' +
+
+          '<div class="panel"><div class="panel-head"><h3>匹配的本体实例</h3>' +
+          '<span class="note">关系对象 → DCS 本体对象</span></div>' +
+          '<div class="panel-body' + (matchRows ? ' flush' : '') + '">' +
+          (matchRows
+            ? '<div class="tbl-wrap scroll-y"><table class="tbl"><thead><tr><th>本体对象</th><th>类型</th>' +
+              '<th>标识</th><th>匹配方式</th><th>置信度</th><th>确认状态</th><th>映射说明</th>' +
+              '</tr></thead><tbody>' + matchRows + '</tbody></table></div>'
+            : emptyState('未匹配 DCS 实例',
+                '该关系对象已加载并保留为外部关系对象，未在 DCS 点表或对象映射表中找到对应实例，关系数据不会被丢弃。')) +
+          '</div></div>' +
+
+          '<div class="panel"><div class="panel-head"><h3>测量锚点</h3></div>' +
+          '<div class="panel-body' + (anchorRows ? ' flush' : '') + '">' +
+          (anchorRows
+            ? '<div class="tbl-wrap scroll-y"><table class="tbl"><thead><tr><th>设备</th><th>参数语义</th>' +
+              '<th>DCS 点名</th><th>DCS 块</th><th>单位</th><th>原点描述</th></tr></thead><tbody>' +
+              anchorRows + '</tbody></table></div>'
+            : emptyState('关系对象已加载，当前暂无对应 DCS 测点', '不虚构任何 DCS 点。')) +
+          '</div></div>'
+        );
+
+        setTimeout(function () { mountGraph({ rootId: S.entityId, depth: S.depth }); }, 0);
+      });
+  }
+
+  function viewGraph(done) {
+    Promise.all([api.getRelations({}), api.getRelationEntities({})]).then(function (r) {
+      var rels = r[0].items, entities = r[1].items;
+      var f = S.graphFilters;
+
+      function opts(values, current) {
+        return ['<option value="">全部</option>'].concat(values.map(function (v) {
+          return '<option value="' + esc(v) + '"' + (current === v ? ' selected' : '') + '>' + esc(v) + '</option>';
+        })).join('');
+      }
+      function uniq(list, key) {
+        var out = [];
+        list.forEach(function (x) { if (x[key] && out.indexOf(x[key]) < 0) out.push(x[key]); });
+        return out.sort();
+      }
+
+      var rootOpts = ['<option value="">（不指定中心，显示全部筛选结果）</option>'].concat(
+        entities.map(function (e) {
+          return '<option value="' + esc(e.id) + '"' + (f.rootId === e.id ? ' selected' : '') + '>' +
+            esc(e.name) + ' · ' + esc(e.type) + '</option>';
+        })).join('');
+
+      done(
+        '<div class="view-head"><h2>关系图谱</h2>' +
+        '<p>关系边全部来自工业关系 Excel。系统不根据设备名称、编号或参数名称推断任何关系。</p></div>' +
+        '<div class="panel"><div class="filters">' +
+        '<label>中心对象<select class="ctl" data-gf="rootId" style="min-width:220px">' + rootOpts + '</select></label>' +
+        '<label>工段<select class="ctl" data-gf="area">' + opts(uniq(rels, 'area'), f.area) + '</select></label>' +
+        '<label>关系大类<select class="ctl" data-gf="category">' + opts(uniq(rels, 'category'), f.category) + '</select></label>' +
+        '<label>关系谓词<select class="ctl" data-gf="predicate">' + opts(uniq(rels, 'predicate'), f.predicate) + '</select></label>' +
+        '<label>起始对象类型<select class="ctl" data-gf="subjectType">' + opts(uniq(rels, 'subjectType'), f.subjectType) + '</select></label>' +
+        '<label>目标对象类型<select class="ctl" data-gf="objectType">' + opts(uniq(rels, 'objectType'), f.objectType) + '</select></label>' +
+        '<label>子场景<select class="ctl" data-gf="scenario">' + opts(uniq(rels, 'scenario'), f.scenario) + '</select></label>' +
+        '<label>最小权重<input class="ctl" data-gf="minWeight" type="number" step="0.5" style="width:78px" value="' +
+        esc(f.minWeight || '') + '"></label>' +
+        '<label>最大权重<input class="ctl" data-gf="maxWeight" type="number" step="0.5" style="width:78px" value="' +
+        esc(f.maxWeight || '') + '"></label>' +
+        '<label>匹配状态<select class="ctl" data-gf="matched">' +
+        '<option value="">全部</option>' +
+        '<option value="1"' + (f.matched === true ? ' selected' : '') + '>仅已匹配 DCS 实例</option>' +
+        '<option value="0"' + (f.matched === false ? ' selected' : '') + '>仅未匹配</option></select></label>' +
+        '<label>&nbsp;<button class="ctl" data-gf-reset="1">重置筛选</button></label>' +
+        '</div>' +
+        '<div class="panel-body flush"><div class="graph-shell" style="height:640px">' +
+        '<div id="graph-host" style="position:absolute;inset:0"></div>' +
+        graphToolbar(null) + legendHtml() + '</div></div></div>'
+      );
+
+      setTimeout(function () {
+        mountGraph(Object.assign({ depth: S.depth }, S.graphFilters));
+      }, 0);
+    });
+  }
+
+  function mountGraph(q) {
+    var host = document.getElementById('graph-host');
+    if (!host) return;
+    q = Object.assign({ includeDcs: S.showDcs }, q);
+    api.getGraph(q).then(function (g) {
+      if (graph) graph.destroy();
+      graph = new global.RelationGraph(host, {
+        onNodeClick: function (node) { inspectNode(node); },
+        onEdgeClick: function (edge) {
+          if (edge.edgeKind === 'relation') return inspectRelation(edge.id);
+          inspectStructuralEdge(edge);
+        }
+      });
+      graph.render(g);
+      var hint = host.parentElement.querySelector('.graph-hint');
+      if (hint) {
+        hint.innerHTML = '节点 ' + g.nodeCount + ' · 边 ' + g.edgeCount +
+          (g.truncated ? ' · <span style="color:var(--warn)">已截断，请收紧筛选</span>' : '') +
+          ' · 滚轮缩放 / 拖拽平移 / 点击查看详情';
+      }
+    });
+  }
+
+  function inspectNode(node) {
+    if (node.nodeKind === 'relationEntity') { inspectEntity(node.id); return; }
+    var id = String(node.id).replace(/^dcs::/, '');
+    if (node.nodeKind === 'equipment') { inspectEquipment(id); return; }
+    if (node.nodeKind === 'parameter') { inspectParameter(id); return; }
+    if (node.nodeKind === 'tag') { inspectTag(id, node); return; }
+    if (node.nodeKind === 'area') { go({ view: 'area', areaId: id }); }
+  }
+
+  // ------------------------------------------------------------ 视图：关系清单 / 关系对象
+
+  function viewRelations(done) {
+    api.getRelations({}).then(function (all) {
+      var f = S.relFilters;
+      api.getRelations(f).then(function (res) {
+        function uniq(key) {
+          var out = [];
+          all.items.forEach(function (x) { if (x[key] && out.indexOf(x[key]) < 0) out.push(x[key]); });
+          return out.sort();
+        }
+        function opts(values, current) {
+          return ['<option value="">全部</option>'].concat(values.map(function (v) {
+            return '<option value="' + esc(v) + '"' + (current === v ? ' selected' : '') + '>' + esc(v) + '</option>';
+          })).join('');
+        }
+
+        var rows = res.items.map(function (r) {
+          var st = EDGE_STYLES.filter(function (s) { return s.category === r.category; })[0] || {};
+          return '<tr data-rel="' + esc(r.id) + '">' +
+            '<td>' + esc(r.area) + '</td>' +
+            '<td><span class="tag-pill pill-plain"><i class="swatch" style="background:' +
+            (st.color || '#8fa6c4') + '"></i>' + esc(r.category) + '</span></td>' +
+            '<td data-entity-jump="' + esc(r.subject.id) + '"><strong>' + esc(r.subjectEntity) + '</strong>' +
+            '<div style="color:var(--muted);font-size:11px">' + esc(r.subjectType) + '</div></td>' +
+            '<td><span class="tag-pill pill-info">' + esc(r.predicate) + '</span></td>' +
+            '<td data-entity-jump="' + esc(r.object.id) + '"><strong>' + esc(r.objectEntity) + '</strong>' +
+            '<div style="color:var(--muted);font-size:11px">' + esc(r.objectType) + '</div></td>' +
+            '<td>' + esc(r.scenario) + '</td>' +
+            '<td class="num mono">' + esc(r.weight) + '</td>' +
+            '<td style="color:var(--text-2);max-width:260px">' + esc(r.domainDescription) + '</td>' +
+            '<td>' + matchPill(r.matchStatus === 'MATCHED' ? 'MATCHED' : 'UNMATCHED',
+              r.matchStatus === 'MATCHED' ? '双端已匹配' : r.matchStatus === 'PARTIAL' ? '单端已匹配' : '双端未匹配') + '</td>' +
+            '<td class="mono" style="font-size:11px;color:var(--muted)">第 ' + esc(r.source.row) + ' 行</td></tr>';
+        }).join('');
+
+        done(
+          '<div class="view-head"><h2>关系清单</h2>' +
+          '<p>共 ' + all.total + ' 条关系，全部来自 <span class="mono">6APA_工业关系.xlsx</span> 的「关系明细」Sheet。' +
+          '当前筛选命中 ' + res.total + ' 条。</p></div>' +
+          '<div class="panel"><div class="filters">' +
+          '<label>工段<select class="ctl" data-rf="area">' + opts(uniq('area'), f.area) + '</select></label>' +
+          '<label>关系大类<select class="ctl" data-rf="category">' + opts(uniq('category'), f.category) + '</select></label>' +
+          '<label>关系谓词<select class="ctl" data-rf="predicate">' + opts(uniq('predicate'), f.predicate) + '</select></label>' +
+          '<label>起始对象类型<select class="ctl" data-rf="subjectType">' + opts(uniq('subjectType'), f.subjectType) + '</select></label>' +
+          '<label>目标对象类型<select class="ctl" data-rf="objectType">' + opts(uniq('objectType'), f.objectType) + '</select></label>' +
+          '<label>子场景<select class="ctl" data-rf="scenario">' + opts(uniq('scenario'), f.scenario) + '</select></label>' +
+          '<label>最小权重<input class="ctl" data-rf="minWeight" type="number" step="0.5" style="width:78px" value="' +
+          esc(f.minWeight || '') + '"></label>' +
+          '<label>最大权重<input class="ctl" data-rf="maxWeight" type="number" step="0.5" style="width:78px" value="' +
+          esc(f.maxWeight || '') + '"></label>' +
+          '<label>关键词<input class="ctl" data-rf="keyword" placeholder="对象 / 谓词 / 机理说明" value="' +
+          esc(f.keyword || '') + '"></label>' +
+          '<label>&nbsp;<button class="ctl" data-rf-reset="1">重置</button></label>' +
+          '</div><div class="panel-body flush"><div class="tbl-wrap"><table class="tbl"><thead><tr>' +
+          '<th>工段</th><th>关系大类</th><th>起始对象</th><th>谓词</th><th>目标对象</th>' +
+          '<th>子场景</th><th class="num">权重</th><th>工艺机理与业务因果说明</th><th>匹配</th><th>来源</th>' +
+          '</tr></thead><tbody>' + rows + '</tbody></table></div></div></div>'
+        );
+      });
+    });
+  }
+
+  function viewEntities(done) {
+    api.getRelationEntities({}).then(function (res) {
+      var byType = {};
+      res.items.forEach(function (e) {
+        (byType[e.type || '未标注'] = byType[e.type || '未标注'] || []).push(e);
+      });
+      var matched = res.items.filter(function (e) { return e.matchStatus === 'MATCHED'; }).length;
+
+      var blocks = Object.keys(byType).map(function (t) {
+        var rows = byType[t].map(function (e) {
+          return '<tr data-entity="' + esc(e.id) + '">' +
+            '<td><strong>' + esc(e.name) + '</strong></td>' +
+            '<td class="num mono">' + n(e.relationCount) + '</td>' +
+            '<td class="mono">' + e.outgoingCount + ' / ' + e.incomingCount + '</td>' +
+            '<td>' + matchPill(e.matchStatus, e.matchStatusLabel) + '</td>' +
+            '<td>' + esc(e.matchStrategyLabel) + '</td>' +
+            '<td class="num mono">' + (e.matchCount || '—') + '</td>' +
+            '<td class="num mono">' + (e.tagCount || '—') + '</td>' +
+            '<td>' + (e.pendingConfirmation ? '<span class="tag-pill pill-warn">待现场确认</span>' : '—') + '</td></tr>';
+        }).join('');
+        return '<div class="panel"><div class="panel-head"><h3>' + typePill(t) + '</h3>' +
+          '<span class="note">' + byType[t].length + ' 个对象</span></div>' +
+          '<div class="panel-body flush"><div class="tbl-wrap"><table class="tbl"><thead><tr>' +
+          '<th>对象语义名称</th><th class="num">关系数</th><th>出/入边</th><th>匹配状态</th>' +
+          '<th>匹配方式</th><th class="num">实例</th><th class="num">测点</th><th>确认</th>' +
+          '</tr></thead><tbody>' + rows + '</tbody></table></div></div></div>';
+      }).join('');
+
+      done(
+        '<div class="view-head"><h2>关系对象</h2>' +
+        '<p>关系 Excel 中出现的全部工业对象共 ' + res.total + ' 个，其中 ' + matched +
+        ' 个已匹配到 DCS 本体实例，' + (res.total - matched) + ' 个保留为外部关系对象并标记“未匹配DCS实例”。' +
+        '关系 Excel 使用工艺抽象名称、DCS 点表使用现场位号命名，两者精确匹配数为 0，' +
+        '已匹配项全部经由人工对象映射表建立，状态为“待现场确认”。</p></div>' + blocks
+      );
+    });
+  }
+
+  // ------------------------------------------------------------ 视图：12 分类
+
+  function viewCategory(done) {
+    var cat = CATEGORIES.filter(function (c) { return c.key === S.categoryKey; })[0];
+    if (!cat) return done(emptyState('未知分类', ''));
+    var head = '<div class="view-head"><h2>' + esc(cat.name) + ' · ' + esc(cat.nameEn) + '</h2>' +
+      '<p>' + esc(cat.description) + '　<span class="mono" style="color:var(--muted)">' + esc(cat.endpoint) + '</span></p></div>';
+
+    var K = S.categoryKey;
+
+    if (K === 'class') {
+      api.getClasses().then(function (res) {
+        var rows = res.items.map(function (c) {
+          return '<tr><td class="mono">' + dash(c.uri) + '</td><td><strong>' + esc(c.label) + '</strong></td>' +
+            '<td>' + esc(c.kind) + '</td><td class="num mono">' + n(c.instanceCount) + '</td>' +
+            '<td class="mono" style="font-size:11px;color:var(--text-2)">' + dash(c.example) + '</td>' +
+            '<td class="mono" style="font-size:11px;color:var(--muted)">' + esc(c.sourceType) + '</td></tr>';
+        }).join('');
+        done(head + '<div class="panel"><div class="panel-body flush"><div class="tbl-wrap"><table class="tbl"><thead><tr>' +
+          '<th>URI</th><th>中文语义</th><th>建模要素</th><th class="num">实例数</th><th>三元组示例</th><th>来源</th>' +
+          '</tr></thead><tbody>' + rows + '</tbody></table></div></div></div>');
+      });
+
+    } else if (K === 'instance') {
+      api.getEquipment({ limit: 300 }).then(function (res) {
+        var rows = res.items.map(function (e) {
+          return '<tr data-equip="' + esc(e.id) + '"><td><strong>' + esc(e.name) + '</strong></td>' +
+            '<td class="mono" style="font-size:11px">' + esc(e.owlSubject) + '</td>' +
+            '<td>' + esc(e.areaName || '') + '</td><td class="mono">' + esc(e.station) + '</td>' +
+            '<td class="num mono">' + n(e.parameterCount) + '</td><td class="num mono">' + n(e.tagCount) + '</td></tr>';
+        }).join('');
+        done(head + '<div class="panel"><div class="panel-head"><h3>设备实例</h3>' +
+          '<span class="note">按点位数排序，显示前 300 台，共 ' + n(res.total) + ' 台</span></div>' +
+          '<div class="panel-body flush"><div class="tbl-wrap scroll-y"><table class="tbl"><thead><tr>' +
+          '<th>设备</th><th>OWL Subject</th><th>工段</th><th>控制站</th>' +
+          '<th class="num">参数</th><th class="num">点位</th></tr></thead><tbody>' + rows +
+          '</tbody></table></div></div></div>');
+      });
+
+    } else if (K === 'property') {
+      api.getProperties().then(function (res) {
+        var groups = {};
+        res.items.forEach(function (p) { (groups[p.kind] = groups[p.kind] || []).push(p); });
+        var blocks = Object.keys(groups).map(function (k) {
+          var rows = groups[k].map(function (p) {
+            return '<tr><td class="mono">' + esc(p.name) + '</td><td>' + dash(p.label) + '</td>' +
+              '<td class="mono" style="font-size:11px">' + dash(p.domain) + '</td>' +
+              '<td class="mono" style="font-size:11px">' + dash(p.range) + '</td>' +
+              '<td class="mono" style="font-size:11px;color:var(--muted)">' + esc(p.sourceType) + '</td></tr>';
+          }).join('');
+          return '<div class="panel"><div class="panel-head"><h3>' + esc(k) + '</h3>' +
+            '<span class="note">' + groups[k].length + ' 项</span></div><div class="panel-body flush">' +
+            '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>属性名 / 字段</th><th>中文语义</th>' +
+            '<th>Domain</th><th>Range</th><th>来源</th></tr></thead><tbody>' + rows +
+            '</tbody></table></div></div></div>';
+        }).join('');
+        done(head + blocks);
+      });
+
+    } else if (K === 'relation') {
+      api.getPredicates().then(function (res) {
+        var rows = res.items.map(function (p) {
+          return '<tr' + (p.count ? ' data-predicate="' + esc(p.predicate) + '"' : '') + '>' +
+            '<td class="mono">' + esc(p.predicate) + '</td><td>' + dash(p.label) + '</td>' +
+            '<td>' + (p.categories || []).map(function (c) {
+              return '<span class="tag-pill pill-plain">' + esc(c) + '</span>';
+            }).join(' ') + '</td>' +
+            '<td class="num mono">' + (p.count == null ? '—' : n(p.count)) + '</td>' +
+            '<td class="mono" style="font-size:11px;color:var(--muted)">' + esc(p.sourceType) + '</td></tr>';
+        }).join('');
+        done(head + '<div class="panel"><div class="panel-head"><h3>关系谓词</h3>' +
+          '<span class="note">Schema 定义的对象属性 + 关系 Excel 中实际出现的谓词；点击可跳转到关系清单</span></div>' +
+          '<div class="panel-body flush"><div class="tbl-wrap"><table class="tbl"><thead><tr>' +
+          '<th>谓词 / 边类型</th><th>中文语义</th><th>所属关系大类</th><th class="num">出现次数</th><th>来源</th>' +
+          '</tr></thead><tbody>' + rows + '</tbody></table></div></div></div>');
+      });
+
+    } else if (K === 'constraint' || K === 'capability' || K === 'modelRegistry') {
+      var fn = K === 'constraint' ? api.getConstraints : K === 'capability' ? api.getCapabilities : api.getModelRegistry;
+      fn().then(function (res) {
+        done(head + '<div class="panel"><div class="panel-body">' +
+          emptyState(res.emptyReason, '期望数据源：' + (res.expectedSource || '')) + '</div></div>');
+      });
+
+    } else if (K === 'rule') {
+      api.getRules().then(function (res) {
+        if (res.total) {
+          var rows = res.items.map(function (r) {
+            return '<tr><td class="mono">' + esc(r.ruleId) + '</td><td><strong>' + esc(r.name) + '</strong></td>' +
+              '<td>' + dash(r.appliesTo) + '</td><td>' + dash(r.condition) + '</td>' +
+              '<td>' + dash(r.conclusion) + '</td><td>' + dash(r.severity) + '</td>' +
+              '<td class="mono" style="font-size:11px;color:var(--muted)">' + esc(r.sourceType) + '</td></tr>';
+          }).join('');
+          return done(head + '<div class="panel"><div class="panel-body flush"><div class="tbl-wrap">' +
+            '<table class="tbl"><thead><tr><th>规则编号</th><th>规则名称</th><th>适用对象</th>' +
+            '<th>条件</th><th>推理结论</th><th>严重程度</th><th>来源</th></tr></thead><tbody>' + rows +
+            '</tbody></table></div></div></div>');
+        }
+        var cols = (res.templateColumns || []).map(function (c) {
+          return '<li class="mono">' + esc(c) + '</li>';
+        }).join('');
+        done(head +
+          '<div class="panel"><div class="panel-head"><h3>规则数据源</h3>' +
+          '<div class="right"><span class="tag-pill pill-mute">未提供</span></div></div>' +
+          '<div class="panel-body">' + emptyState(res.emptyReason, '') +
+          '<div style="margin-top:16px"><p class="note-line">规则文件就位后即自动加载，' +
+          '期望文件名 <span class="mono">' + esc(res.expectedSource) + '</span>，' +
+          'Sheet「规则明细」字段如下（仓库内已提供空表模板 <span class="mono">6APA_规则.模板.xlsx</span>）：</p>' +
+          '<ul class="list-plain" style="columns:2;column-gap:28px">' + cols + '</ul></div>' +
+          '</div></div>');
+      });
+
+    } else if (K === 'semantic') {
+      api.getSemantics({ limit: 150 }).then(function (res) {
+        var rows = res.dcsSemantics.map(function (x) {
+          return '<tr data-param="' + esc(x.parameterId) + '">' +
+            '<td style="color:var(--text-2)">' + esc(x.rawDescription) + '</td>' +
+            '<td><strong>' + esc(x.parameterSemantic) + '</strong></td>' +
+            '<td>' + esc(x.industrialObject) + '</td>' +
+            '<td class="mono" style="font-size:11px">' + esc(x.owlSubject) + '</td>' +
+            '<td class="mono">' + esc(x.tagName) + '</td></tr>';
+        }).join('');
+        var relRows = res.relationSemantics.slice(0, 80).map(function (x) {
+          return '<tr data-rel="' + esc(x.id) + '"><td><strong>' + esc(x.subjectEntity) + '</strong></td>' +
+            '<td><span class="tag-pill pill-info">' + esc(x.predicate) + '</span></td>' +
+            '<td>' + esc(x.objectEntity) + '</td>' +
+            '<td style="color:var(--text-2)">' + esc(x.domainDescription) + '</td></tr>';
+        }).join('');
+        done(head +
+          '<div class="panel"><div class="panel-head"><h3>DCS 语义提升</h3>' +
+          '<span class="note">DCS 原始描述 → 参数语义 → 工业对象 · 显示前 150 条，共 ' + n(res.dcsSemanticTotal) + ' 条</span></div>' +
+          '<div class="panel-body flush"><div class="tbl-wrap scroll-y"><table class="tbl"><thead><tr>' +
+          '<th>DCS 原始描述</th><th>参数语义</th><th>工业对象</th><th>OWL Subject</th><th>DCS 点名</th>' +
+          '</tr></thead><tbody>' + rows + '</tbody></table></div></div></div>' +
+          '<div class="panel"><div class="panel-head"><h3>关系语义</h3>' +
+          '<span class="note">起始对象 → 谓词 → 目标对象 → 工艺机理说明</span></div>' +
+          '<div class="panel-body flush"><div class="tbl-wrap scroll-y"><table class="tbl"><thead><tr>' +
+          '<th>起始对象</th><th>谓词</th><th>目标对象</th><th>工艺机理与业务因果说明</th>' +
+          '</tr></thead><tbody>' + relRows + '</tbody></table></div></div></div>');
+      });
+
+    } else if (K === 'measurementAnchor') {
+      api.getMeasurementAnchors({}).then(function (res) {
+        var rows = res.items.map(function (a) {
+          return '<tr data-param="' + esc(a.parameterId) + '">' +
+            '<td><strong>' + esc(a.relationEntityName || a.semanticName) + '</strong></td>' +
+            '<td>' + esc(a.equipmentName) + '</td><td>' + esc(a.semanticName) + '</td>' +
+            '<td class="mono">' + esc(a.tagName) + '</td><td class="mono">' + esc(a.blockType) + '</td>' +
+            '<td class="mono">' + dash(a.unit) + '</td><td class="mono">' + esc(a.station) + '</td>' +
+            '<td style="color:var(--text-2)">' + esc(a.rawDescription) + '</td></tr>';
+        }).join('');
+        var un = res.unanchoredEntities.map(function (e) {
+          return '<tr data-entity="' + esc(e.id) + '"><td><strong>' + esc(e.name) + '</strong></td>' +
+            '<td>' + typePill(e.type) + '</td><td>' + matchPill(e.matchStatus, e.matchStatusLabel) + '</td>' +
+            '<td class="num mono">' + n(e.relationCount) + '</td></tr>';
+        }).join('');
+        done(head +
+          '<div class="panel"><div class="panel-head"><h3>已建立的测量锚点</h3>' +
+          '<span class="note">工业语义 → DCS Tag → DCS 块，共 ' + n(res.total) + ' 条</span></div>' +
+          '<div class="panel-body flush"><div class="tbl-wrap scroll-y"><table class="tbl"><thead><tr>' +
+          '<th>关系对象</th><th>设备</th><th>参数语义</th><th>DCS 点名</th><th>DCS 块</th>' +
+          '<th>单位</th><th>控制站</th><th>原点描述</th></tr></thead><tbody>' + rows +
+          '</tbody></table></div></div></div>' +
+          '<div class="panel"><div class="panel-head"><h3>暂无 DCS 测量锚点的关系对象</h3>' +
+          '<span class="note">' + res.unanchoredEntities.length + ' 个 · 关系数据已加载，不虚构 DCS 点</span></div>' +
+          '<div class="panel-body flush"><div class="tbl-wrap scroll-y"><table class="tbl"><thead><tr>' +
+          '<th>对象</th><th>类型</th><th>匹配状态</th><th class="num">关系数</th></tr></thead><tbody>' + un +
+          '</tbody></table></div></div></div>');
+      });
+
+    } else if (K === 'causal') {
+      api.getCausalRelations().then(function (res) {
+        var rows = res.items.map(function (r) {
+          var st = EDGE_STYLES.filter(function (s) { return s.category === r.category; })[0] || {};
+          return '<tr data-rel="' + esc(r.id) + '">' +
+            '<td>' + esc(r.area) + '</td>' +
+            '<td><span class="tag-pill pill-plain"><i class="swatch" style="background:' +
+            (st.color || '#f2557a') + '"></i>' + esc(r.category) + '</span></td>' +
+            '<td data-entity-jump="' + esc(r.subject.id) + '"><strong>' + esc(r.subjectEntity) + '</strong></td>' +
+            '<td><span class="tag-pill ' + (String(r.predicate).indexOf('负向') >= 0 ? 'pill-err' : 'pill-ok') + '">' +
+            esc(r.predicate) + '</span></td>' +
+            '<td data-entity-jump="' + esc(r.object.id) + '"><strong>' + esc(r.objectEntity) + '</strong></td>' +
+            '<td class="num mono">' + esc(r.weight) + '</td>' +
+            '<td style="color:var(--text-2)">' + esc(r.domainDescription) + '</td></tr>';
+        }).join('');
+        done(head + '<div class="panel"><div class="panel-head"><h3>因果 / 影响 / 质量关系</h3>' +
+          '<span class="note">共 ' + res.total + ' 条，直接来自关系 Excel，不重新推断</span></div>' +
+          '<div class="panel-body flush"><div class="tbl-wrap"><table class="tbl"><thead><tr>' +
+          '<th>工段</th><th>关系大类</th><th>原因对象</th><th>影响方向</th><th>结果对象</th>' +
+          '<th class="num">权重</th><th>工艺机理与业务因果说明</th></tr></thead><tbody>' + rows +
+          '</tbody></table></div></div></div>');
+      });
+
+    } else if (K === 'provenance') {
+      viewSources(function (html) { done(head + html); }, true);
+    } else {
+      done(head + emptyState('该分类暂无数据', ''));
+    }
+  }
+
+  // ------------------------------------------------------------ 视图：数据源 / 质量 / API
+
+  function viewSources(done, bare) {
+    Promise.all([api.getDataSources(), api.getMeta()]).then(function (r) {
+      var ds = r[0];
+      var cards = ds.sources.map(function (s) {
+        var sheets = (s.sheets || []).map(function (sh) {
+          return '<tr><td class="mono">' + esc(sh.sheet) + '</td>' +
+            '<td class="num mono">' + n(sh.rows) + '</td>' +
+            '<td class="num mono">' + n(sh.validRows) + '</td>' +
+            '<td class="num mono">' + (sh.errorRows ? '<span style="color:var(--err)">' + n(sh.errorRows) + '</span>' : '0') + '</td></tr>';
+        }).join('');
+        var stats = Object.keys(s.stats || {}).map(function (k) {
+          return '<dt>' + esc(k) + '</dt><dd class="mono">' + n(s.stats[k]) + '</dd>';
+        }).join('');
+        return '<div class="panel"><div class="panel-head"><h3>' + esc(s.sourceTypeLabel) + '</h3>' +
+          '<span class="note mono">' + esc(s.sourceType) + '</span>' +
+          '<div class="right">' + (s.available ? '<span class="tag-pill pill-ok">已加载</span>' :
+            '<span class="tag-pill pill-mute">未提供</span>') + '</div></div>' +
+          '<div class="panel-body">' +
+          '<dl class="kv"><dt>文件</dt><dd class="mono">' + esc(s.file) + '</dd>' +
+          '<dt>加载时间</dt><dd class="mono">' + dash(s.loadedAt) + '</dd>' + stats + '</dl>' +
+          '<p class="note-line" style="margin-top:10px">' + esc(s.note || '') + '</p>' +
+          (sheets ? '<div class="tbl-wrap" style="margin-top:8px"><table class="tbl"><thead><tr>' +
+            '<th>Sheet</th><th class="num">数据行数</th><th class="num">有效行数</th><th class="num">异常行数</th>' +
+            '</tr></thead><tbody>' + sheets + '</tbody></table></div>' : '') +
+          '</div></div>';
+      }).join('');
+
+      var boundary = Object.keys(ds.boundary).map(function (k) {
+        return '<tr><td class="mono">' + esc(k) + '</td><td>' + esc(ds.boundary[k]) + '</td></tr>';
+      }).join('');
+
+      var html = (bare ? '' : '<div class="view-head"><h2>数据源管理</h2>' +
+        '<p>现场 DCS 数据、工业关系 Excel、对象映射与规则数据源相互独立，' +
+        'API 返回体以 <span class="mono">sourceType</span> 字段区分来源。</p></div>') +
+        cards +
+        '<div class="panel"><div class="panel-head"><h3>数据边界</h3>' +
+        '<span class="note">四类数据源各自回答什么问题</span></div>' +
+        '<div class="panel-body flush"><table class="tbl"><thead><tr><th>sourceType</th><th>职责</th>' +
+        '</tr></thead><tbody>' + boundary + '</tbody></table></div></div>';
+      done(html);
+    });
+  }
+
+  function viewQuality(done) {
+    api.getDataQuality().then(function (q) {
+      var s = q.summary;
+      var checkRows = q.checks.map(function (c) {
+        return '<tr data-check="' + esc(c.check) + '">' +
+          '<td>' + esc(c.group) + '</td><td><strong>' + esc(c.check) + '</strong></td>' +
+          '<td style="color:var(--text-2)">' + esc(c.description) + '</td>' +
+          '<td>' + (c.passed ? '<span class="tag-pill pill-ok">通过</span>' :
+            '<span class="tag-pill ' + (c.severity === 'error' ? 'pill-err' : c.severity === 'warning' ? 'pill-warn' : 'pill-info') +
+            '">' + n(c.issueCount) + ' 项</span>') + '</td></tr>';
+      }).join('');
+
+      var shown = q.issues.slice(0, 200);
+      var issueRows = shown.map(function (i) {
+        var cls = i.severity === 'error' ? 'pill-err' : i.severity === 'warning' ? 'pill-warn' : 'pill-info';
+        return '<tr><td><span class="tag-pill ' + cls + '">' + esc(i.severity) + '</span></td>' +
+          '<td>' + esc(i.check) + '</td><td style="color:var(--text-2)">' + esc(i.detail) + '</td>' +
+          '<td class="mono" style="font-size:11px;color:var(--muted)">' +
+          (i.source ? esc((i.source.sheet || '') + (i.source.row ? ' 第 ' + i.source.row + ' 行' : '')) : '—') +
+          '</td></tr>';
+      }).join('');
+
+      done('<div class="view-head"><h2>数据质量报告</h2>' +
+        '<p>导入 Excel 时自动执行一致性校验。检查只报告问题，不修改任何原始数据。</p></div>' +
+        '<div class="stat-row">' +
+        '<div class="stat"><div class="k">检查项</div><div class="v">' + n(s.checkCount) + '</div></div>' +
+        '<div class="stat"><div class="k">通过</div><div class="v" style="color:var(--ok)">' + n(s.passedCount) + '</div></div>' +
+        '<div class="stat"><div class="k">错误</div><div class="v" style="color:var(--err)">' + n(s.errorCount) + '</div></div>' +
+        '<div class="stat is-warn"><div class="k">告警</div><div class="v">' + n(s.warningCount) + '</div></div>' +
+        '<div class="stat"><div class="k">提示</div><div class="v" style="color:var(--info)">' + n(s.infoCount) + '</div></div>' +
+        '</div>' +
+        '<div class="panel"><div class="panel-head"><h3>检查项</h3></div><div class="panel-body flush">' +
+        '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>分组</th><th>检查项</th><th>说明</th><th>结果</th>' +
+        '</tr></thead><tbody>' + checkRows + '</tbody></table></div></div></div>' +
+        '<div class="panel"><div class="panel-head"><h3>问题明细</h3>' +
+        '<span class="note">共 ' + n(s.issueCount) + ' 项，显示前 ' + shown.length + ' 项</span></div>' +
+        '<div class="panel-body flush"><div class="tbl-wrap scroll-y"><table class="tbl"><thead><tr>' +
+        '<th>级别</th><th>检查项</th><th>问题描述</th><th>来源</th></tr></thead><tbody>' + issueRows +
+        '</tbody></table></div></div></div>');
+    });
+  }
+
+  function viewApi(done) {
+    var rows = api.endpoints.map(function (p) {
+      return '<tr><td class="mono">GET</td><td class="mono">' + esc(p) + '</td></tr>';
+    }).join('');
+    done('<div class="view-head"><h2>API 接口</h2>' +
+      '<p>前端全部数据经由下列 REST 接口获取。当前运行模式：<b>' +
+      (api.mode === 'live' ? '连接本体服务（' + esc(api.baseUrl) + '）' : '静态 API 快照（离线演示）') +
+      '</b>。静态模式下由前端 API 适配层按同一份契约在浏览器内合成响应体，' +
+      '页面代码路径与连接后端时完全一致。</p></div>' +
+      '<div class="panel"><div class="panel-head"><h3>REST 接口清单</h3>' +
+      '<span class="note">' + api.endpoints.length + ' 个接口</span></div>' +
+      '<div class="panel-body flush"><table class="tbl"><thead><tr><th style="width:70px">方法</th><th>路径</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table></div></div>' +
+      '<div class="panel"><div class="panel-head"><h3>启动本体服务</h3></div><div class="panel-body">' +
+      '<p class="note-line">在仓库根目录执行：</p>' +
+      '<pre class="mono" style="background:var(--panel-2);border:1px solid var(--line);border-radius:7px;' +
+      'padding:12px;overflow-x:auto;margin:0">pip install -r requirements.txt\n' +
+      'uvicorn backend.main:app --reload --port 8700</pre>' +
+      '<p class="note-line" style="margin-top:10px">随后在本页面地址后追加 ' +
+      '<span class="mono">?api=http://localhost:8700</span> 即可切换为实时后端模式。</p></div></div>');
+  }
+
+  // ------------------------------------------------------------ 右栏
+
+  function inspectorHtml() {
+    var i = S.inspector;
+    if (!i) {
+      return '<div class="insp-kicker">对象详情</div>' +
+        '<div class="insp-title">未选择对象</div>' +
+        '<p class="note-line">在左侧列表、表格行或关系图中点击任意对象或关系边，' +
+        '此处显示其属性、关系、测量锚点与数据来源。</p>' +
+        '<div class="insp-section"><h4>数据边界</h4>' +
+        '<dl class="kv"><dt>DCS_EXCEL</dt><dd>工段 / 设备 / 参数 / DCS 点</dd>' +
+        '<dt>RELATION_EXCEL</dt><dd>关系 / 部件 / 属性 / 因果</dd>' +
+        '<dt>MAPPING_FILE</dt><dd>抽象对象与现场位号对齐</dd>' +
+        '<dt>RULE_FILE</dt><dd>条件 → 推理结论</dd></dl></div>';
+    }
+    return i.html;
+  }
+
+  function setInspector(html) {
+    S.inspector = { html: html };
+    var el = $('#inspector');
+    if (el) el.innerHTML = html;
+  }
+
+  function inspectRelation(relationId) {
+    api.getRelationDetail(relationId).then(function (r) {
+      if (!r) return;
+      var st = EDGE_STYLES.filter(function (s) { return s.category === r.category; })[0] || {};
+      setInspector(
+        '<div class="insp-kicker">关系详情</div>' +
+        '<div class="insp-title">' + esc(r.subjectEntity) + ' → ' + esc(r.objectEntity) + '</div>' +
+        '<div style="margin-bottom:12px"><span class="tag-pill pill-plain">' +
+        '<i class="swatch" style="background:' + (st.color || '#8fa6c4') + '"></i>' + esc(r.category) + '</span> ' +
+        '<span class="tag-pill pill-info">' + esc(r.predicate) + '</span></div>' +
+
+        '<div class="insp-section"><h4>关系三元组</h4>' +
+        '<div class="chain">' +
+        '<div class="chain-node"><span class="lbl">起始对象</span><span class="val">' + esc(r.subjectEntity) +
+        '</span><span style="margin-left:auto">' + typePill(r.subjectType) + '</span></div>' +
+        '<div class="chain-arrow"></div>' +
+        '<div class="chain-node"><span class="lbl">关系谓词</span><span class="val">' + esc(r.predicate) + '</span></div>' +
+        '<div class="chain-arrow"></div>' +
+        '<div class="chain-node"><span class="lbl">目标对象</span><span class="val">' + esc(r.objectEntity) +
+        '</span><span style="margin-left:auto">' + typePill(r.objectType) + '</span></div>' +
+        '</div></div>' +
+
+        '<div class="insp-section"><h4>关系元数据</h4><dl class="kv">' +
+        '<dt>工段</dt><dd>' + esc(r.area) + '</dd>' +
+        '<dt>子场景</dt><dd>' + esc(r.scenario) + '</dd>' +
+        '<dt>权重</dt><dd class="mono">' + esc(r.weight) + '</dd>' +
+        '<dt>关系标识</dt><dd class="mono" style="font-size:11px">' + esc(r.id) + '</dd>' +
+        '<dt>稳定键</dt><dd class="mono" style="font-size:10.5px;word-break:break-all">' + esc(r.stableKey) + '</dd>' +
+        '<dt>对象匹配</dt><dd>' + (r.matchStatus === 'MATCHED' ? '双端已匹配' :
+          r.matchStatus === 'PARTIAL' ? '单端已匹配' : '双端未匹配 DCS 实例') + '</dd>' +
+        '</dl></div>' +
+
+        '<div class="insp-section"><h4>工艺机理与业务因果说明</h4>' +
+        '<p style="margin:0;color:var(--text-2)">' + esc(r.domainDescription) + '</p></div>' +
+
+        '<div class="insp-section"><h4>数据来源</h4>' + sourceBox('', r.source, r.sourceType) + '</div>' +
+
+        '<div class="insp-section"><h4>操作</h4>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:7px">' +
+        '<button class="ctl" data-entity-jump="' + esc(r.subject.id) + '">查看起始对象</button>' +
+        '<button class="ctl" data-entity-jump="' + esc(r.object.id) + '">查看目标对象</button>' +
+        '<button class="ctl" data-rel-filter-cat="' + esc(r.category) + '">同类关系 ' + r.sameCategoryRelationIds.length + ' 条</button>' +
+        '<button class="ctl" data-rel-filter-area="' + esc(r.area) + '">同工段关系 ' + r.sameAreaRelationIds.length + ' 条</button>' +
+        '</div></div>'
+      );
+    });
+  }
+
+  function inspectStructuralEdge(edge) {
+    var kinds = {
+      mapping: ['对象映射边', '关系对象 → DCS 本体实例，来自人工对象映射表，状态为“待现场确认”。',
+        'MAPPING_FILE', { file: '6APA_对象映射.xlsx', sheet: '对象映射' }],
+      anchor: ['测量锚点边', '工业语义 → DCS 参数语义，据此绑定到现场测点。',
+        'MAPPING_FILE', { file: '6APA_对象映射.xlsx', sheet: '对象映射' }],
+      tag: ['boundToTag', '参数语义 → DCS Tag，来自 DCS 点表。',
+        'DCS_EXCEL', { file: '6APA_DCS.xlsx', sheet: 'DCS点位明细' }],
+      structure: ['本体结构边', '工段 hasEquipment 设备、设备 hasParameter 参数，来自 DCS 点表层级。',
+        'DCS_EXCEL', { file: '6APA_DCS.xlsx', sheet: 'DCS点位明细' }]
+    };
+    var k = kinds[edge.edgeKind] || ['结构边', '', edge.sourceType, null];
+    setInspector(
+      '<div class="insp-kicker">' + esc(k[0]) + '</div>' +
+      '<div class="insp-title">' + esc(edge.label) + '</div>' +
+      '<p class="note-line">' + esc(k[1]) + '</p>' +
+      '<div class="insp-section"><h4>说明</h4>' +
+      '<p style="margin:0;color:var(--text-2)">本边不是工业关系 Excel 中的关系记录，' +
+      '而是本体内部的结构连接，用于把关系对象与现场 DCS 实例、测点串起来。' +
+      '工业关系只在关系图中以彩色实线 / 虚线绘制，点击即可查看其工艺机理说明与行号。</p></div>' +
+      '<div class="insp-section"><h4>数据来源</h4>' + sourceBox('', k[3], k[2]) + '</div>'
+    );
+  }
+
+  function inspectEntity(entityId) {
+    api.getRelationEntityDetail(entityId).then(function (e) {
+      if (!e) return;
+      var matches = e.matches.slice(0, 6).map(function (m) {
+        return '<li><strong>' + esc(m.name) + '</strong> ' +
+          '<span style="color:var(--muted)">' + esc(m.strategyLabel) + '</span>' +
+          (m.confidence ? ' <span class="tag-pill ' + (m.confidence === '高' ? 'pill-ok' :
+            m.confidence === '中' ? 'pill-warn' : 'pill-err') + '">置信度 ' + esc(m.confidence) + '</span>' : '') +
+          (m.note ? '<div style="color:var(--text-2);font-size:11.5px">' + esc(m.note) + '</div>' : '') + '</li>';
+      }).join('');
+      var anchors = e.measurementAnchors.slice(0, 6).map(function (a) {
+        return '<li><span class="mono">' + esc(a.tagName) + '</span> · ' + esc(a.blockType) +
+          ' · ' + dash(a.unit) + '<div style="color:var(--muted);font-size:11.5px">' + esc(a.rawDescription) + '</div></li>';
+      }).join('');
+
+      setInspector(
+        '<div class="insp-kicker">关系对象</div>' +
+        '<div class="insp-title">' + esc(e.name) + '</div>' +
+        '<div style="margin-bottom:12px">' + typePill(e.type) + ' ' + matchPill(e.matchStatus, e.matchStatusLabel) + '</div>' +
+        '<div class="insp-section"><h4>基本信息</h4><dl class="kv">' +
+        '<dt>对象类型</dt><dd>' + esc(e.type) + '</dd>' +
+        '<dt>适用工段</dt><dd>' + esc(e.areas.join('、')) + '</dd>' +
+        '<dt>关系数</dt><dd class="mono">' + e.relationCount + '（出 ' + e.outgoingCount + ' / 入 ' + e.incomingCount + '）</dd>' +
+        '<dt>匹配方式</dt><dd>' + esc(e.matchStrategyLabel) + '</dd>' +
+        '<dt>本体实例</dt><dd class="mono">' + e.matchCount + '</dd>' +
+        '<dt>测量锚点</dt><dd class="mono">' + e.tagCount + '</dd>' +
+        '</dl></div>' +
+        (matches ? '<div class="insp-section"><h4>匹配的本体实例</h4><ul class="list-plain">' + matches + '</ul></div>' : '') +
+        (anchors ? '<div class="insp-section"><h4>测量锚点</h4><ul class="list-plain">' + anchors + '</ul></div>'
+          : '<div class="insp-section"><h4>测量锚点</h4>' +
+            emptyState('当前关系对象暂无 DCS 测量锚点', '') + '</div>') +
+        '<div class="insp-section"><h4>数据来源</h4>' +
+        sourceBox('', { file: '6APA_工业关系.xlsx', sheet: '关系明细' }, 'RELATION_EXCEL') + '</div>' +
+        '<div class="insp-section"><h4>操作</h4>' +
+        '<div style="display:flex;gap:7px;flex-wrap:wrap">' +
+        '<button class="ctl" data-entity="' + esc(e.id) + '">打开对象详情页</button>' +
+        '<button class="ctl" data-graph-root="' + esc(e.id) + '">以此为中心绘图</button></div></div>'
+      );
+    });
+  }
+
+  function inspectEquipment(equipmentId) {
+    api.getEquipmentDetail(equipmentId).then(function (e) {
+      if (!e) return;
+      var s = e.stats;
+      setInspector(
+        '<div class="insp-kicker">设备实例 · DCS_EXCEL</div>' +
+        '<div class="insp-title">' + esc(e.name) + '</div>' +
+        '<div class="insp-section"><h4>属性</h4><dl class="kv">' +
+        '<dt>OWL Subject</dt><dd class="mono" style="font-size:11px">' + esc(e.owlSubject) + '</dd>' +
+        '<dt>所属工段</dt><dd>' + esc((e.area || {}).nameZh || '') + '</dd>' +
+        '<dt>控制站</dt><dd class="mono">' + esc(e.station) + '</dd>' +
+        '<dt>总点位</dt><dd class="mono">' + n(s.total) + '</dd>' +
+        '<dt>参数语义</dt><dd class="mono">' + n(e.parameterCount) + '</dd>' +
+        '<dt>PV / OP</dt><dd class="mono">' + s.pv + ' / ' + s.op + '</dd>' +
+        '<dt>VAL / DI·DO</dt><dd class="mono">' + s.val + ' / ' + s.dido + '</dd>' +
+        '</dl></div>' +
+        (e.relationEntities.length
+          ? '<div class="insp-section"><h4>关联工艺对象</h4><ul class="list-plain">' +
+            e.relationEntities.map(function (x) {
+              return '<li><button class="ctl" data-entity="' + esc(x.id) + '">' + esc(x.name) + '</button></li>';
+            }).join('') + '</ul></div>'
+          : '') +
+        '<div class="insp-section"><h4>数据来源</h4>' + sourceBox('', e.source, e.sourceType) +
+        (e.statsSource ? '<div style="height:8px"></div>' + sourceBox('设备统计来源', e.statsSource, e.sourceType) : '') +
+        '</div>' +
+        '<div class="insp-section"><h4>操作</h4><div style="display:flex;gap:7px;flex-wrap:wrap">' +
+        '<button class="ctl" data-equip="' + esc(e.id) + '">打开设备详情页</button>' +
+        '<button class="ctl" data-graph-equip="' + esc(e.id) + '">查看关系图</button></div></div>'
+      );
+    });
+  }
+
+  function inspectParameter(parameterId) {
+    api.getParameterDetail(parameterId).then(function (p) {
+      if (!p) return;
+      var anchors = p.measurementAnchors.map(function (a) {
+        return '<li><span class="mono">' + esc(a.tagName) + '</span> · ' + esc(a.blockType) + ' · ' + dash(a.unit) +
+          '<div style="color:var(--muted);font-size:11.5px">' + esc(a.rawDescription) + '</div></li>';
+      }).join('');
+      setInspector(
+        '<div class="insp-kicker">参数语义 · DCS_EXCEL</div>' +
+        '<div class="insp-title">' + esc(p.name) + '</div>' +
+        '<div class="insp-section"><h4>属性</h4><dl class="kv">' +
+        '<dt>参数分类</dt><dd>' + (p.categories || []).join('、') + '</dd>' +
+        '<dt>工程单位</dt><dd class="mono">' + dash((p.units || []).join('、')) + '</dd>' +
+        '<dt>DCS 块类型</dt><dd class="mono">' + dash((p.blockTypes || []).join('、')) + '</dd>' +
+        '<dt>所属设备</dt><dd>' + esc(p.equipmentName) + '</dd>' +
+        '<dt>OWL Subject</dt><dd class="mono" style="font-size:11px">' + esc(p.owlSubject) + '</dd>' +
+        '</dl></div>' +
+        '<div class="insp-section"><h4>测量锚点</h4><ul class="list-plain">' + anchors + '</ul></div>' +
+        '<div class="insp-section"><h4>数据来源</h4>' + sourceBox('', p.source, p.sourceType) + '</div>' +
+        '<div class="insp-section"><h4>操作</h4><div style="display:flex;gap:7px;flex-wrap:wrap">' +
+        '<button class="ctl" data-param="' + esc(p.id) + '">打开参数详情页</button>' +
+        '<button class="ctl" data-equip="' + esc(p.equipmentId) + '">查看所属设备</button></div></div>'
+      );
+    });
+  }
+
+  function inspectTag(tagId, node) {
+    api.getTags({}).then(function (res) {
+      var t = res.items.filter(function (x) { return x.id === tagId; })[0];
+      if (!t) return;
+      setInspector(
+        '<div class="insp-kicker">DCS 点 · DCS_EXCEL</div>' +
+        '<div class="insp-title mono">' + esc(t.name) + '</div>' +
+        '<div class="insp-section"><h4>属性</h4><dl class="kv">' +
+        '<dt>原点描述</dt><dd>' + esc(t.rawDescription) + '</dd>' +
+        '<dt>参数语义</dt><dd>' + esc(t.parameterName) + '</dd>' +
+        '<dt>参数分类</dt><dd>' + esc(t.parameterType) + '</dd>' +
+        '<dt>DCS 块类型</dt><dd class="mono">' + esc(t.blockType) + '</dd>' +
+        '<dt>工程单位</dt><dd class="mono">' + dash(t.unit) + '</dd>' +
+        '<dt>控制站</dt><dd class="mono">' + esc(t.station) + '</dd>' +
+        '<dt>所属设备</dt><dd>' + esc(t.equipmentName) + '</dd>' +
+        '<dt>OWL Subject</dt><dd class="mono" style="font-size:11px">' + esc(t.owlSubject) + '</dd>' +
+        '</dl></div>' +
+        '<div class="insp-section"><h4>数据来源</h4>' + sourceBox('', t.source, t.sourceType) + '</div>' +
+        '<div class="insp-section"><h4>操作</h4><div style="display:flex;gap:7px;flex-wrap:wrap">' +
+        '<button class="ctl" data-param="' + esc(t.parameterId) + '">查看参数语义</button>' +
+        '<button class="ctl" data-equip="' + esc(t.equipmentId) + '">查看所属设备</button></div></div>'
+      );
+    });
+  }
+
+  // ------------------------------------------------------------ 渲染
+
+  var VIEWS = {
+    overview: viewOverview,
+    areas: viewAreas,
+    area: viewArea,
+    equipment: viewEquipment,
+    parameter: viewParameter,
+    entity: viewEntity,
+    entities: viewEntities,
+    graph: viewGraph,
+    relations: viewRelations,
+    category: viewCategory,
+    sources: viewSources,
+    quality: viewQuality,
+    api: viewApi
+  };
+
+  function buildCrumbs(cb) {
+    var c = [{ label: '6-APA 生产线', view: 'overview' }];
+    function push(label, patch) { c.push(Object.assign({ label: label }, patch)); }
+    if (S.view === 'areas') { push('工段与设备', { view: 'areas' }); return cb(c); }
+    if (['area', 'equipment', 'parameter'].indexOf(S.view) >= 0) {
+      push('工段与设备', { view: 'areas' });
+      var tasks = [];
+      if (S.areaId) tasks.push(api.getProcessAreas());
+      Promise.all(tasks).then(function (r) {
+        if (S.areaId && r[0]) {
+          var a = r[0].items.filter(function (x) { return x.id === S.areaId; })[0];
+          if (a) push(a.nameZh, { view: 'area', areaId: a.id });
+        }
+        var more = [];
+        if (S.equipmentId) more.push(api.getEquipmentDetail(S.equipmentId));
+        if (S.parameterId) more.push(api.getParameterDetail(S.parameterId));
+        Promise.all(more).then(function (m) {
+          m.forEach(function (x) {
+            if (!x) return;
+            if (x.owlSubject && x.tagCount != null && x.parameterCount != null) {
+              push(x.name, { view: 'equipment', equipmentId: x.id, areaId: x.areaId });
+            } else if (x.equipmentId) {
+              push(x.name, { view: 'parameter', parameterId: x.id, equipmentId: x.equipmentId, areaId: x.areaId });
+            }
+          });
+          cb(c);
+        });
+      });
+      return;
+    }
+    if (S.view === 'entity') {
+      push('关系图谱', { view: 'graph' });
+      api.getRelationEntityDetail(S.entityId).then(function (e) {
+        if (e) push(e.name, { view: 'entity', entityId: e.id });
+        cb(c);
+      });
+      return;
+    }
+    if (S.view === 'category') {
+      var cat = CATEGORIES.filter(function (x) { return x.key === S.categoryKey; })[0];
+      push('本体分类', { view: 'overview' });
+      if (cat) push(cat.name, { view: 'category', categoryKey: cat.key });
+      return cb(c);
+    }
+    var names = { graph: '关系图谱', relations: '关系清单', entities: '关系对象', sources: '数据源管理', quality: '数据质量', api: 'API 接口' };
+    if (names[S.view]) push(names[S.view], { view: S.view });
+    cb(c);
+  }
+
+  function render() {
+    $('#rail').innerHTML = railHtml();
+    $('#inspector').innerHTML = inspectorHtml();
+    var canvas = $('#canvas');
+    canvas.innerHTML = '<div class="loading">正在加载…</div>';
+
+    buildCrumbs(function (crumbs) {
+      S.crumbs = crumbs;
+      var fn = VIEWS[S.view] || viewOverview;
+      fn(function (html) {
+        canvas.innerHTML = crumbsHtml() + html;
+      });
+    });
+  }
+
+  // ------------------------------------------------------------ 事件委托
+
+  function bind() {
+    document.addEventListener('click', function (ev) {
+      var t = ev.target;
+
+      var nav = t.closest('[data-nav]');
+      if (nav) {
+        var view = nav.getAttribute('data-nav');
+        var cat = nav.getAttribute('data-cat');
+        return go({ view: view, categoryKey: cat || null });
+      }
+
+      var crumb = t.closest('[data-crumb]');
+      if (crumb) {
+        var c = S.crumbs[+crumb.getAttribute('data-crumb')];
+        if (c) return go(Object.assign({ view: c.view }, c));
+      }
+
+      var jump = t.closest('[data-entity-jump]');
+      if (jump && jump.getAttribute('data-entity-jump')) {
+        ev.stopPropagation();
+        return go({ view: 'entity', entityId: jump.getAttribute('data-entity-jump'), depth: 1 });
+      }
+
+      var ent = t.closest('[data-entity]');
+      if (ent) return go({ view: 'entity', entityId: ent.getAttribute('data-entity'), depth: 1 });
+
+      var eq = t.closest('[data-equip]');
+      if (eq) return go({ view: 'equipment', equipmentId: eq.getAttribute('data-equip') });
+
+      var pm = t.closest('[data-param]');
+      if (pm) return go({ view: 'parameter', parameterId: pm.getAttribute('data-param') });
+
+      var ar = t.closest('[data-area]');
+      if (ar) return go({ view: 'area', areaId: ar.getAttribute('data-area') });
+
+      var rel = t.closest('[data-rel]');
+      if (rel) return inspectRelation(rel.getAttribute('data-rel'));
+
+      var relcat = t.closest('[data-relcat]');
+      if (relcat) return go({ view: 'relations', relFilters: { category: relcat.getAttribute('data-relcat') } });
+
+      var pred = t.closest('[data-predicate]');
+      if (pred) return go({ view: 'relations', relFilters: { predicate: pred.getAttribute('data-predicate') } });
+
+      var rfc = t.closest('[data-rel-filter-cat]');
+      if (rfc) return go({ view: 'relations', relFilters: { category: rfc.getAttribute('data-rel-filter-cat') } });
+
+      var rfa = t.closest('[data-rel-filter-area]');
+      if (rfa) return go({ view: 'relations', relFilters: { area: rfa.getAttribute('data-rel-filter-area') } });
+
+      var groot = t.closest('[data-graph-root]');
+      if (groot) return go({ view: 'graph', graphFilters: { rootId: groot.getAttribute('data-graph-root') }, depth: 1 });
+
+      var gequip = t.closest('[data-graph-equip]');
+      if (gequip) {
+        ev.stopPropagation();
+        return go({ view: 'graph', graphFilters: { rootId: gequip.getAttribute('data-graph-equip') }, depth: 2 });
+      }
+
+      var depth = t.closest('[data-depth]');
+      if (depth) {
+        S.depth = +depth.getAttribute('data-depth');
+        document.querySelectorAll('[data-depth]').forEach(function (b) {
+          b.classList.toggle('is-on', +b.getAttribute('data-depth') === S.depth);
+        });
+        var q = S.view === 'entity'
+          ? { rootId: S.entityId, depth: S.depth }
+          : Object.assign({ depth: S.depth }, S.graphFilters);
+        return mountGraph(q);
+      }
+
+      var sd = t.closest('[data-showdcs]');
+      if (sd) {
+        S.showDcs = !S.showDcs;
+        sd.classList.toggle('is-on', S.showDcs);
+        return mountGraph(S.view === 'entity'
+          ? { rootId: S.entityId, depth: S.depth }
+          : Object.assign({ depth: S.depth }, S.graphFilters));
+      }
+
+      if (t.closest('[data-gf-reset]')) return go({ graphFilters: {} });
+      if (t.closest('[data-rf-reset]')) return go({ relFilters: {} });
+    });
+
+    document.addEventListener('change', function (ev) {
+      var gf = ev.target.closest('[data-gf]');
+      if (gf) {
+        var key = gf.getAttribute('data-gf');
+        var v = gf.value;
+        var patch = {};
+        if (key === 'matched') patch.matched = v === '' ? undefined : v === '1';
+        else patch[key] = v || undefined;
+        S.graphFilters = Object.assign({}, S.graphFilters, patch);
+        if (key === 'rootId') return go({});
+        return mountGraph(Object.assign({ depth: S.depth }, S.graphFilters));
+      }
+      var rf = ev.target.closest('[data-rf]');
+      if (rf) {
+        var k = rf.getAttribute('data-rf');
+        var patch2 = {};
+        patch2[k] = rf.value || undefined;
+        return go({ relFilters: Object.assign({}, S.relFilters, patch2) });
+      }
+    });
+
+    var timer = null;
+    document.addEventListener('input', function (ev) {
+      var rf = ev.target.closest('[data-rf="keyword"]');
+      if (!rf) return;
+      clearTimeout(timer);
+      var v = rf.value;
+      timer = setTimeout(function () {
+        var pos = v.length;
+        S.relFilters = Object.assign({}, S.relFilters, { keyword: v || undefined });
+        render();
+        setTimeout(function () {
+          var box = document.querySelector('[data-rf="keyword"]');
+          if (box) { box.focus(); box.setSelectionRange(pos, pos); }
+        }, 0);
+      }, 260);
+    });
+  }
+
+  // ------------------------------------------------------------ 启动
+
+  function boot() {
+    var params = new URLSearchParams(location.search);
+    var apiBase = params.get('api');
+    if (apiBase && !global.__API_BASE__) {
+      global.__API_BASE__ = apiBase;
+      location.search = '';
+      return;
+    }
+
+    api.getCategories().then(function (c) {
+      CATEGORIES = c.categories;
+      CORE = c.coreContents;
+      EDGE_STYLES = c.edgeStyles || [];
+      (c.nodeStyles || []).forEach(function (s) { NODE_COLORS[s.type] = s.color; });
+      CORE_STYLES.nodes = (c.nodeStyles || []).filter(function (s) {
+        return ['生产工段', '生产设备', '设备部件', '工艺属性', '参数', 'DCS点', '物料流股',
+          '控制仪表', '执行机构', '质量指标', '业务指标'].indexOf(s.type) >= 0;
+      });
+      return api.getDataSources();
+    }).then(function (ds) {
+      $('#src-chips').innerHTML = ds.sources.map(function (s) {
+        return '<span class="chip' + (s.available ? '' : ' is-missing') + '">' +
+          '<span class="tick">' + (s.available ? '✓' : '○') + '</span>' + esc(s.file) + '</span>';
+      }).join('');
+      $('#svc-label').textContent = api.mode === 'live' ? '本体服务 · 实时' : '本体服务 · 静态快照';
+      bind();
+      render();
+    });
+  }
+
+  global.OntologyApp = { boot: boot, state: S };
+})(window);
+
+</script>
+<script>window.OntologyApp && window.OntologyApp.boot();</script>
