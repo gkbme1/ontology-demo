@@ -1,0 +1,5 @@
+# 本体服务运行依赖
+fastapi>=0.115
+uvicorn[standard]>=0.32
+pandas>=2.1
+openpyxl>=3.1
