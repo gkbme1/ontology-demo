@@ -16,8 +16,9 @@ from backend.config import settings
 from backend.tools.executor import ToolExecutor
 from backend.tools.ontology_tools import build_ontology_registry
 
-# 需要具体 ID 的工具，先通过列表类工具动态取一个真实 ID，不写死任何业务值
-ID_PROVIDERS: dict[str, tuple[str, dict, str]] = {
+# 需要具体 ID 的工具，先通过列表类工具动态取一个真实 ID，不写死任何业务值。
+# 第三项是点号路径（填进第一个必填参数），或 {参数名: 点号路径}（一次填多个参数）。
+ID_PROVIDERS: dict[str, tuple[str, dict, str | dict[str, str]]] = {
     "query_process_area_detail": ("query_process_areas", {}, "items.0.id"),
     "query_equipment_detail": ("query_equipment_list", {"limit": 1}, "items.0.id"),
     "query_parameter_detail": ("query_parameters", {"limit": 1}, "items.0.id"),
@@ -28,6 +29,13 @@ ID_PROVIDERS: dict[str, tuple[str, dict, str]] = {
     "query_object_limits": ("query_equipment_list", {"keyword": "水解罐A", "limit": 1}, "items.0.id"),
     "query_equipment_group_detail": ("query_equipment_groups", {"limit": 1}, "items.0.id"),
     "query_limit_check": ("query_equipment_list", {"keyword": "水解罐A", "limit": 1}, "items.0.id"),
+    "investigate_process_anomaly": ("query_relation_entities", {"type": "工艺属性", "matched": True, "limit": 1}, "items.0.id"),
+    "verify_process_influence": (
+        "query_relations",
+        {"category": "影响关系", "predicate": "正向影响", "limit": 1},
+        {"cause": "items.0.subject.id", "effect": "items.0.object.id"},
+    ),
+    "summarize_area_relations": ("query_process_areas", {}, "items.0.id"),
 }
 
 EXTRA_ARGS: dict[str, dict] = {
@@ -88,13 +96,13 @@ async def main() -> int:
             provider_name, provider_args, path = ID_PROVIDERS[spec.name]
             provider = registry.require(provider_name)
             probe = await executor.execute(provider, "probe", json.dumps(provider_args))
-            identifier = resolve(probe.result, path) if probe.status != "error" else None
-            if not identifier:
+            required = [p.name for p in spec.parameters if p.required]
+            targets = path if isinstance(path, dict) else ({required[0]: path} if required else {})
+            found = {name: resolve(probe.result, dotted) if probe.status != "error" else None for name, dotted in targets.items()}
+            if not all(found.values()):
                 rows.append((spec.name, "SKIP", 0, "取不到可用 ID"))
                 continue
-            required = [p.name for p in spec.parameters if p.required]
-            if required:
-                args[required[0]] = identifier
+            args.update(found)
 
         execution = await executor.execute(spec, "verify", json.dumps(args, ensure_ascii=False))
         note = execution.error or execution.to_public_dict()["resultSummary"]

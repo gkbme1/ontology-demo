@@ -665,9 +665,10 @@ def build_ontology_registry(compact_relations: bool = False) -> ToolRegistry:
     compact_relations=True 时，关系查询默认走精简视图——本地模型上下文紧张时用，
     一条关系约 300 字节而不是 1.8 KB。这只是改一个默认入参，不改工具集合。
     """
+    from backend.tools.analysis_tools import ANALYSIS_TOOLS
     from backend.tools.discovery import DISCOVERY_TOOL
 
-    specs = list(ONTOLOGY_TOOLS)
+    specs = list(ONTOLOGY_TOOLS) + list(ANALYSIS_TOOLS)
     if compact_relations:
         specs = [
             replace(spec, defaults={**spec.defaults, "view": "compact"})

@@ -49,6 +49,7 @@ from backend.agent.examples import load_examples
 from backend.llm.openai_compatible import build_llm_client
 from backend.tools.executor import ToolExecutor
 from backend.tools.ontology_tools import build_ontology_registry
+from backend.tools.registry import INITIAL_GROUPS
 
 RESULT_DIR = Path(__file__).resolve().parent.parent / "logs" / "eval"
 
@@ -188,7 +189,7 @@ async def main_async(args: argparse.Namespace) -> int:
         return 1
 
     registry = build_ontology_registry(compact_relations=settings.compact_relations)
-    initial = [s.name for s in registry if s.group == "core"] if settings.progressive_tools else None
+    initial = [s.name for s in registry if s.group in INITIAL_GROUPS] if settings.progressive_tools else None
     executor = ToolExecutor(
         settings.ontology_base_url,
         timeout=settings.ontology_timeout,

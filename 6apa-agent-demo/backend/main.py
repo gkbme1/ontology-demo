@@ -27,6 +27,7 @@ from .llm.openai_compatible import build_llm_client
 from .logging_setup import log_turn, setup_logging
 from .tools.executor import ToolExecutor
 from .tools.ontology_tools import build_ontology_registry
+from .tools.registry import INITIAL_GROUPS
 
 setup_logging(settings.log_level, settings.log_dir)
 logger = logging.getLogger("agent.api")
@@ -42,9 +43,9 @@ _executor = ToolExecutor(
     max_result_chars=settings.max_tool_result_chars,
     registry=registry,
 )
-# 渐进解锁模式下，一开始只下发 core 组（含工具发现），其余由模型按需取用
+# 渐进解锁模式下，一开始只下发 core 组（含工具发现）与确定性分析组，其余由模型按需取用
 _initial_tools = (
-    [spec.name for spec in registry if spec.group == "core"]
+    [spec.name for spec in registry if spec.group in INITIAL_GROUPS]
     if settings.progressive_tools
     else None
 )

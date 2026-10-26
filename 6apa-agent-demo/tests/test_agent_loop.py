@@ -214,6 +214,25 @@ async def main() -> int:
     ok &= check(not orphan, "裁剪后没有出现孤立的 tool 消息")
     ok &= check(long_conversation.dropped_turns > 0, f"确实丢弃了 {long_conversation.dropped_turns} 轮早期对话")
 
+    # ---------------------------------------------------------------- 用例 7
+    print("\n[7] 同一轮里原样重复的工具调用不再执行")
+    runtime7, llm7 = build_runtime(
+        [
+            [("query_ontology_overview", {})],
+            [("query_ontology_overview", {})],
+            [("query_equipment_list", {"limit": 2, "keyword": "泵"})],
+            [("query_equipment_list", {"keyword": "泵", "limit": 2})],
+            "全车间设备数见概览。",
+        ],
+        executor,
+    )
+    events7 = await collect(runtime7, store.get_or_create("t7"), "车间有多少设备？")
+    results7 = [e.data for e in events7 if e.type == "tool_result"]
+    ok &= check([r["status"] for r in results7] == ["ok", "empty", "ok", "empty"], f"重复调用标记为未执行：{[r['status'] for r in results7]}")
+    ok &= check("重复" in (results7[1].get("resultSummary") or ""), "执行面板写明是重复调用")
+    duplicate_msgs = [m for m in llm7.seen_messages[-1] if m.get("role") == "tool" and '"duplicate": true' in (m.get("content") or "")]
+    ok &= check(len(duplicate_msgs) == 2, "回灌给模型的是一句提示，而不是第二份完整结果（参数顺序不同也能识别）")
+
     await executor.aclose()
     print("\n全部通过" if ok else "\n存在失败用例")
     return 0 if ok else 1

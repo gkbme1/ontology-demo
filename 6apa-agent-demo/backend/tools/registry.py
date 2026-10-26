@@ -76,13 +76,13 @@ class ToolSpec:
     defaults: dict[str, Any] = field(default_factory=dict)
     # 返回体可能很大的接口：Executor 会更激进地裁剪列表
     heavy: bool = False
-    # 所属工具组。渐进解锁模式下，只有 core 组一开始就下发给模型，
-    # 其余组由模型通过元工具按需索取。分组是按"能力类别"划分的静态属性，
-    # 与具体问题无关——不构成对某类问题写死流程。
+    # 所属工具组。渐进解锁模式下，只有 INITIAL_GROUPS 里的组一开始就下发给模型，
+    # 其余组由模型通过元工具按需索取。分组是按"能力类别"划分的静态属性。
     group: str = "core"
     # 一句话摘要，元工具列清单时用（几十字，比完整 schema 便宜两个数量级）
     summary: str = ""
-    # 本地执行的工具（不打本体 HTTP）。handler(registry, arguments) -> dict。
+    # 本地执行的工具（不直接映射到某个本体接口）。handler(registry, arguments, api) -> dict，
+    # 可以是 async；api 是 ToolExecutor，通过 api.get_json 访问本体服务。
     # Runtime 只看这个字段是否为空，仍然不认识任何具体工具名。
     handler: Any = None
 
@@ -221,12 +221,18 @@ def _coerce(tool_name: str, param: ToolParameter, value: Any) -> Any:
 # 工具组的中文说明。元工具把它原样报给模型，让模型自己判断该要哪一组。
 TOOL_GROUPS: dict[str, str] = {
     "core": "核心：本体概览、设备检索与详情、参数、点位、任意对象的关联信息",
+    "analysis": "确定性分析：异常溯源、影响验证、工段关系结构统计（程序按本体通用算法一次给出完整证据链）",
     "structure": "结构与关系：工段、关系清单与详情、关系对象、关系图、测量锚点、因果关系、标准设备组、工段衔接",
     "values": "运行时数据：测点当前值与历史趋势",
     "limits": "工艺限值与越限判断",
     "rules": "生产规则、约束、能力、模型注册",
     "meta": "元数据：本体分类、类与属性、语义绑定、数据来源、数据质量、OWL 规范",
 }
+
+
+# 渐进解锁模式下一开始就下发的组：核心查询 + 确定性分析。
+# 分析工具必须首批下发，模型识别到分析类问题时才能直接调用，不用先去工具发现里找。
+INITIAL_GROUPS: tuple[str, ...] = ("core", "analysis")
 
 
 class ToolRegistry:

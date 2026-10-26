@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
 import uuid
@@ -62,6 +63,9 @@ class AgentRuntime:
         tool_budget = self.max_tool_calls_per_turn
         tool_calls_used = 0
         rounds = 0
+        # 本轮已执行过的 (工具名, 参数) → 第几次调用。模型偶尔会原样重复调用，
+        # 重复的不再执行：既省一次本体查询，也不让同一份结果在上下文里出现两遍。
+        executed: dict[tuple[str, str], int] = {}
 
         yield AgentEvent(events.TURN_START, {"conversationId": conversation.conversation_id, "turn": turn})
         yield events.status("理解用户问题", phase="understanding", done=True)
@@ -180,6 +184,30 @@ class AgentRuntime:
                         },
                     )
                     continue
+
+                call_key = (call.name, _canonical_args(call.arguments))
+                first_index = executed.get(call_key)
+                if first_index is not None:
+                    message = (
+                        f"与本轮第 {first_index} 次工具调用的工具和参数完全相同，未重新执行，结果见上文。"
+                        "请直接基于已有结果作答；确实需要不同的数据时，请改变参数后再调用。"
+                    )
+                    conversation.add_tool_result(
+                        call.id, call.name, json.dumps({"ok": True, "duplicate": True, "note": message}, ensure_ascii=False)
+                    )
+                    yield AgentEvent(
+                        events.TOOL_RESULT,
+                        {
+                            "callId": call.id,
+                            "tool": call.name,
+                            "arguments": _safe_json(call.arguments),
+                            "status": "empty",
+                            "resultSummary": f"与第 {first_index} 次调用重复，未重新执行",
+                            "durationMs": 0,
+                        },
+                    )
+                    continue
+                executed[call_key] = tool_calls_used
 
                 execution = await self.executor.execute(spec, call.id, call.arguments)
 
@@ -335,12 +363,16 @@ class AgentRuntime:
 
 
 def _safe_json(raw: str) -> Any:
-    import json
-
     try:
         return json.loads(raw) if raw.strip() else {}
     except ValueError:
         return {"_raw": raw[:500]}
+
+
+def _canonical_args(raw: str) -> str:
+    """参数的规范化形式（键排序、去空白），用于识别同一轮里的重复调用。"""
+    parsed = _safe_json(raw)
+    return json.dumps(parsed, ensure_ascii=False, sort_keys=True)
 
 
 def _tool_label(spec: ToolSpec | None, name: str) -> str:

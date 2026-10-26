@@ -2,8 +2,8 @@
 
 示例问题放在 backend/data/examples.json，与代码分离——它是一份**纯数据**：
 前端点一下，只是把问题文本填进输入框，Agent 照常自己规划工具链。
-这里不做任何「问题 → 工具」的绑定，也不把 referenceToolChain 下发给模型，
-否则就成了针对具体问题写死业务流程，违背本项目的硬性约束。
+这里不做任何「问题 → 工具」的绑定，也不把 referenceToolChain 下发给模型。
+分析类问题走哪个确定性分析工具，由模型按系统提示自己识别。
 
 改完 JSON 后调 POST /api/examples/reload，或直接重启进程。
 """

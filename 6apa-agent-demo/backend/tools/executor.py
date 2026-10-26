@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import inspect
 import json
 import logging
 import time
@@ -109,6 +110,14 @@ _ERROR_HINTS = {
 }
 
 
+class ToolApiError(RuntimeError):
+    """本地工具经 Executor 访问本体 API 失败。kind 与 HTTP 工具的错误分类一致。"""
+
+    def __init__(self, kind: str, message: str) -> None:
+        super().__init__(message)
+        self.kind = kind
+
+
 class ToolExecutor:
     """所有工具共用的执行器。"""
 
@@ -166,23 +175,37 @@ class ToolExecutor:
 
         execution.arguments = arguments
 
-        # 2.5) 本地执行的工具（如工具发现）：不打 HTTP，直接调 spec 自带的 handler。
+        # 2.5) 本地执行的工具（工具发现、确定性分析）：不直接映射到某个 HTTP 接口，
+        # 而是调 spec 自带的 handler(registry, arguments, api)，可以是 async。
+        # api 就是本 Executor，handler 通过 get_json 访问本体服务。
         # Executor 不认识任何具体工具名，只看 handler 字段是否为空。
         if spec.handler is not None:
-            try:
-                result = spec.handler(self.registry, arguments)
-            except Exception as exc:  # pragma: no cover - handler 自身出错不应打断整轮
-                execution.status = "error"
-                execution.error_kind = "server_error"
-                execution.error = f"本地工具执行失败：{exc}"
-                execution.duration_ms = _elapsed(started)
-                return execution
             execution.url = f"local://{spec.name}"
+            try:
+                result = spec.handler(self.registry, arguments, self)
+                if inspect.isawaitable(result):
+                    result = await result
+            except ToolApiError as exc:
+                return _fail(execution, started, exc.kind, str(exc))
+            except Exception as exc:  # pragma: no cover - handler 自身出错不应打断整轮
+                logger.exception("本地工具 %s 执行失败", spec.name)
+                return _fail(execution, started, "server_error", f"本地工具执行失败：{exc}")
             execution.unlocked = list(result.pop("_unlock", []) or [])
-            execution.result = result
-            execution.raw_bytes = len(json.dumps(result, ensure_ascii=False).encode("utf-8"))
+            execution.raw_bytes = len(json.dumps(result, ensure_ascii=False, default=str).encode("utf-8"))
+            compacted, truncated, note = compact_json(result, self.max_result_chars)
+            execution.result = compacted
+            execution.truncated = truncated
+            execution.truncation_note = note
             execution.status = "empty" if _is_empty(result) else "ok"
             execution.duration_ms = _elapsed(started)
+            logger.info(
+                "tool=%s status=%s local bytes=%s truncated=%s %dms",
+                spec.name,
+                execution.status,
+                execution.raw_bytes,
+                execution.truncated,
+                execution.duration_ms,
+            )
             return execution
 
         url = f"{self.base_url}{path}"
@@ -242,6 +265,28 @@ class ToolExecutor:
             execution.duration_ms,
         )
         return execution
+
+    # ------------------------------------------------------------ 给本地工具用
+
+    async def get_json(self, path: str, params: dict[str, Any] | None = None) -> Any:
+        """本地工具访问本体服务的唯一入口；失败统一抛 ToolApiError。"""
+        url = f"{self.base_url}{path}"
+        try:
+            response = await self._client.get(url, params=params or None)
+        except httpx.TimeoutException as exc:
+            raise ToolApiError("timeout", f"请求本体服务超时：{url}") from exc
+        except httpx.HTTPError as exc:
+            raise ToolApiError("network", f"请求本体服务失败：{exc}") from exc
+        if response.status_code == 404:
+            raise ToolApiError("not_found", f"本体服务返回 404：{path} {_body_snippet(response)}")
+        if 400 <= response.status_code < 500:
+            raise ToolApiError("bad_request", f"本体服务返回 {response.status_code}：{path} {_body_snippet(response)}")
+        if response.status_code >= 500:
+            raise ToolApiError("server_error", f"本体服务返回 {response.status_code}：{path} {_body_snippet(response)}")
+        try:
+            return response.json()
+        except ValueError as exc:
+            raise ToolApiError("invalid_json", f"本体服务返回内容不是合法 JSON：{path}") from exc
 
 
 # --------------------------------------------------------------------- helpers
@@ -384,6 +429,10 @@ def _build_note(caps: dict[str, int], omitted: dict[str, int]) -> str:
 def _summarize(result: Any) -> str:
     """给前端执行过程面板用的一句话摘要。"""
     if isinstance(result, dict):
+        if result.get("status") == "needs_clarification":
+            return f"需要确认对象：{len(result.get('candidates') or [])} 个候选"
+        if isinstance(result.get("conclusion"), str):
+            return result["conclusion"][:80]
         if isinstance(result.get("total"), int):
             shown = len(result.get("items") or []) if isinstance(result.get("items"), list) else None
             if shown is not None:

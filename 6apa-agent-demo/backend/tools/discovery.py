@@ -14,9 +14,9 @@
 
 这里有意不做的事
 ----------------
-不根据问题内容猜该给哪些工具——那就是"针对具体问题写死业务流程"，本项目明令禁止。
-分组是按能力类别划分的静态属性（结构 / 运行时值 / 限值 / 规则 / 元数据），
-与任何具体问题无关；选哪一组由模型自己判断，Runtime 不参与。
+不根据问题内容猜该给哪些工具：分组是按能力类别划分的静态属性
+（结构 / 运行时值 / 限值 / 规则 / 元数据），选哪一组由模型自己判断，Runtime 不参与。
+按问题类型走固定算法的是 analysis 组的确定性分析工具，它们一开始就和 core 组一起下发。
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ DISCOVERY_TOOL_NAME = "list_available_tools"
 MAX_UNLOCK_PER_CALL = 12
 
 
-def _discover(registry: ToolRegistry, arguments: dict[str, Any]) -> dict[str, Any]:
+def _discover(registry: ToolRegistry, arguments: dict[str, Any], api: Any = None) -> dict[str, Any]:
     group = (arguments.get("group") or "").strip()
     keyword = (arguments.get("keyword") or "").strip()
 
