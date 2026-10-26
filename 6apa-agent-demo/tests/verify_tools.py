@@ -39,6 +39,7 @@ ID_PROVIDERS: dict[str, tuple[str, dict, str | dict[str, str]]] = {
     "check_limit_exceedance": ("query_process_limits", {"hasValues": True, "appliesToType": "工艺属性"}, "items.0.appliesTo"),
     "map_causal_neighborhood": ("query_relations", {"category": "影响关系", "limit": 1}, "items.0.object.id"),
     "describe_equipment_links": ("query_equipment_list", {"keyword": "水解罐A", "limit": 1}, "items.0.id"),
+    "analyze_switch_signals": ("query_equipment_list", {"keyword": "一层排渣泵", "limit": 1}, "items.0.id"),
 }
 
 EXTRA_ARGS: dict[str, dict] = {
@@ -57,6 +58,7 @@ EXTRA_ARGS: dict[str, dict] = {
     "check_limit_exceedance": {"startTime": "__ONE_HOUR_AGO__"},
     "map_causal_neighborhood": {"withValues": True},
     "audit_data_gaps": {"kind": "无测点"},
+    "analyze_switch_signals": {"startTime": "__ONE_HOUR_AGO__"},
 }
 
 

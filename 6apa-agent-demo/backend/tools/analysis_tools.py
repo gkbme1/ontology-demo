@@ -1408,6 +1408,204 @@ async def describe_equipment_links(registry: Any, arguments: dict[str, Any], api
     return {k: v for k, v in result.items() if v not in ([], None, "")}
 
 
+# ================================================================ 工具八：开关量分析
+
+MAX_SWITCH_SIGNALS = 12
+_FAULT_WORDS = ("故障", "报警", "跳闸")
+_RUN_WORDS = ("运行",)
+_COMMAND_WORDS = ("启停", "指令", "控制")
+
+
+def _fmt_ts(t_ms: int) -> str:
+    return datetime.fromtimestamp(t_ms / 1000, TZ).strftime("%m-%d %H:%M:%S")
+
+
+def _signal_role(desc: str) -> str:
+    if any(w in desc for w in _FAULT_WORDS):
+        return "故障"
+    if any(w in desc for w in _RUN_WORDS):
+        return "运行反馈"
+    if "远程" in desc or "就地" in desc:
+        return "远程/就地"
+    if any(w in desc for w in _COMMAND_WORDS):
+        return "启停指令"
+    return "开关量"
+
+
+_EDGE_LABELS = {
+    "故障": ("报故障", "故障复位"),
+    "运行反馈": ("启动", "停止"),
+    "启停指令": ("发启动指令", "发停止指令"),
+    "远程/就地": ("切到 1", "切到 0"),
+    "开关量": ("0→1", "1→0"),
+}
+
+
+def switch_events(points: list[tuple[int, float]], window_end_ms: int) -> dict[str, Any]:
+    """raw 变位序列 → 初始状态、上升/下降沿时刻、处于 1 的累计时长。
+
+    第一个点是时间窗起点的状态，之后每个点都是一次变位；值不变的重复点不算变位。
+    """
+    points = sorted(points)
+    initial = int(points[0][1])
+    rises, falls = [], []
+    on_ms = 0
+    state, since = initial, points[0][0]
+    for t, v in points[1:]:
+        value = int(v)
+        if value == state:
+            continue
+        if state == 1:
+            on_ms += t - since
+        (rises if value == 1 else falls).append(t)
+        state, since = value, t
+    if state == 1:
+        on_ms += max(0, window_end_ms - since)
+    return {"initial": initial, "final": state, "rises": rises, "falls": falls, "onMinutes": int(round(on_ms / 60_000))}
+
+
+async def analyze_switch_signals(registry: Any, arguments: dict[str, Any], api: Any) -> dict[str, Any]:
+    try:
+        ref = await _resolve_equipment(api, arguments.get("equipment", ""))
+    except AnalysisInputError as exc:
+        return _clarify(exc)
+    object_ids = ref.get("ids") or [ref["id"]]
+    keyword = arguments.get("signal")
+    current_mode = not arguments.get("startTime") and not arguments.get("endTime")
+
+    if current_mode:
+        rows, simulated, name = [], False, None
+        for oid in object_ids:
+            params: dict[str, Any] = {"limit": 50}
+            if keyword:
+                params["keyword"] = keyword
+            data = await api.get_json(f"/api/ontology/{oid}/realtime", params)
+            name = name or (data.get("scope") or {}).get("objectName")
+            simulated = simulated or bool((data.get("dataSource") or {}).get("simulated"))
+            for item in data.get("items") or []:
+                value = item.get("value")
+                if value not in (0, 1, 0.0, 1.0):
+                    continue  # 只看开关量
+                desc = item.get("description") or ""
+                role = _signal_role(desc)
+                rows.append({"tag": item.get("tagName"), "desc": desc, "role": role, "value": int(value), "time": item.get("timeText")})
+        running = [r for r in rows if r["role"] == "运行反馈"]
+        faults = [r for r in rows if r["role"] == "故障" and r["value"] == 1]
+        parts = []
+        if running:
+            parts.append("运行反馈：" + "、".join(f"{r['desc']}={'运行' if r['value'] else '停止'}" for r in running) + "。")
+        fault_rows = [r for r in rows if r["role"] == "故障"]
+        if fault_rows:
+            parts.append(
+                f"故障点 {len(fault_rows)} 个，当前报故障 {len(faults)} 个" + (f"（{'、'.join(r['desc'] for r in faults)}）" if faults else "") + "。"
+            )
+        if not rows:
+            parts.append("没有找到可读的开关量测点。")
+        return {
+            "analysisType": "开关量分析",
+            "mode": "当前状态",
+            "equipment": {"ids": object_ids, "name": name},
+            "signalCount": len(rows),
+            "signals": rows[:30],
+            "conclusion": "".join(parts),
+            "method": "开关量取值 1/0 按测点描述判断含义（运行反馈 1=运行，故障 1=报故障）。"
+            + ("数值来自模拟数据服务，不是现场真实读数。" if simulated else ""),
+        }
+
+    try:
+        start, end, _ = _window(arguments)
+    except AnalysisInputError as exc:
+        return _clarify(exc)
+    end_ms = int(_parse_time(end, _now()).timestamp() * 1000)
+    signals, simulated, name = [], False, None
+    for oid in object_ids:
+        params = {"startTime": start, "endTime": end, "sampleMode": "raw", "limit": 50}
+        if keyword:
+            params["keyword"] = keyword
+        data = await api.get_json(f"/api/ontology/{oid}/history", params)
+        name = name or (data.get("scope") or {}).get("objectName")
+        simulated = simulated or bool((data.get("dataSource") or {}).get("simulated"))
+        for item in data.get("items") or []:
+            points = [(int(p["t"]), p["v"]) for p in item.get("values") or [] if p.get("v") is not None and p.get("q", 1) == 1]
+            if not points or any(v not in (0, 1, 0.0, 1.0) for _, v in points):
+                continue  # 只看开关量
+            desc = item.get("description") or ""
+            role = _signal_role(desc)
+            ev = switch_events(points, end_ms)
+            up, down = _EDGE_LABELS[role]
+            signals.append(
+                {
+                    "tag": item.get("tagName"),
+                    "desc": desc,
+                    "role": role,
+                    "initial": ev["initial"],
+                    up: [_fmt_ts(t) for t in ev["rises"]],
+                    down: [_fmt_ts(t) for t in ev["falls"]],
+                    "counts": f"{up} {len(ev['rises'])} 次 / {down} {len(ev['falls'])} 次",
+                    "onMinutes": ev["onMinutes"],
+                    "_ev": ev,
+                }
+            )
+
+    if not signals:
+        return {
+            "analysisType": "开关量分析",
+            "equipment": {"ids": object_ids, "name": name},
+            "window": {"start": start, "end": end},
+            "conclusion": "该设备在时间窗内没有可读的开关量测点。",
+        }
+
+    order = {"运行反馈": 0, "启停指令": 1, "故障": 2, "远程/就地": 3, "开关量": 4}
+    signals.sort(key=lambda s: order.get(s["role"], 9))
+    primary = signals[0]
+    parts = []
+    if primary["role"] in ("运行反馈", "启停指令"):
+        ev = primary["_ev"]
+        parts.append(
+            f"以{primary['desc']}（{primary['tag']}）为准：时间窗开始时{'运行' if ev['initial'] else '停止'}，"
+            f"启动 {len(ev['rises'])} 次、停止 {len(ev['falls'])} 次，累计运行约 {ev['onMinutes']} 分钟。"
+        )
+    # 指令与运行反馈对账：指令变了而运行反馈没跟上，正是"启动失败 / 停机失败"的判据
+    command = next((s for s in signals if s["role"] == "启停指令"), None)
+    feedback = next((s for s in signals if s["role"] == "运行反馈"), None)
+    mismatch = None
+    if command and feedback:
+        c, f = command["_ev"], feedback["_ev"]
+        if (len(c["rises"]), len(c["falls"])) != (len(f["rises"]), len(f["falls"])):
+            mismatch = (
+                f"启停指令（{len(c['rises'])} 启 / {len(c['falls'])} 停）与运行反馈（{len(f['rises'])} 启 / {len(f['falls'])} 停）次数对不上，"
+                "可能存在启动失败或停机失败，需结合规则与现场核实。"
+            )
+        else:
+            parts.append("启停指令与运行反馈的变位次数一致。")
+    faults = [s for s in signals if s["role"] == "故障"]
+    if faults:
+        fault_count = sum(len(s["_ev"]["rises"]) for s in faults)
+        parts.append(f"故障点 {len(faults)} 个，时间窗内报故障 {fault_count} 次。")
+    if mismatch:
+        parts.append(mismatch)
+    for s in signals:
+        s.pop("_ev")
+    result: dict[str, Any] = {
+        "analysisType": "开关量分析",
+        "mode": "时间窗",
+        "equipment": {"ids": object_ids, "name": name},
+        "window": {"start": start, "end": end},
+        "signalCount": len(signals),
+        "signals": signals[:MAX_SWITCH_SIGNALS],
+        "conclusion": "".join(parts),
+        "method": "取历史库原始变位（raw）：第一个点是时间窗起点的状态，之后每个点是一次变位，按测点描述判断 1/0 的含义。"
+        + ("数值来自模拟数据服务，不是现场真实读数。" if simulated else ""),
+        "next": "启停次数与时刻已由程序数好，照实列出，不要自己重数。",
+    }
+    if len(signals) > MAX_SWITCH_SIGNALS:
+        result["truncationNote"] = (
+            f"该设备共有 {len(signals)} 个开关量，只展开了前 {MAX_SWITCH_SIGNALS} 个（运行反馈优先）；"
+            "要看某一个，请用 signal 传它的位号或关键词再调一次。"
+        )
+    return result
+
+
 # ================================================================ 注册
 
 
@@ -1458,6 +1656,7 @@ ANALYSIS_TOOLS: list[ToolSpec] = [
             "影响验证（确定性分析，优先使用）。用户问'X 是不是 Y 引起的''X 会不会影响 Y''用数据验证一下 X 对 Y 的影响'时直接调用。"
             "程序会查本体里 cause→effect 的影响路径与正负向（上推 3 层），取同一时间窗两端的历史值，"
             "按本体方向判断数据是否支持，并说明本体有没有记载这条路径。"
+            "用户点名了疑似原因（'是不是稀硫酸加多了'）时优先用本工具，而不是异常溯源。"
             "cause / effect 的写法同 investigate_process_anomaly 的 target。"
         ),
         path="",
@@ -1565,6 +1764,8 @@ ANALYSIS_TOOLS: list[ToolSpec] = [
             "程序从设备对应的本体对象出发，按物理拓扑（上游/下游，并再往上推一层）、结构（所属设备组、实例、部件、属性）、"
             "控制、报警联锁归类，并给出所在工段的上下游工段与衔接物料；"
             "设备级没有登记关系时会明确说明，并退到工段层面给出确定结论。"
+            "注意：本工具只回答'关联与上下游'，不返回参数和测点清单；'介绍一下某设备'这类概况问题"
+            "请用 query_equipment_list 拿到 ID 后调 query_object_relations（参数、测点、关系一次拿全）。"
         ),
         path="",
         parameters=(
@@ -1574,5 +1775,25 @@ ANALYSIS_TOOLS: list[ToolSpec] = [
         summary="设备关联与上下游：拓扑上下游、所属设备组、部件、控制，及工段衔接",
         returns="device、area（工段上下游与衔接物料）、deviceLevelRecorded、upstream[] / upstreamChains / downstream[]、memberOf、instances、components、properties、control、alarms、conclusion。",
         handler=describe_equipment_links,
+    ),
+    ToolSpec(
+        name="analyze_switch_signals",
+        description=(
+            "开关量分析（确定性分析，优先使用）。问'某设备昨天/夜班启停了几次、分别什么时候、运行了多久、报过几次故障'时"
+            "给时间窗调用；问'现在在运行吗、有没有报故障'时不给时间窗调用。不要自己取原始变位再数。"
+            "程序取历史库原始变位，按测点描述区分运行反馈 / 启停指令 / 故障 / 远程就地，"
+            "数出每个点的上升沿与下降沿时刻、累计运行时长，并核对启停指令与运行反馈次数是否一致（不一致提示启动或停机失败）。"
+        ),
+        path="",
+        parameters=(
+            ToolParameter("equipment", "string", "设备名称（如 一层排渣泵）、equip- ID，或设备类本体对象 robj- ID。", required=True),
+            *_WINDOW_PARAMS[:1],
+            ToolParameter("endTime", "string", "时间窗结束，格式同上；只给 startTime 时默认到当前时刻。问'现在'时两个时间都不要填。"),
+            ToolParameter("signal", "string", "只看某类开关量，如 运行、故障、搅拌；不填看该设备全部开关量。"),
+        ),
+        group="analysis",
+        summary="开关量分析：启停次数与时刻、运行时长、故障次数，或当前运行/故障状态",
+        returns="mode、equipment、window、signals[]（位号、描述、角色、初始状态、各沿时刻、次数、onMinutes；当前状态模式为 value）、conclusion、method。",
+        handler=analyze_switch_signals,
     ),
 ]

@@ -182,6 +182,18 @@ def run_unit_tests() -> None:
     low_only = at.exceedance_profile({i * minute: v for i, v in enumerate([34, 32.8, 31, 34])}, limit, minute)
     check(low_only["worst"] == "低于低限", f"低侧最严重档位取低限而不是正常下沿：{low_only['worst']}")
 
+    # 开关量：第一个点是窗起点状态，之后每点一次变位；重复值不算变位
+    hour = 3_600_000
+    ev = at.switch_events([(0, 0), (1 * hour, 1), (3 * hour, 0), (3 * hour + 1, 0), (5 * hour, 1)], 6 * hour)
+    check(ev["initial"] == 0 and len(ev["rises"]) == 2 and len(ev["falls"]) == 1, f"上升沿 2 次、下降沿 1 次，重复值不计：{ev}")
+    check(ev["onMinutes"] == 180, f"累计处于 1 的时长算到窗末（{ev['onMinutes']} 分钟）")
+    check(at.switch_events([(0, 1)], 2 * hour)["onMinutes"] == 120 and not at.switch_events([(0, 1)], 2 * hour)["rises"], "整窗无变位时初始状态即全程状态")
+    check(
+        at._signal_role("一层排渣泵运行状态反馈") == "运行反馈" and at._signal_role("水解罐A搅拌故障") == "故障"
+        and at._signal_role("一层排渣泵启停指令") == "启停指令" and at._signal_role("一层排渣泵远程/就地状态") == "远程/就地",
+        "按测点描述区分运行反馈 / 故障 / 启停指令 / 远程就地",
+    )
+
     asyncio.run(graph_checks())
 
 
@@ -207,6 +219,7 @@ async def run_live_tests() -> None:
             "map_causal_neighborhood",
             "audit_data_gaps",
             "describe_equipment_links",
+            "analyze_switch_signals",
         ):
             spec = registry.get(name)
             check(spec is not None and spec.group in INITIAL_GROUPS, f"{name} 已注册且首批下发")
@@ -344,6 +357,27 @@ async def run_live_tests() -> None:
         if spread:
             res = await call("describe_equipment_links", equipment=spread)
             check(res.result.get("status") == "needs_clarification", f"跨工段同名设备不合并，返回候选（{spread}）")
+
+        # 开关量：动态挑一台有运行反馈点、窗口内有变位的设备，次数与原始变位逐点对得上
+        window = {"startTime": "2026-10-25 00:00:00", "endTime": "2026-10-26 00:00:00"}
+        candidate = None
+        for item in equipment:
+            raw = await executor.get_json(f"/api/ontology/{item['id']}/history", {**window, "sampleMode": "raw", "keyword": "运行", "limit": 5})
+            series = next((x for x in raw.get("items") or [] if len(x.get("values") or []) > 2), None)
+            if series:
+                candidate, raw_series = item, series
+                break
+        check(candidate is not None, "能找到窗口内有运行变位的设备")
+        if candidate:
+            res = await call("analyze_switch_signals", equipment=candidate["id"], signal=raw_series["tagName"], **window)
+            run = next((x for x in res.result["signals"] if x["tag"] == raw_series["tagName"]), None)
+            values = [int(p["v"]) for p in raw_series["values"]]
+            changes = sum(1 for a, b in zip(values, values[1:]) if a != b)
+            got = len(run.get("启动") or []) + len(run.get("停止") or []) if run else -1
+            check(run is not None and got == changes, f"启停次数与原始变位一致（{candidate['name']} {raw_series['tagName']}：{got}/{changes}）")
+            check("启动" in res.result["conclusion"] and not res.truncated, "结论按运行反馈给出启停次数，返回体未裁剪")
+            now = await call("analyze_switch_signals", equipment=candidate["id"])
+            check(now.result.get("mode") == "当前状态" and all(x["value"] in (0, 1) for x in now.result.get("signals") or []), "不给时间窗时读当前开关状态")
     finally:
         await executor.aclose()
 
