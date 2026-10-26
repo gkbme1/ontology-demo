@@ -272,6 +272,30 @@ async def run_live_tests() -> None:
         )
         check("模拟数据" in idata.get("conclusion", ""), "模拟数据声明写进了 conclusion")
 
+        # 设备说法 + 物理量：动态取一个有测点、有所属设备的工艺量，用"所属设备名 + 物理量词"来问
+        ents = await executor.get_json("/api/ontology/relation-entities", {"keyword": "温度", "type": "工艺属性", "matched": "true", "limit": 300})
+        probe_hit = None
+        for ent in ents.get("items") or []:
+            owner = ent.get("belongsTo") or ""
+            if not owner or not ent.get("tagCount"):
+                continue
+            phrase = owner.split("(")[0] + "温度"
+            resolved = await call("check_limit_exceedance", target=phrase)
+            tv = (resolved.result or {}).get("target") or {}
+            if tv.get("matchedBy"):
+                probe_hit = (phrase, ent, tv)
+                break
+        check(probe_hit is not None, "设备说法 + 物理量能唯一推定到工艺量，并给出推定依据")
+        if probe_hit:
+            print(f"        动态选取：「{probe_hit[0]}」→ {probe_hit[2]['name']}")
+            check(probe_hit[2]["name"] and "温度" in probe_hit[2]["name"], "推定结果是名称含该物理量的工艺量")
+
+        batch = await call("check_limit_exceedance", target="pH", startTime="2026-10-25 20:00:00", endTime="2026-10-26 06:00:00")
+        bres = batch.result or {}
+        check(bres.get("analysisType") == "越限统计（多工艺量）" and len(bres.get("quantities") or []) >= 2, f"只说物理量时逐个统计全部同类工艺量（{len(bres.get('quantities') or [])} 个）")
+        check(all(q.get("maxOutsideMinutes", 0) <= 10 * 60 + 5 for q in bres.get("quantities") or []), "多工艺量越限分钟不超过时间窗（各档嵌套不重复相加）")
+        check("模拟数据" in bres.get("conclusion", "") and not batch.truncated, f"批量结果声明模拟数据且未被裁剪（{len(batch.to_llm_content())} 字符）")
+
         clarify = await call("investigate_process_anomaly", target="温度")
         check(clarify.result.get("status") == "needs_clarification" and clarify.result.get("candidates"), "名称多义时返回候选而不是乱挑")
 
@@ -294,7 +318,7 @@ async def run_live_tests() -> None:
             w = win.result or {}
             check(w.get("limit", {}).get("id") == picked["id"], "越限统计用的是该工艺量本身的限值")
             check(w.get("abnormalTagCount", 0) + len(w.get("normalTags") or []) == w.get("tagCount"), "越限测点 + 正常测点 = 全部测点（不漏表）")
-            longest = max((sum((r.get("越限分钟") or {}).values()) for r in w.get("abnormal") or []), default=0)
+            longest = max((at._outside_minutes(r) for r in w.get("abnormal") or []), default=0)
             check(all(m <= 24 * 60 + w["window"]["intervalMinutes"] for r in w.get("abnormal") or [] for m in (r.get("越限分钟") or {}).values()), f"单档越限时长不超过时间窗（最大合计 {longest} 分钟）")
             lim = w.get("limit") or {}
             check(

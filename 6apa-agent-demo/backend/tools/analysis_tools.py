@@ -171,6 +171,30 @@ async def _resolve_entity(api: Any, raw: str) -> dict[str, Any]:
         if _TAG_RE.match(text):
             break
 
+    # "水解罐温度" = 设备说法"水解罐" + 物理量"温度"：只认名称含物理量、且名称或所属设备含设备说法的
+    # 有测点工艺量；唯一命中才采用（"水解罐温度" → 所属"水解反应釜组(水解罐A–K)"的「釜内反应温度」）
+    split = _split_quantity(compact_text)
+    if split:
+        device, word = split
+        same_kind = await api.get_json("/api/ontology/relation-entities", {"keyword": word, "limit": 300})
+        hits = [
+            e
+            for e in same_kind.get("items") or []
+            if e.get("type") in _QUANTITY_TYPES
+            and e.get("tagCount")
+            and word.lower() in (e.get("name") or "").lower()
+            and (device in (e.get("name") or "") or device in (e.get("belongsTo") or ""))
+        ]
+        if len(hits) == 1:
+            pick = hits[0]
+            return {
+                "id": pick["id"],
+                "name": pick["name"],
+                "type": pick.get("type"),
+                "focusTag": None,
+                "matchedBy": f"按设备「{device}」+ 物理量「{word}」匹配到「{pick['name']}」（所属 {pick.get('belongsTo')}）",
+            }
+
     pool = items
     if not pool:
         everything = await api.get_json("/api/ontology/relation-entities", {})
@@ -191,6 +215,17 @@ async def _resolve_entity(api: Any, raw: str) -> dict[str, Any]:
         for e in pool[:8]
     ]
     raise AnalysisInputError(f"「{text}」没有唯一对应的本体对象，请从候选里选一个，用它的 id 或完整名称重新调用。", candidates)
+
+
+_QUANTITY_WORDS = ("温度", "压力", "液位", "流量", "浓度", "转速", "开度", "电流", "频率", "pH", "PH", "ph")
+
+
+def _split_quantity(text: str) -> tuple[str, str] | None:
+    """按结尾的物理量词拆成 (设备说法, 物理量)；没有设备说法的（如单独一个"pH"）不拆。"""
+    for word in _QUANTITY_WORDS:
+        if text.endswith(word) and len(text) > len(word):
+            return text[: -len(word)], word
+    return None
 
 
 async def _causal_links(api: Any, entity_id: str, direction: str) -> tuple[list[dict[str, Any]], list[str]]:
@@ -630,7 +665,7 @@ async def investigate_process_anomaly(registry: Any, arguments: dict[str, Any], 
         causes, _ = await _cause_tree(api, target, depth)
         return {
             "analysisType": "异常溯源",
-            "target": {"id": target["id"], "name": target["name"], "symptom": symptom},
+            "target": {**_target_view(target), "symptom": symptom},
             "window": {"start": window[0], "end": window[1]},
             "status": "no_data",
             "limit": _limit_brief(limit),
@@ -702,7 +737,7 @@ async def investigate_process_anomaly(registry: Any, arguments: dict[str, Any], 
 
     return {
         "analysisType": "异常溯源",
-        "target": {"id": target["id"], "name": target["name"], "symptom": symptom},
+        "target": {**_target_view(target), "symptom": symptom},
         "window": {"start": window[0], "end": window[1], "intervalMinutes": window[2] // 60_000},
         "limit": _limit_brief(limit),
         "anomaly": judged,
@@ -738,8 +773,8 @@ async def verify_process_influence(registry: Any, arguments: dict[str, Any], api
     effect_hist = await _history(api, effect["id"], *window, keyword=arguments.get("focus"), limit=MAX_TARGET_TAGS)
     base = {
         "analysisType": "影响验证",
-        "cause": {"id": cause["id"], "name": cause["name"]},
-        "effect": {"id": effect["id"], "name": effect["name"]},
+        "cause": _target_view(cause),
+        "effect": _target_view(effect),
         "window": {"start": window[0], "end": window[1], "intervalMinutes": window[2] // 60_000},
         "ontology": (
             {"recorded": True, "path": path["path"], "direction": _SIGN_LABEL[sign], "mechanism": path["mechanism"][:60], "source": path["source"]}
@@ -937,16 +972,85 @@ def exceedance_profile(series: dict[int, float], limit: dict[str, Any], interval
     return out
 
 
+MAX_BATCH_QUANTITIES = 10
+
+
 async def check_limit_exceedance(registry: Any, arguments: dict[str, Any], api: Any) -> dict[str, Any]:
     try:
         target = await _resolve_with_quantity(api, arguments.get("target", ""), arguments.get("quantity"))
     except AnalysisInputError as exc:
-        return _clarify(exc)
+        batch = await _batch_quantities(api, arguments.get("target", ""))
+        if not batch:
+            return _clarify(exc)
+        return await _check_limit_batch(api, batch, arguments)
+    return await _check_limit_one(api, target, arguments)
+
+
+async def _batch_quantities(api: Any, raw: str) -> list[dict[str, Any]]:
+    """"pH""温度"这类只说了物理量的问法：取名称含该词、有测点的全部工艺量，逐个统计。"""
+    word = re.sub(r"\s+", "", raw or "")
+    if word not in _QUANTITY_WORDS:
+        return []
+    found = await api.get_json("/api/ontology/relation-entities", {"keyword": word, "limit": 300})
+    return [
+        {"id": e["id"], "name": e["name"], "type": e.get("type"), "focusTag": None}
+        for e in found.get("items") or []
+        if e.get("type") in _QUANTITY_TYPES and e.get("tagCount") and word.lower() in (e.get("name") or "").lower()
+    ]
+
+
+async def _check_limit_batch(api: Any, quantities: list[dict[str, Any]], arguments: dict[str, Any]) -> dict[str, Any]:
+    rows, no_limit = [], []
+    for quantity in quantities[:MAX_BATCH_QUANTITIES]:
+        one = await _check_limit_one(api, quantity, {k: v for k, v in arguments.items() if k not in ("target", "quantity", "focus")})
+        if not one.get("limit"):
+            no_limit.append(quantity["name"])
+            continue
+        abnormal = one.get("abnormal") or []
+        row = {
+            "name": quantity["name"],
+            "limit": f"{one['limit']['id']} 正常{one['limit'].get('正常区间')}（{one['limit'].get('状态')}）",
+            "tagCount": one.get("tagCount"),
+            "abnormalTags": [a["tag"] for a in abnormal],
+            "worst": abnormal[0].get("worst") if abnormal else "正常",
+        }
+        if abnormal and one.get("mode") == "时间窗":
+            row["abnormalTagCount"] = one.get("abnormalTagCount")
+            row["maxOutsideMinutes"] = max(_outside_minutes(a) for a in abnormal)
+        if one.get("mode") == "当前值":
+            row["abnormal"] = [f"{a['tag']}={a.get('value')}（{a['status']}）" for a in abnormal]
+            row.pop("abnormalTags")
+        rows.append(row)
+    flagged = [r["name"] for r in rows if r["worst"] != "正常"]
+    window = None
+    if arguments.get("startTime") or arguments.get("endTime"):
+        start, end, _ = _window(arguments)
+        window = {"start": start, "end": end}
+    result: dict[str, Any] = {
+        "analysisType": "越限统计（多工艺量）",
+        "mode": "时间窗" if window else "当前值",
+        "window": window,
+        "quantities": rows,
+        "noLimit": no_limit,
+        "conclusion": (
+            f"「{arguments.get('target')}」对应 {len(quantities)} 个有测点的工艺量，逐个按各自限值统计："
+            + (f"越限的有 {'、'.join(flagged)}。" if flagged else "全部在正常区间内。")
+            + (f"另有 {len(no_limit)} 个没有已填数值的限值，无法判断（{'、'.join(no_limit)}）。" if no_limit else "")
+            + _SIMULATED_TAIL
+        ),
+        "next": "每个工艺量的结果都已由程序算好，照实列出；需要某个量的逐表明细时，用它的名称再调一次本工具。",
+    }
+    if len(quantities) > MAX_BATCH_QUANTITIES:
+        result["truncationNote"] = f"共 {len(quantities)} 个工艺量，只统计了前 {MAX_BATCH_QUANTITIES} 个。"
+    return {k: v for k, v in result.items() if v is not None}
+
+
+async def _check_limit_one(api: Any, target: dict[str, Any], arguments: dict[str, Any]) -> dict[str, Any]:
     focus_kw = arguments.get("focus") or target.get("focusTag")
     limit = await _limit_for(api, target)
     base: dict[str, Any] = {
         "analysisType": "越限统计",
-        "target": {"id": target["id"], "name": target["name"]},
+        "target": {**_target_view(target)},
         "limit": _limit_brief(limit),
     }
     if not limit:
@@ -1003,7 +1107,7 @@ async def check_limit_exceedance(registry: Any, arguments: dict[str, Any], api: 
     # 排序：高高 / 低低最严重，其次高限 / 低限，最后正常区间外
     severity = {"高于高高限": 0, "低于低低限": 0, "高于高限": 1, "低于低限": 1, "高于正常上沿": 2, "低于正常下沿": 2}
     abnormal = [p for p in profiles if p["worst"] != "正常"]
-    abnormal.sort(key=lambda p: (severity.get(p["worst"], 9), -sum((p.get("越限分钟") or {}).values())))
+    abnormal.sort(key=lambda p: (severity.get(p["worst"], 9), -_outside_minutes(p)))
     peak = max(profiles, key=lambda p: p["max"])
     trough = min(profiles, key=lambda p: p["min"])
     conclusion = (
@@ -1030,6 +1134,12 @@ async def check_limit_exceedance(registry: Any, arguments: dict[str, Any], api: 
     if len(abnormal) > MAX_ABNORMAL_ROWS:
         result["truncationNote"] = f"越限测点共 {len(abnormal)} 个，只展开了最严重的 {MAX_ABNORMAL_ROWS} 个。"
     return result
+
+
+def _outside_minutes(row: dict[str, Any]) -> int:
+    """越出正常区间的分钟数。各档是嵌套的（高高 ⊂ 高 ⊂ 正常上沿以上），不能相加。"""
+    minutes = row.get("越限分钟") or {}
+    return minutes.get("高于正常上沿", 0) + minutes.get("低于正常下沿", 0)
 
 
 def _limit_status_note(limit: dict[str, Any]) -> str:
@@ -1127,7 +1237,7 @@ async def map_causal_neighborhood(registry: Any, arguments: dict[str, Any], api:
         parts.append(f"它处于闭环控制（{'、'.join(controllers)}）。")
     result: dict[str, Any] = {
         "analysisType": "影响因素与后果梳理",
-        "target": {"id": target["id"], "name": target["name"], **own},
+        "target": {**_target_view(target), **own},
         "causes": cause_rows,
         "consequences": effect_rows,
         "conclusion": "".join(parts),
@@ -1633,6 +1743,14 @@ async def analyze_switch_signals(registry: Any, arguments: dict[str, Any], api: 
 # 关闭思考的模型常常不转述 method，模拟数据声明直接写进它会照抄的 conclusion
 _SIMULATED_TAIL = "（以上数值来自模拟数据服务，不是现场真实读数。）"
 _NEXT_HINT = "证据链已完整，请直接按 数据事实 / 本体记载 / 统计判断 三层作答并列出 dataGaps，不要用相同参数重复调用本工具。"
+
+
+def _target_view(target: dict[str, Any]) -> dict[str, Any]:
+    """对外展示的分析对象；按设备 + 物理量推定的，带上推定依据，回答里要说明按哪个对象分析。"""
+    view = {"id": target["id"], "name": target["name"]}
+    if target.get("matchedBy"):
+        view["matchedBy"] = target["matchedBy"]
+    return view
 
 
 def _clarify(exc: AnalysisInputError) -> dict[str, Any]:
