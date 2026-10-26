@@ -483,7 +483,7 @@ def _limit_brief(limit: dict[str, Any] | None) -> dict[str, Any] | None:
 
 
 def _judge_target(
-    hist: dict[str, Any], limit: dict[str, Any] | None, symptom: str, focus_tag: str | None
+    hist: dict[str, Any], limit: dict[str, Any] | None, symptom: str, focus_tag: str | None, interval_ms: int
 ) -> dict[str, Any]:
     """确认异常是否成立，并选出用于对比的"关注测点"。"""
     per_tag = []
@@ -534,7 +534,16 @@ def _judge_target(
         established = "无法按限值判定（本体中暂无该对象的工艺限值）"
 
     shown = sorted(hits, key=lambda t: -(t["up"] + t["down"]))[:5] if hits else [focus]
-    public = [{k: v for k, v in t.items() if not k.startswith("_") and k not in ("up", "down")} for t in shown]
+    # 对外一律给"分钟"而不是样本数，避免把"84 个 15 分钟样本"读成"84 分钟"
+    step_min = interval_ms / 60_000
+    band_keys = [key for key, _, _, _ in _BANDS]
+    public = []
+    for t in shown:
+        row = {k: v for k, v in t.items() if not k.startswith("_") and k not in ("up", "down") and k not in band_keys}
+        minutes = {k: int(round(t[k] * step_min)) for k in band_keys if t.get(k)}
+        if minutes:
+            row["minutes"] = minutes
+        public.append(row)
     return {
         "established": established,
         "direction": direction,
@@ -635,7 +644,7 @@ async def investigate_process_anomaly(registry: Any, arguments: dict[str, Any], 
             ),
         }
 
-    judged = _judge_target(hist, limit, symptom, focus_kw if focus_kw and _TAG_RE.match(focus_kw) else None)
+    judged = _judge_target(hist, limit, symptom, focus_kw if focus_kw and _TAG_RE.match(focus_kw) else None, window[2])
     focus = judged.pop("focus")
     mask = anomaly_mask(focus["_series"], limit, judged["direction"])
     causes, controllers = await _cause_tree(api, target, depth)
@@ -692,7 +701,7 @@ async def investigate_process_anomaly(registry: Any, arguments: dict[str, Any], 
         "anomaly": judged,
         "candidates": candidates,
         "dataGaps": gaps,
-        "conclusion": "".join(conclusion),
+        "conclusion": "".join(conclusion) + (_SIMULATED_TAIL if simulated else ""),
         "method": _method_note(simulated),
         "next": _NEXT_HINT,
     }
@@ -740,7 +749,7 @@ async def verify_process_influence(registry: Any, arguments: dict[str, Any], api
     if not effect_hist["tags"]:
         return {**base, "verdict": "无测点，无法用数据验证", "conclusion": f"「{effect['name']}」没有可取历史值的现场测点。"}
 
-    judged = _judge_target(effect_hist, limit, arguments.get("symptom") or "异常", None)
+    judged = _judge_target(effect_hist, limit, arguments.get("symptom") or "异常", None, window[2])
     focus = judged.pop("focus")
     mask = anomaly_mask(focus["_series"], limit, judged["direction"])
     probe = {"id": cause["id"], "pathSign": sign}
@@ -751,7 +760,7 @@ async def verify_process_influence(registry: Any, arguments: dict[str, Any], api
         ev["verdict"] = f"仅统计参考：{ev['verdict']}（本体未记载该影响路径）"
     conclusion = (
         f"本体记载 {path['path']}（{_SIGN_LABEL[sign]}）。" if path else base["ontology"]["note"] + "。"
-    ) + f"同期数据对比结论：{ev['verdict']}。"
+    ) + f"同期数据对比结论：{ev['verdict']}。" + (_SIMULATED_TAIL if simulated else "")
     return {
         **base,
         "effectAnomaly": judged,
@@ -963,7 +972,8 @@ async def check_limit_exceedance(registry: Any, arguments: dict[str, Any], api: 
             "conclusion": (
                 f"当前 {len(rows)} 个测点中 {len(abnormal)} 个不在正常区间。" if abnormal else f"当前 {len(rows)} 个测点全部在正常区间内。"
             )
-            + _limit_status_note(limit),
+            + _limit_status_note(limit)
+            + (_SIMULATED_TAIL if simulated else ""),
             "method": _exceedance_method(None, simulated),
         }
 
@@ -993,6 +1003,8 @@ async def check_limit_exceedance(registry: Any, arguments: dict[str, Any], api: 
         f"最低 {trough['min']}{limit.get('unit') or ''}（{trough['tag']}，{trough['minAt']}，{classify(trough['min'], limit)}）。"
         + _limit_status_note(limit)
     )
+    if hist["simulated"]:
+        conclusion += _SIMULATED_TAIL
     result = {
         **base,
         "mode": "时间窗",
@@ -1507,7 +1519,7 @@ async def analyze_switch_signals(registry: Any, arguments: dict[str, Any], api: 
             "equipment": {"ids": object_ids, "name": name},
             "signalCount": len(rows),
             "signals": rows[:30],
-            "conclusion": "".join(parts),
+            "conclusion": "".join(parts) + (_SIMULATED_TAIL if simulated else ""),
             "method": "开关量取值 1/0 按测点描述判断含义（运行反馈 1=运行，故障 1=报故障）。"
             + ("数值来自模拟数据服务，不是现场真实读数。" if simulated else ""),
         }
@@ -1593,7 +1605,7 @@ async def analyze_switch_signals(registry: Any, arguments: dict[str, Any], api: 
         "window": {"start": start, "end": end},
         "signalCount": len(signals),
         "signals": signals[:MAX_SWITCH_SIGNALS],
-        "conclusion": "".join(parts),
+        "conclusion": "".join(parts) + (_SIMULATED_TAIL if simulated else ""),
         "method": "取历史库原始变位（raw）：第一个点是时间窗起点的状态，之后每个点是一次变位，按测点描述判断 1/0 的含义。"
         + ("数值来自模拟数据服务，不是现场真实读数。" if simulated else ""),
         "next": "启停次数与时刻已由程序数好，照实列出，不要自己重数。",
@@ -1609,6 +1621,8 @@ async def analyze_switch_signals(registry: Any, arguments: dict[str, Any], api: 
 # ================================================================ 注册
 
 
+# 关闭思考的模型常常不转述 method，模拟数据声明直接写进它会照抄的 conclusion
+_SIMULATED_TAIL = "（以上数值来自模拟数据服务，不是现场真实读数。）"
 _NEXT_HINT = "证据链已完整，请直接按 数据事实 / 本体记载 / 统计判断 三层作答并列出 dataGaps，不要用相同参数重复调用本工具。"
 
 

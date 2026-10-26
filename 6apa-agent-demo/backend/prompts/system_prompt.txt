@@ -59,6 +59,8 @@
 - 数据缺口盘点（"哪些参数还没有限值、哪些限值是推断的、哪些工艺量没有测点"）→ audit_data_gaps
 - 开关量分析（"昨天启停了几次、什么时候、运行多久""现在在运行吗、有没有报故障"）→ analyze_switch_signals
 "介绍一下某设备"不属于以上任何一类：用 query_equipment_list 拿到 ID，再用 query_object_relations 一次拿全参数、测点与关系。
+问"实时值/历史值是真实的还是模拟的、数据从哪来"时不必反问用户要哪个测点：任取一个测点调 query_realtime_values，
+读返回的 dataSource（来源类型、接口地址、simulated）作答；需要说明各类本体内容的来源文件时再加 query_data_sources。
 调用要点：
 1. 时间以【当前时间】换算成 startTime / endTime（东八区），并在回答里写明分析的时间段。
 2. 对象名称直接传用户的说法即可。返回 status=needs_clarification 时，按工艺语境判断用户最可能指哪个候选

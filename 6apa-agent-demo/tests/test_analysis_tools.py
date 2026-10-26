@@ -264,6 +264,13 @@ async def run_live_tests() -> None:
             owner = next((x for x in raw["items"] if x["id"] == lim["id"]), {})
             check(owner.get("appliesTo") == effect["entity"], "只采用 appliesTo 为该对象本身的限值")
         check(not inv.truncated and len(inv.to_llm_content()) <= budget + 200, f"异常溯源返回体在 local32k 预算内（{len(inv.to_llm_content())} 字符）")
+        rows = idata.get("anomaly", {}).get("tags") or []
+        window_min = 24 * 60
+        check(
+            all("aboveNormal" not in r and all(m <= window_min + 60 for m in (r.get("minutes") or {}).values()) for r in rows),
+            "异常溯源对外给的是越限分钟数而不是样本数",
+        )
+        check("模拟数据" in idata.get("conclusion", ""), "模拟数据声明写进了 conclusion")
 
         clarify = await call("investigate_process_anomaly", target="温度")
         check(clarify.result.get("status") == "needs_clarification" and clarify.result.get("candidates"), "名称多义时返回候选而不是乱挑")
