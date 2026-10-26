@@ -137,6 +137,8 @@ def run_unit_tests() -> None:
         check(by_id["robj-v"]["pathSign"] == 0 and by_id["robj-c"]["level"] == 2, "控制执行机构方向未标注，且不再往控制器上推")
         check("→负向→" in by_id["robj-c"]["path"] and by_id["robj-c"]["path"].endswith("A"), f"路径文本完整：{by_id['robj-c']['path']}")
         check(controllers == ["控制器K"], "识别出目标所在的控制回路")
+        down, _ = await at._causal_walk(api, {"id": "robj-a", "name": "A"}, 2, "down")
+        check([d["id"] for d in down] == ["robj-b"] and down[0]["path"].startswith("A →正向→"), "往下游找后果，不把'反馈给'控制器当后果")
 
         exact = await at._resolve_entity(api, "反应温度")
         check(exact["id"] == "robj-a", "名称精确命中")
@@ -168,6 +170,18 @@ def run_unit_tests() -> None:
         check(good.status == "ok" and good.truncated and len(good.to_llm_content()) < 2600, "async 本地工具的大返回体同样按预算裁剪")
         check(bad.status == "error" and bad.error_kind == "not_found", "本地工具访问本体失败时保留错误分类")
 
+    # 越限统计：逐档判断与时长 / 连续时段
+    check(at.classify(37.5, limit) == "高于高高限" and at.classify(35.2, limit) == "高于正常上沿", "取值分档按从严到宽判断")
+    check(at.classify(31, limit) == "低于低限" and at.classify(34, limit) == "正常", "低侧分档与正常")
+    minute = 60_000
+    run_series = {i * 3 * minute: v for i, v in enumerate([34, 36, 36, 34, 36, 37.5, 36, 34, 32.5, 34])}
+    prof = at.exceedance_profile(run_series, limit, 3 * minute)
+    check(prof["minutes"] == {"aboveHighHigh": 3, "aboveHigh": 15, "aboveNormal": 15, "belowNormal": 3}, f"各档越限时长 = 样本数 × 间隔：{prof['minutes']}")
+    check(prof["runCount"] == 3 and "（9分钟）" in prof["longestRuns"][0], f"连续越限时段按长度排序：{prof['longestRuns']}")
+    check(prof["max"] == 37.5 and prof["worst"] == "高于高高限", "最值与最严重档位")
+    low_only = at.exceedance_profile({i * minute: v for i, v in enumerate([34, 32.8, 31, 34])}, limit, minute)
+    check(low_only["worst"] == "低于低限", f"低侧最严重档位取低限而不是正常下沿：{low_only['worst']}")
+
     asyncio.run(graph_checks())
 
 
@@ -185,7 +199,13 @@ async def run_live_tests() -> None:
         return execution
 
     try:
-        for name in ("investigate_process_anomaly", "verify_process_influence", "summarize_area_relations"):
+        for name in (
+            "investigate_process_anomaly",
+            "verify_process_influence",
+            "summarize_area_relations",
+            "check_limit_exceedance",
+            "map_causal_neighborhood",
+        ):
             spec = registry.get(name)
             check(spec is not None and spec.group in INITIAL_GROUPS, f"{name} 已注册且首批下发")
 
@@ -241,6 +261,32 @@ async def run_live_tests() -> None:
         check(sdata.get("total") == independent.get("total"), f"工段关系总数与独立查询一致（{area['name']}：{sdata.get('total')}）")
         check(sum(row["count"] for row in sdata["byCategory"]) == sdata["total"], "各类别计数之和等于总数（不漏类别）")
         check(not summ.truncated, "工段统计返回体未被裁剪")
+
+        # 越限统计：动态挑一个已填数值、且有测点的工艺量限值
+        limits = await executor.get_json("/api/ontology/process-limits", {"hasValues": "true", "appliesToType": "工艺属性"})
+        picked = next((x for x in limits.get("items") or [] if (x.get("matchedTargetCount") or x.get("targetCount"))), None)
+        check(picked is not None, "本体里能找到已填数值、有测点的工艺量限值")
+        if picked:
+            print(f"        动态选取：{picked['appliesTo']}（{picked['id']}）")
+            win = await call("check_limit_exceedance", target=picked["appliesTo"], startTime="2026-10-25 00:00:00", endTime="2026-10-26 00:00:00")
+            w = win.result or {}
+            check(w.get("limit", {}).get("id") == picked["id"], "越限统计用的是该工艺量本身的限值")
+            check(w.get("abnormalTagCount", 0) + len(w.get("normalTags") or []) == w.get("tagCount"), "越限测点 + 正常测点 = 全部测点（不漏表）")
+            longest = max((sum((r.get("minutes") or {}).values()) for r in w.get("abnormal") or []), default=0)
+            check(all(m <= 24 * 60 + w["window"]["intervalMinutes"] for r in w.get("abnormal") or [] for m in (r.get("minutes") or {}).values()), f"单档越限时长不超过时间窗（最大合计 {longest} 分钟）")
+            check(not win.truncated and len(win.to_llm_content()) <= budget + 200, f"越限统计返回体在 local32k 预算内（{len(win.to_llm_content())} 字符）")
+            now = await call("check_limit_exceedance", target=picked["appliesTo"])
+            check(now.result.get("mode") == "当前值" and now.result.get("tagCount"), "不给时间窗时核对当前值")
+
+        # 影响因素与后果：用前面动态选出的关系，两端互相能找到对方
+        down = await call("map_causal_neighborhood", target=cause["id"], scope="后果")
+        up = await call("map_causal_neighborhood", target=effect["id"], scope="原因", withValues=True)
+        check(any(r["id"] == effect["id"] and r["direction"] == "负向" for r in down.result["consequences"]), "从原因往下游能找到结果，方向为负向")
+        mine_up = next((r for r in up.result["causes"] if r["id"] == cause["id"]), None)
+        check(mine_up is not None and mine_up["measurable"] and mine_up.get("current"), "从结果往上游能找到原因，并带出当前值")
+        hist = await executor.get_json(f"/api/ontology/{effect['id']}/realtime", {"limit": 1})
+        check(up.result["target"]["measurable"] == bool(hist.get("total")), "有无测点与本体实时值接口一致")
+        check(not up.truncated and len(up.to_llm_content()) <= budget + 200, f"梳理结果在 local32k 预算内（{len(up.to_llm_content())} 字符）")
     finally:
         await executor.aclose()
 

@@ -60,8 +60,10 @@ _THRESHOLD_HINT = re.compile(
 _NUMBER = re.compile(r"\d")
 _PL_REF = re.compile(r"PL\d{3}")
 _THINK_LEAK = re.compile(r"<\s*/?\s*(think|thinking|reasoning|thought)\b", re.IGNORECASE)
-_VALUE_TOOLS = {"query_realtime_values", "query_history_values", "query_limit_check"}
-_LIMIT_TOOLS = {"query_process_limits", "query_object_limits", "query_limit_check"}
+# 确定性分析工具在内部取值 / 查限值，评分时与对应的查询工具同等看待
+_ANALYSIS_VALUE_TOOLS = {"investigate_process_anomaly", "verify_process_influence", "check_limit_exceedance"}
+_VALUE_TOOLS = {"query_realtime_values", "query_history_values", "query_limit_check"} | _ANALYSIS_VALUE_TOOLS
+_LIMIT_TOOLS = {"query_process_limits", "query_object_limits", "query_limit_check"} | _ANALYSIS_VALUE_TOOLS
 
 CHECKS = ("完成", "用工具", "不编阈值", "声明模拟", "报缺口", "无思维链")
 

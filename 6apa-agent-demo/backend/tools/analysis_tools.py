@@ -193,16 +193,20 @@ async def _resolve_entity(api: Any, raw: str) -> dict[str, Any]:
     raise AnalysisInputError(f"「{text}」没有唯一对应的本体对象，请从候选里选一个，用它的 id 或完整名称重新调用。", candidates)
 
 
-async def _incoming_causes(api: Any, entity_id: str) -> tuple[list[dict[str, Any]], list[str]]:
-    """一个对象的直接原因：带方向的影响/质量关系 + 控制回路里的执行机构。
+async def _causal_links(api: Any, entity_id: str, direction: str) -> tuple[list[dict[str, Any]], list[str]]:
+    """一个对象在因果图上的直接邻居。
 
-    第二个返回值是它所在的控制回路控制器（"反馈给"关系），用于提醒补偿效应。
+    direction="up"：它的原因（以它为客体的影响/质量关系 + 控制回路里作用于它的执行机构）；
+    direction="down"：它的后果（以它为主体的影响/质量关系 + 它作为执行机构所作用的对象）。
+    第二个返回值是它所在控制回路的控制器（"反馈给"关系），用于提醒补偿效应。
     """
     detail = await api.get_json(f"/api/ontology/relation-entities/{entity_id}")
-    causes: list[dict[str, Any]] = []
-    for rel in detail.get("incomingRelations") or []:
-        subject = rel.get("subject") or {}
-        if not str(subject.get("id", "")).startswith("robj-"):
+    upward = direction == "up"
+    side = "subject" if upward else "object"
+    links: list[dict[str, Any]] = []
+    for rel in detail.get("incomingRelations" if upward else "outgoingRelations") or []:
+        other = rel.get(side) or {}
+        if not str(other.get("id", "")).startswith("robj-"):
             continue
         category, predicate = rel.get("category"), rel.get("predicate")
         if category in _CAUSAL_CATEGORIES:
@@ -211,11 +215,11 @@ async def _incoming_causes(api: Any, entity_id: str) -> tuple[list[dict[str, Any
             kind = "控制执行机构"
         else:
             continue
-        causes.append(
+        links.append(
             {
-                "id": subject["id"],
-                "name": subject.get("entity") or rel.get("subjectEntity"),
-                "type": subject.get("type"),
+                "id": other["id"],
+                "name": other.get("entity") or rel.get(f"{side}Entity"),
+                "type": other.get("type") or rel.get(f"{side}Type"),
                 "sign": _SIGN_BY_PREDICATE.get(predicate, 0),
                 "predicate": predicate,
                 "kind": kind,
@@ -229,13 +233,15 @@ async def _incoming_causes(api: Any, entity_id: str) -> tuple[list[dict[str, Any
         for rel in detail.get("outgoingRelations") or []
         if rel.get("category") == _CONTROL_CATEGORY and rel.get("predicate") == _FEEDBACK_PREDICATE
     ]
-    return causes, [c for c in controllers if c]
+    return links, [c for c in controllers if c]
 
 
-async def _cause_tree(api: Any, root: dict[str, Any], depth: int) -> tuple[list[dict[str, Any]], list[str]]:
-    """沿因果关系往上游做广度优先遍历，路径方向按正负号相乘传播。
+async def _causal_walk(
+    api: Any, root: dict[str, Any], depth: int, direction: str = "up"
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """沿因果关系做广度优先遍历（up 找原因、down 找后果），路径方向按正负号相乘传播。
 
-    控制执行机构不再继续往上推（再往上是控制器，属于控制回路本身，不是扰动来源）。
+    控制执行机构那一跳之后不再继续推：往上是控制器、往下是同一个回路，都不是新的原因或后果。
     """
     found: list[dict[str, Any]] = []
     controllers: list[str] = []
@@ -246,22 +252,27 @@ async def _cause_tree(api: Any, root: dict[str, Any], depth: int) -> tuple[list[
         node_id, level, path_sign, path = queue.popleft()
         if level >= depth:
             continue
-        causes, loop = await _incoming_causes(api, node_id)
+        links, loop = await _causal_links(api, node_id, direction)
         if level == 0:
             controllers = loop
-        for cause in causes:
-            if cause["id"] in seen:
+        for link in links:
+            if link["id"] in seen:
                 continue
-            seen.add(cause["id"])
+            seen.add(link["id"])
             # 任一环节方向未标注，整条路径的方向就无法确定
-            sign = path_sign * cause["sign"]
-            arrow = _SIGN_LABEL[cause["sign"]] if cause["kind"] == "影响" else "控制"
-            item = {**cause, "level": level + 1, "pathSign": sign, "path": f"{cause['name']} →{arrow}→ {path}"}
+            sign = path_sign * link["sign"]
+            arrow = _SIGN_LABEL[link["sign"]] if link["kind"] == "影响" else "控制"
+            text = f"{link['name']} →{arrow}→ {path}" if direction == "up" else f"{path} →{arrow}→ {link['name']}"
+            item = {**link, "level": level + 1, "pathSign": sign, "path": text}
             found.append(item)
-            if cause["kind"] == "影响":
-                queue.append((cause["id"], level + 1, sign, item["path"]))
+            if link["kind"] == "影响":
+                queue.append((link["id"], level + 1, sign, text))
     found.sort(key=lambda c: (c["level"], -abs(c["pathSign"])))
     return found, controllers
+
+
+async def _cause_tree(api: Any, root: dict[str, Any], depth: int) -> tuple[list[dict[str, Any]], list[str]]:
+    return await _causal_walk(api, root, depth, "up")
 
 
 async def _history(
@@ -816,6 +827,299 @@ async def summarize_area_relations(registry: Any, arguments: dict[str, Any], api
     }
 
 
+# ================================================================ 工具四：越限统计
+
+_QUANTITY_TYPES = {"工艺属性", "质量指标", "业务指标"}
+EXCEEDANCE_SAMPLES = 480  # 统计时长时每个测点取多少个等间隔样本（24 小时约 3 分钟一个）
+MAX_ABNORMAL_ROWS = 15
+_BANDS = (
+    ("aboveHighHigh", "highHigh", 1, "高于高高限"),
+    ("aboveHigh", "high", 1, "高于高限"),
+    ("aboveNormal", "normalHigh", 1, "高于正常上沿"),
+    ("belowNormal", "normalLow", -1, "低于正常下沿"),
+    ("belowLow", "low", -1, "低于低限"),
+    ("belowLowLow", "lowLow", -1, "低于低低限"),
+)
+
+
+async def _resolve_with_quantity(api: Any, target: str, quantity: str | None) -> dict[str, Any]:
+    """"水解罐A" + "温度" 这类设备加物理量的说法：先拼成测点描述解析（水解罐A温度），不行再按原样解析。"""
+    if quantity and quantity not in target:
+        try:
+            return await _resolve_entity(api, f"{target}{quantity}")
+        except AnalysisInputError:
+            pass
+    return await _resolve_entity(api, target)
+
+
+# 判档顺序：高侧与低侧都从最严的一档往宽判断
+_CLASSIFY_ORDER = ("aboveHighHigh", "aboveHigh", "aboveNormal", "belowLowLow", "belowLow", "belowNormal")
+
+
+def classify(value: float, limit: dict[str, Any]) -> str:
+    """单个值落在哪一档。"""
+    bands = {key: (field, side, label) for key, field, side, label in _BANDS}
+    for key in _CLASSIFY_ORDER:
+        field, side, label = bands[key]
+        bound = limit.get(field)
+        if bound is None:
+            continue
+        if (side > 0 and value > bound) or (side < 0 and value < bound):
+            return label
+    return "正常"
+
+
+def exceedance_profile(series: dict[int, float], limit: dict[str, Any], interval_ms: int) -> dict[str, Any]:
+    """一个测点在时间窗内：最值及时刻、各档越限累计时长、最长的连续越限时段。
+
+    时长 = 越限样本数 × 采样间隔，精度就是一个采样间隔。
+    """
+    times = sorted(series)
+    values = [series[t] for t in times]
+    step_min = interval_ms / 60_000
+    t_max = max(times, key=lambda t: series[t])
+    t_min = min(times, key=lambda t: series[t])
+    out: dict[str, Any] = {
+        "max": _r(series[t_max]),
+        "maxAt": _fmt_t(t_max),
+        "min": _r(series[t_min]),
+        "minAt": _fmt_t(t_min),
+    }
+    minutes: dict[str, int] = {}
+    for key, field, side, _ in _BANDS:
+        bound = limit.get(field)
+        if bound is None:
+            continue
+        count = sum(1 for v in values if (side > 0 and v > bound) or (side < 0 and v < bound))
+        if count:
+            minutes[key] = int(round(count * step_min))
+    if minutes:
+        out["minutes"] = minutes
+
+    lo, hi = limit.get("normalLow"), limit.get("normalHigh")
+    runs: list[tuple[int, int]] = []
+    run_start = None
+    for index, value in enumerate(values):
+        outside = (hi is not None and value > hi) or (lo is not None and value < lo)
+        if outside and run_start is None:
+            run_start = index
+        if not outside and run_start is not None:
+            runs.append((run_start, index - 1))
+            run_start = None
+    if run_start is not None:
+        runs.append((run_start, len(values) - 1))
+    if runs:
+        runs.sort(key=lambda r: r[0] - r[1])
+        out["longestRuns"] = [
+            f"{_fmt_t(times[a])}~{_fmt_t(times[b])}（{int(round((b - a + 1) * step_min))}分钟）" for a, b in runs[:2]
+        ]
+        out["runCount"] = len(runs)
+    labels = {key: label for key, _, _, label in _BANDS}
+    out["worst"] = next((labels[key] for key in _CLASSIFY_ORDER if key in minutes), "正常")
+    return out
+
+
+async def check_limit_exceedance(registry: Any, arguments: dict[str, Any], api: Any) -> dict[str, Any]:
+    try:
+        target = await _resolve_with_quantity(api, arguments.get("target", ""), arguments.get("quantity"))
+    except AnalysisInputError as exc:
+        return _clarify(exc)
+    focus_kw = arguments.get("focus") or target.get("focusTag")
+    limit = await _limit_for(api, target)
+    base: dict[str, Any] = {
+        "analysisType": "越限统计",
+        "target": {"id": target["id"], "name": target["name"]},
+        "limit": _limit_brief(limit),
+    }
+    if not limit:
+        base["conclusion"] = f"本体中暂无「{target['name']}」已填数值的工艺限值，无法判断是否越限；不要自行设定阈值。"
+        if target.get("type") not in _QUANTITY_TYPES:
+            base["conclusion"] += f"注意「{target['name']}」是{target.get('type') or '非工艺量'}，限值挂在具体工艺量上，请带上 quantity（如 温度、pH）重新调用。"
+        return base
+
+    # 不给时间窗 = 看当前值
+    if not arguments.get("startTime") and not arguments.get("endTime"):
+        params: dict[str, Any] = {"limit": 50}
+        if focus_kw:
+            params["keyword"] = focus_kw
+        data = await api.get_json(f"/api/ontology/{target['id']}/realtime", params)
+        rows = []
+        for item in data.get("items") or []:
+            if item.get("value") is None or item.get("quality", 1) != 1:
+                rows.append({"tag": item.get("tagName"), "desc": item.get("description"), "status": "无有效值"})
+                continue
+            value = float(item["value"])
+            rows.append({"tag": item.get("tagName"), "desc": item.get("description"), "value": _r(value, 3), "status": classify(value, limit)})
+        abnormal = [r for r in rows if r["status"] not in ("正常",)]
+        simulated = bool((data.get("dataSource") or {}).get("simulated"))
+        return {
+            **base,
+            "mode": "当前值",
+            "time": next((i.get("timeText") for i in data.get("items") or [] if i.get("timeText")), None),
+            "unit": limit.get("unit"),
+            "tagCount": len(rows),
+            "abnormal": abnormal[:MAX_ABNORMAL_ROWS],
+            "normalTags": [r["tag"] for r in rows if r["status"] == "正常"],
+            "conclusion": (
+                f"当前 {len(rows)} 个测点中 {len(abnormal)} 个不在正常区间。" if abnormal else f"当前 {len(rows)} 个测点全部在正常区间内。"
+            )
+            + _limit_status_note(limit),
+            "method": _exceedance_method(None, simulated),
+        }
+
+    try:
+        start, end, _ = _window(arguments)
+    except AnalysisInputError as exc:
+        return _clarify(exc)
+    span_ms = int((_parse_time(end, _now()) - _parse_time(start, _now())).total_seconds() * 1000)
+    interval = max(60_000, math.ceil(span_ms / EXCEEDANCE_SAMPLES / 60_000) * 60_000)
+    hist = await _history(api, target["id"], start, end, interval, keyword=focus_kw, limit=50)
+    if not hist["tags"]:
+        return {**base, "window": {"start": start, "end": end}, "conclusion": f"「{target['name']}」没有可取历史值的现场测点。"}
+
+    profiles = []
+    for tag in hist["tags"]:
+        profile = exceedance_profile(tag["series"], limit, interval)
+        profiles.append({"tag": tag["tag"], "desc": tag["desc"], **profile})
+    # 排序：高高 / 低低最严重，其次高限 / 低限，最后正常区间外
+    severity = {"高于高高限": 0, "低于低低限": 0, "高于高限": 1, "低于低限": 1, "高于正常上沿": 2, "低于正常下沿": 2}
+    abnormal = [p for p in profiles if p["worst"] != "正常"]
+    abnormal.sort(key=lambda p: (severity.get(p["worst"], 9), -sum((p.get("minutes") or {}).values())))
+    peak = max(profiles, key=lambda p: p["max"])
+    trough = min(profiles, key=lambda p: p["min"])
+    conclusion = (
+        f"{len(profiles)} 个测点中 {len(abnormal)} 个在时间窗内越出正常区间。"
+        f"全窗最高 {peak['max']}{limit.get('unit') or ''}（{peak['tag']}，{peak['maxAt']}，{classify(peak['max'], limit)}），"
+        f"最低 {trough['min']}{limit.get('unit') or ''}（{trough['tag']}，{trough['minAt']}，{classify(trough['min'], limit)}）。"
+        + _limit_status_note(limit)
+    )
+    result = {
+        **base,
+        "mode": "时间窗",
+        "window": {"start": start, "end": end, "intervalMinutes": interval // 60_000},
+        "unit": limit.get("unit"),
+        "tagCount": len(profiles),
+        "abnormalTagCount": len(abnormal),
+        "abnormal": abnormal[:MAX_ABNORMAL_ROWS],
+        "normalTags": [p["tag"] for p in profiles if p["worst"] == "正常"],
+        "conclusion": conclusion,
+        "method": _exceedance_method(interval, hist["simulated"]),
+        "next": "越限统计已完整，请直接作答；abnormal 已按严重程度排好序，列出全部越限测点，不要只挑几个。",
+    }
+    if len(abnormal) > MAX_ABNORMAL_ROWS:
+        result["truncationNote"] = f"越限测点共 {len(abnormal)} 个，只展开了最严重的 {MAX_ABNORMAL_ROWS} 个。"
+    return result
+
+
+def _limit_status_note(limit: dict[str, Any]) -> str:
+    if limit.get("status") == "已确认":
+        return f"判据为 {limit.get('id')}（已确认）。"
+    return f"判据为 {limit.get('id')}，状态「{limit.get('status')}」，结论仅供工艺调查参考。"
+
+
+def _exceedance_method(interval_ms: int | None, simulated: bool) -> str:
+    note = "按本体工艺限值逐档判断（高高限/高限/正常上沿/正常下沿/低限/低低限）。"
+    if interval_ms:
+        note += f"时长 = 越限样本数 × 采样间隔（{interval_ms // 60_000} 分钟），精度为一个采样间隔。"
+    if simulated:
+        note += "数值来自模拟数据服务，不是现场真实读数。"
+    return note
+
+
+# ================================================================ 工具五：影响因素与后果梳理
+
+MAX_NEIGHBORS = 12
+
+
+async def _measurement(api: Any, entity: dict[str, Any], with_values: bool) -> tuple[dict[str, Any], bool]:
+    """对象能不能被测到：以本体实时值接口实际能解析出的测点为准。
+
+    with_values 时取全部测点的当前值，按该工艺量自己的限值分档汇总（"11 支中 6 支高于正常上沿"），
+    再附前 3 个读数作样例。
+    """
+    data = await api.get_json(f"/api/ontology/{entity['id']}/realtime", {"limit": 50 if with_values else 3})
+    items = data.get("items") or []
+    total = data.get("total") or 0
+    out: dict[str, Any] = {"measurable": bool(total), "tagCount": total}
+    if total:
+        out["tags"] = [i.get("tagName") for i in items[:3]]
+        if with_values:
+            readings = [i for i in items if i.get("value") is not None and i.get("quality", 1) == 1]
+            out["current"] = [f"{i.get('tagName')}={i.get('value')}{i.get('unit') or ''}" for i in readings[:3]]
+            limit = await _limit_for(api, entity)
+            if limit:
+                counts = Counter(classify(float(i["value"]), limit) for i in readings)
+                out["limit"] = f"{limit.get('id')} 正常 {limit.get('normalLow')}~{limit.get('normalHigh')}（{limit.get('status')}）"
+                out["currentStatus"] = "、".join(f"{label} {n} 支" for label, n in counts.most_common())
+            else:
+                out["limit"] = "本体中暂无该量的工艺限值"
+    return out, bool((data.get("dataSource") or {}).get("simulated"))
+
+
+async def map_causal_neighborhood(registry: Any, arguments: dict[str, Any], api: Any) -> dict[str, Any]:
+    try:
+        target = await _resolve_entity(api, arguments.get("target", ""))
+    except AnalysisInputError as exc:
+        return _clarify(exc)
+    depth = max(1, min(MAX_DEPTH, int(arguments.get("depth") or 1)))
+    scope = arguments.get("scope") or "全部"
+    with_values = bool(arguments.get("withValues"))
+
+    own, simulated = await _measurement(api, target, with_values)
+    causes, controllers = (await _causal_walk(api, target, depth, "up")) if scope in ("全部", "原因") else ([], [])
+    effects, _ = (await _causal_walk(api, target, depth, "down")) if scope in ("全部", "后果") else ([], [])
+
+    async def describe(nodes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        nonlocal simulated
+        rows = []
+        for node in nodes[:MAX_NEIGHBORS]:
+            meas, sim = await _measurement(api, node, with_values)
+            simulated = simulated or sim
+            row = {
+                "name": node["name"],
+                "id": node["id"],
+                "type": node["type"],
+                "level": node["level"],
+                "path": node["path"],
+                "direction": _SIGN_LABEL[node["pathSign"]] if node["kind"] == "影响" else "控制（未标方向）",
+                "mechanism": node["mechanism"][:50],
+                "source": node["source"],
+                **meas,
+            }
+            rows.append(row)
+        return rows
+
+    cause_rows = await describe(causes)
+    effect_rows = await describe(effects)
+
+    def split(rows: list[dict[str, Any]]) -> str:
+        yes = [r["name"] for r in rows if r["measurable"]]
+        no = [r["name"] for r in rows if not r["measurable"]]
+        return f"有测点 {len(yes)} 个" + (f"、无测点 {len(no)} 个（{'、'.join(no)}）" if no else "")
+
+    parts = [f"「{target['name']}」本身{'有' if own['measurable'] else '没有'}可取值的现场测点。"]
+    if scope in ("全部", "原因"):
+        parts.append(f"本体记载的上游原因 {len(causes)} 个：{split(cause_rows)}。" if causes else "本体中没有登记影响它的因素。")
+    if scope in ("全部", "后果"):
+        parts.append(f"下游后果 {len(effects)} 个：{split(effect_rows)}。" if effects else "本体中没有登记它会影响的对象。")
+    if controllers:
+        parts.append(f"它处于闭环控制（{'、'.join(controllers)}）。")
+    result: dict[str, Any] = {
+        "analysisType": "影响因素与后果梳理",
+        "target": {"id": target["id"], "name": target["name"], **own},
+        "causes": cause_rows,
+        "consequences": effect_rows,
+        "conclusion": "".join(parts),
+        "note": "原因与后果全部来自本体因果关系（正负向按路径逐层相乘）；有无测点以本体实时值接口实际能解析出的测点为准。",
+        "next": "梳理已完整，请把原因与后果分开、把有测点与无测点分开作答，注明来源行号；不要再逐个查关系。",
+    }
+    if with_values and simulated:
+        result["note"] += "current 为模拟数据服务的当前值，不是现场真实读数。"
+    if len(causes) > MAX_NEIGHBORS or len(effects) > MAX_NEIGHBORS:
+        result["truncationNote"] = f"原因 {len(causes)} 个、后果 {len(effects)} 个，各只展开前 {MAX_NEIGHBORS} 个。"
+    return result
+
+
 # ================================================================ 注册
 
 
@@ -894,5 +1198,51 @@ ANALYSIS_TOOLS: list[ToolSpec] = [
         summary="工段关系结构精确统计：类别分布、关联最多的对象",
         returns="total、byCategory[]（类别、数量、谓词分布）、topEntities[]、topEquipment[]、entityTypes、note。",
         handler=summarize_area_relations,
+    ),
+    ToolSpec(
+        name="check_limit_exceedance",
+        description=(
+            "越限统计（确定性分析，优先使用）。问'某参数昨天/夜班最高到多少、超没超限、超了多久、哪几支表越限'"
+            "或'现在是多少、在不在工艺范围内'时直接调用，不要自己逐个查参数、限值、历史值。"
+            "程序按本体工艺限值逐档判断每个测点：给时间窗时统计最值及时刻、各档越限累计时长、最长连续越限时段；"
+            "不给时间窗时核对当前值。只采用该工艺量本身的限值，没有限值就如实说没有。"
+            "target 写法同 investigate_process_anomaly；也可以 target=设备名、quantity=物理量（如 水解罐A + 温度）。"
+        ),
+        path="",
+        parameters=(
+            ToolParameter("target", "string", "工艺量 / 位号 / 测点描述 / 设备名。", required=True),
+            ToolParameter("quantity", "string", "target 是设备名时补充物理量，如 温度、pH、液位。"),
+            ToolParameter("startTime", "string", "时间窗开始，yyyy-MM-dd HH:mm:ss（东八区），按【当前时间】换算。问'现在'时不要填。"),
+            ToolParameter("endTime", "string", "时间窗结束，格式同上；只给 startTime 时默认到当前时刻。"),
+            ToolParameter("focus", "string", "只看该工艺量下的某个测点，如 TI_1301A。"),
+        ),
+        group="analysis",
+        summary="越限统计：最值、各档越限时长、越限测点清单（时间窗或当前值）",
+        returns=(
+            "limit、mode（时间窗/当前值）、tagCount、abnormalTagCount、abnormal[]（测点、最值及时刻、"
+            "minutes 各档越限分钟数、longestRuns 最长连续越限时段、runCount；当前值模式为 value 与 status）、"
+            "normalTags、conclusion、method。"
+        ),
+        handler=check_limit_exceedance,
+    ),
+    ToolSpec(
+        name="map_causal_neighborhood",
+        description=(
+            "影响因素与后果梳理（确定性分析，优先使用）。问'X 受哪些因素影响''X 偏高/超温会带来什么后果、本体记了哪些机理'"
+            "'哪些量会影响 X、这些量有没有测点 / 现在什么状态'时直接调用，不要自己分页翻关系。"
+            "程序沿本体因果关系列出上游原因与下游后果（正负向逐层传播、机理、来源行号），并标出每个量有没有现场测点；"
+            "withValues=true 时附带当前值与适用限值。不做历史数据对比——要验证原因请用 investigate_process_anomaly。"
+        ),
+        path="",
+        parameters=(
+            ToolParameter("target", "string", "工艺量 / 质量指标 / 位号 / 测点描述，写法同 investigate_process_anomaly。", required=True),
+            ToolParameter("scope", "string", "只看原因、只看后果，或全部（默认）。", enum=("全部", "原因", "后果")),
+            ToolParameter("depth", "integer", f"沿因果关系推几层，默认 1，最多 {MAX_DEPTH}。"),
+            ToolParameter("withValues", "boolean", "问到'现在是什么状态'时设为 true，附带各量当前值与限值。"),
+        ),
+        group="analysis",
+        summary="影响因素与后果梳理：原因/后果、机理、来源、有无测点",
+        returns="target（含自身有无测点）、causes[]、consequences[]（名称、路径、方向、机理、来源、measurable、tags、current、limit）、conclusion、note。",
+        handler=map_causal_neighborhood,
     ),
 ]
