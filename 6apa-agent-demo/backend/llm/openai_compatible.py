@@ -111,6 +111,7 @@ class OpenAICompatibleClient(LLMClient):
         max_tokens: int = 4096,
         stream: bool = True,
         max_retries: int = 2,
+        enable_thinking: bool | None = None,
     ) -> None:
         if not base_url:
             raise ValueError("LLM_BASE_URL 未配置")
@@ -121,6 +122,8 @@ class OpenAICompatibleClient(LLMClient):
         self.max_tokens = max_tokens
         self.default_stream = stream
         self.max_retries = max_retries
+        # None 表示不传 enable_thinking，避免不认识该参数的服务端报 400
+        self.enable_thinking = enable_thinking
         self._client = httpx.AsyncClient(
             timeout=httpx.Timeout(timeout, connect=min(15.0, timeout)),
             headers={"Content-Type": "application/json"},
@@ -147,6 +150,8 @@ class OpenAICompatibleClient(LLMClient):
         if tools:
             payload["tools"] = list(tools)
             payload["tool_choice"] = "auto"
+        if self.enable_thinking is not None:
+            payload["enable_thinking"] = self.enable_thinking
 
         last_error: LLMError | None = None
         for attempt in range(self.max_retries + 1):
@@ -382,4 +387,5 @@ def build_llm_client(settings) -> OpenAICompatibleClient:
         temperature=settings.llm_temperature,
         max_tokens=settings.llm_max_tokens,
         stream=settings.llm_stream,
+        enable_thinking=settings.llm_enable_thinking,
     )

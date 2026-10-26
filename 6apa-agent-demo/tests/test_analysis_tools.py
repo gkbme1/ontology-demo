@@ -205,6 +205,8 @@ async def run_live_tests() -> None:
             "summarize_area_relations",
             "check_limit_exceedance",
             "map_causal_neighborhood",
+            "audit_data_gaps",
+            "describe_equipment_links",
         ):
             spec = registry.get(name)
             check(spec is not None and spec.group in INITIAL_GROUPS, f"{name} 已注册且首批下发")
@@ -287,6 +289,61 @@ async def run_live_tests() -> None:
         hist = await executor.get_json(f"/api/ontology/{effect['id']}/realtime", {"limit": 1})
         check(up.result["target"]["measurable"] == bool(hist.get("total")), "有无测点与本体实时值接口一致")
         check(not up.truncated and len(up.to_llm_content()) <= budget + 200, f"梳理结果在 local32k 预算内（{len(up.to_llm_content())} 字符）")
+
+        # 数据缺口盘点：数量与本体自己的统计一致，清单完整且不被裁剪
+        raw_limits = await executor.get_json("/api/ontology/process-limits")
+        stat = raw_limits.get("statusSummary") or {}
+        overview = await call("audit_data_gaps")
+        summary = overview.result["summary"]
+        check(
+            summary["limitTotal"] == stat.get("total") and summary["limitConfirmed"] == stat.get("confirmed")
+            and summary["limitMissingValues"] == stat.get("total", 0) - stat.get("withValues", 0),
+            f"限值计数与本体 statusSummary 一致：{summary}",
+        )
+        for kind, key, expected in (
+            ("缺限值", "missingLimits", summary["limitMissingValues"]),
+            ("推断限值", "inferredLimits", summary["limitInferredUnconfirmed"]),
+            ("无测点", "unmeasured", summary["unmeasuredQuantities"]),
+        ):
+            listed = await call("audit_data_gaps", kind=kind)
+            rows = sum(len(v) for v in (listed.result.get(key) or {}).values())
+            check(rows == expected and not listed.truncated, f"{kind}清单完整列出 {rows}/{expected} 条且未被裁剪（{len(listed.to_llm_content())} 字符）")
+        unmatched = await executor.get_json("/api/ontology/relation-entities", {"matched": "false", "type": "工艺属性"})
+        check(summary["unmeasuredByType"].get("工艺属性") == unmatched.get("total"), "无测点工艺属性数与独立查询一致")
+
+        # 设备关联：动态挑一台没有关联本体对象的设备、一台有的
+        equipment = (await executor.get_json("/api/ontology/equipment", {"limit": 60})).get("items") or []
+        bare = linked = None
+        for item in equipment:
+            rel = await executor.get_json(f"/api/ontology/{item['id']}/relations")
+            if not rel.get("relationEntities") and not rel.get("relations") and bare is None:
+                bare = item
+            if rel.get("relationEntities") and linked is None:
+                linked = item
+            if bare and linked:
+                break
+        check(bare is not None and linked is not None, "能找到无关联与有关联的设备各一台")
+        if bare:
+            res = await call("describe_equipment_links", equipment=bare["id"])
+            check(res.result["deviceLevelRecorded"] is False and "没有登记" in res.result["conclusion"], f"无设备级关系时明说并退到工段层面（{bare['name']}）")
+            check(bool(res.result["area"].get("code")), "无设备级关系时仍给出所在工段")
+        if linked:
+            res = await call("describe_equipment_links", equipment=linked["id"])
+            check(res.result["deviceLevelRecorded"] and res.result["device"].get("ontologyObjects"), f"有关联时列出对应本体对象（{linked['name']}）")
+            check(not res.truncated and len(res.to_llm_content()) <= budget + 200, f"设备关联返回体在预算内（{len(res.to_llm_content())} 字符）")
+        same_area: dict = {}
+        by_name: dict = {}
+        for item in (await executor.get_json("/api/ontology/equipment", {"limit": 2000})).get("items") or []:
+            same_area.setdefault((item["name"], item.get("areaId")), []).append(item["id"])
+            by_name.setdefault(item["name"], set()).add(item.get("areaId"))
+        twin = next((k for k, ids in same_area.items() if len(ids) > 1 and len(by_name[k[0]]) == 1), None)
+        if twin:
+            res = await call("describe_equipment_links", equipment=twin[0])
+            check(len(res.result["device"].get("ids") or []) == len(same_area[twin]), f"同工段同名的多站点设备合并看待（{twin[0]}：{len(same_area[twin])} 条）")
+        spread = next((n for n, areas_ in by_name.items() if len(areas_) > 1), None)
+        if spread:
+            res = await call("describe_equipment_links", equipment=spread)
+            check(res.result.get("status") == "needs_clarification", f"跨工段同名设备不合并，返回候选（{spread}）")
     finally:
         await executor.aclose()
 

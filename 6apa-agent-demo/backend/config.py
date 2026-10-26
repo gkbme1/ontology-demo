@@ -47,6 +47,14 @@ def _env_float(name: str, default: float) -> float:
         return default
 
 
+def _env_optional_bool(name: str) -> bool | None:
+    """未设置返回 None（表示不向服务端传这个参数，沿用模型默认行为）。"""
+    raw = os.environ.get(name, "").strip().lower()
+    if not raw:
+        return None
+    return raw in {"1", "true", "yes", "on"}
+
+
 def _env_bool(name: str, default: bool) -> bool:
     raw = os.environ.get(name, "").strip().lower()
     if not raw:
@@ -133,6 +141,9 @@ class Settings:
     llm_temperature: float = field(default_factory=lambda: _env_float("LLM_TEMPERATURE", 0.2))
     llm_max_tokens: int = field(default_factory=lambda: _env_int("LLM_MAX_TOKENS", 4096))
     llm_stream: bool = field(default_factory=lambda: _env_bool("LLM_STREAM", True))
+    # 千问 3 等混合思考模型的思考开关。留空 = 不传，沿用服务端默认（百炼上默认开启）；
+    # false = 关闭思考，省掉最后写回答前的那段思维链，明显缩短耗时。
+    llm_enable_thinking: bool | None = field(default_factory=lambda: _env_optional_bool("LLM_ENABLE_THINKING"))
 
     # ---------- 本体 API ----------
     ontology_base_url: str = field(
@@ -187,6 +198,7 @@ class Settings:
             "llm_model": self.llm_model,
             "llm_api_key_configured": bool(self.llm_api_key),
             "llm_stream": self.llm_stream,
+            "llm_enable_thinking": self.llm_enable_thinking,
             "ontology_base_url": self.ontology_base_url,
             "llm_profile": self.llm_profile,
             "max_tool_calls_per_turn": self.max_tool_calls_per_turn,

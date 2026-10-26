@@ -38,6 +38,7 @@ ID_PROVIDERS: dict[str, tuple[str, dict, str | dict[str, str]]] = {
     "summarize_area_relations": ("query_process_areas", {}, "items.0.id"),
     "check_limit_exceedance": ("query_process_limits", {"hasValues": True, "appliesToType": "工艺属性"}, "items.0.appliesTo"),
     "map_causal_neighborhood": ("query_relations", {"category": "影响关系", "limit": 1}, "items.0.object.id"),
+    "describe_equipment_links": ("query_equipment_list", {"keyword": "水解罐A", "limit": 1}, "items.0.id"),
 }
 
 EXTRA_ARGS: dict[str, dict] = {
@@ -55,6 +56,7 @@ EXTRA_ARGS: dict[str, dict] = {
     "query_area_flow": {"areaId": "S11"},
     "check_limit_exceedance": {"startTime": "__ONE_HOUR_AGO__"},
     "map_causal_neighborhood": {"withValues": True},
+    "audit_data_gaps": {"kind": "无测点"},
 }
 
 

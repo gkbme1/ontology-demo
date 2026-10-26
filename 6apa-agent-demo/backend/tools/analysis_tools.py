@@ -1120,6 +1120,294 @@ async def map_causal_neighborhood(registry: Any, arguments: dict[str, Any], api:
     return result
 
 
+# ================================================================ 工具六：数据缺口盘点
+
+_GAP_KINDS = ("概览", "缺限值", "推断限值", "无测点")
+_MEASURABLE_TYPES_DEFAULT = ("工艺属性", "质量指标", "业务指标")
+
+
+def _range_text(low: Any, high: Any) -> str:
+    if low is None and high is None:
+        return "未填"
+    if low is None:
+        return f"≤{high}"
+    if high is None:
+        return f"≥{low}"
+    return f"{low}~{high}"
+
+
+def _clip(text: str | None, n: int) -> str:
+    text = (text or "").replace("\n", " ").strip()
+    return text if len(text) <= n else text[: n - 1] + "…"
+
+
+async def audit_data_gaps(registry: Any, arguments: dict[str, Any], api: Any) -> dict[str, Any]:
+    kind = arguments.get("kind") or "概览"
+    area_kw = (arguments.get("area") or "").strip()
+
+    def in_area(code: str | None, name: str | None) -> bool:
+        return not area_kw or area_kw in (code or "") or area_kw in (name or "") or (name or "") in area_kw
+
+    limits = (await api.get_json("/api/ontology/process-limits")).get("items") or []
+    limits = [x for x in limits if in_area(x.get("areaCode"), x.get("area"))]
+    missing = [x for x in limits if not x.get("hasValues")]
+    inferred = [x for x in limits if x.get("hasValues") and x.get("status") != "已确认"]
+    unbound = [x for x in limits if x.get("hasValues") and not x.get("targetCount")]
+    confirmed = [x for x in limits if x.get("status") == "已确认"]
+
+    wanted_types = tuple(t.strip() for t in (arguments.get("types") or "").split(",") if t.strip()) or _MEASURABLE_TYPES_DEFAULT
+    entities = (await api.get_json("/api/ontology/relation-entities", {"matched": "false"})).get("items") or []
+    unmeasured_all = [e for e in entities if in_area(e.get("areaCode"), (e.get("areas") or [None])[0])]
+    unmeasured = [e for e in unmeasured_all if e.get("type") in wanted_types]
+
+    summary = {
+        "limitTotal": len(limits),
+        "limitConfirmed": len(confirmed),
+        "limitMissingValues": len(missing),
+        "limitInferredUnconfirmed": len(inferred),
+        "limitWithValuesButNoTags": len(unbound),
+        "unmeasuredQuantities": len(unmeasured),
+        "unmeasuredByType": dict(Counter(e.get("type") for e in unmeasured_all).most_common()),
+    }
+    result: dict[str, Any] = {
+        "analysisType": "数据缺口盘点",
+        "kind": kind,
+        "area": area_kw or "全车间",
+        "summary": summary,
+        "conclusion": (
+            f"限值 {len(limits)} 条：已确认 {len(confirmed)}、待现场提供数值 {len(missing)}、有数值待确认 {len(inferred)}"
+            f"（其中 {len(unbound)} 条落不到测点）；无测点的{'/'.join(wanted_types)} {len(unmeasured)} 个。"
+        ),
+    }
+
+    def by_area(rows: list[tuple[str, str]]) -> dict[str, list[str]]:
+        grouped: dict[str, list[str]] = {}
+        for code, text in rows:
+            grouped.setdefault(code or "未分工段", []).append(text)
+        return dict(sorted(grouped.items()))
+
+    if kind in ("缺限值", "概览"):
+        rows = [
+            (x.get("areaCode"), f"{x['id']} {x.get('appliesTo')}（{x.get('appliesToType')}）：{_clip(x.get('basis') or x.get('note'), 26)}")
+            for x in missing
+        ]
+        result["missingLimits"] = by_area(rows) if kind == "缺限值" else [t for _, t in rows[:5]]
+        if unbound:
+            result["limitsWithoutTags"] = [f"{x['id']} {x.get('appliesTo')}：有数值但没有落到任何测点" for x in unbound]
+    if kind in ("推断限值", "概览"):
+        rows = [
+            (
+                x.get("areaCode"),
+                f"{x['id']} {x.get('appliesTo')} 正常{_range_text(x.get('normalLow'), x.get('normalHigh'))}{x.get('unit') or ''}"
+                f"｜{x.get('basisType')}｜置信度{x.get('confidence') or '-'}｜{_clip(x.get('basis'), 34 if kind == '推断限值' else 20)}",
+            )
+            for x in inferred
+        ]
+        result["inferredLimits"] = by_area(rows) if kind == "推断限值" else [t for _, t in rows[:5]]
+    if kind in ("无测点", "概览"):
+        relations = (await api.get_json("/api/ontology/causal-relations")).get("items") or []
+        causal_use: Counter = Counter()
+        for rel in relations:
+            for side in ("subjectEntity", "objectEntity"):
+                if rel.get(side):
+                    causal_use[rel[side]] += 1
+        unmeasured.sort(key=lambda e: (-causal_use.get(e.get("name"), 0), e.get("areaCode") or ""))
+        rows = [
+            (
+                e.get("areaCode"),
+                f"{e.get('name')}（{e.get('type')}）" + (f"·涉及因果关系{causal_use[e.get('name')]}条" if causal_use.get(e.get("name")) else ""),
+            )
+            for e in unmeasured
+        ]
+        result["unmeasured"] = by_area(rows) if kind == "无测点" else [t for _, t in rows[:5]]
+        blocked = sum(1 for e in unmeasured if causal_use.get(e.get("name")))
+        result["impact"] = (
+            f"{len(unmeasured)} 个{'/'.join(wanted_types)}没有现场测点，其中 {blocked} 个出现在因果关系里："
+            "以它们为原因或结果的影响路径都无法用数据验证（异常溯源时会被列为'无测点，无法用数据验证'）。"
+        )
+
+    if kind == "概览":
+        result["next"] = "这是概览，每类只列了前 5 条；用户要完整清单时，用 kind=缺限值 / 推断限值 / 无测点 再调一次。"
+    else:
+        result["next"] = "清单已完整（按工段分组），请全部列出，不要只挑几条；不要再用查询类工具分页翻。"
+    result["note"] = (
+        f"限值共 {len(limits)} 条，其中「已确认」{len(confirmed)} 条；状态非「已确认」的限值只能用于工艺调查核对，不能作为报警依据。"
+        "有无测点以本体对象是否匹配到 DCS 实例为准。"
+    )
+    return result
+
+
+# ================================================================ 工具七：设备关联与上下游
+
+_TOPOLOGY_CATEGORIES = {"物理拓扑关系", "工段衔接"}
+_MEMBERSHIP_PREDICATES = {"包含实例", "包含设备"}
+
+
+async def _resolve_equipment(api: Any, raw: str) -> dict[str, Any]:
+    """设备名 / equip- ID / 设备类关系对象 → {kind, id, name}。"""
+    text = (raw or "").strip()
+    if not text:
+        raise AnalysisInputError("缺少设备。")
+    if text.startswith("equip-"):
+        return {"kind": "equipment", "ids": [text]}
+    if text.startswith("robj-"):
+        return {"kind": "entity", "id": text}
+    found = await api.get_json("/api/ontology/equipment", {"keyword": text, "limit": 20})
+    items = found.get("items") or []
+    exact = [e for e in items if e.get("name") == text]
+    # 同一工段里的同名 DCS 设备是同一台设备的点位分在了不同控制站（如水解罐A 在站 13 / 站 20），合并看待；
+    # 跨工段同名（如"其他工艺单元"这类兜底名称）不是同一台设备，交给模型 / 用户选
+    pool = exact or (items if len(items) == 1 else [])
+    if pool and len({e.get("areaId") for e in pool}) == 1:
+        return {"kind": "equipment", "ids": [e["id"] for e in pool]}
+    if exact:
+        items = exact
+    ents = await api.get_json("/api/ontology/relation-entities", {"keyword": text, "limit": 20})
+    devs = [e for e in ents.get("items") or [] if e.get("type") in ("生产设备", "设备实例", "执行机构")]
+    exact_e = [e for e in devs if e.get("name") == text]
+    if len(exact_e) == 1 or (len(devs) == 1 and not items):
+        return {"kind": "entity", "id": (exact_e or devs)[0]["id"]}
+    candidates = [{"id": e["id"], "name": e["name"], "area": e.get("areaName") or e.get("area")} for e in items[:8]] + [
+        {"id": e["id"], "name": e["name"], "type": e.get("type")} for e in devs[:4]
+    ]
+    raise AnalysisInputError(f"「{text}」没有唯一对应的设备，请从候选里选一个，用它的 id 重新调用。", candidates)
+
+
+async def describe_equipment_links(registry: Any, arguments: dict[str, Any], api: Any) -> dict[str, Any]:
+    try:
+        ref = await _resolve_equipment(api, arguments.get("equipment", ""))
+    except AnalysisInputError as exc:
+        return _clarify(exc)
+
+    areas = {a.get("code"): a for a in (await api.get_json("/api/ontology/process-areas")).get("items") or []}
+    anchors: dict[str, str] = {}
+    relations: list[dict[str, Any]] = []
+    if ref["kind"] == "equipment":
+        tag_count = 0
+        name, area = None, {}
+        for equip_id in ref["ids"]:
+            data = await api.get_json(f"/api/ontology/{equip_id}/relations")
+            name = name or data.get("objectName")
+            area = area or data.get("area") or {}
+            tag_count += len(data.get("tags") or [])
+            anchors.update({e["id"]: e.get("name") for e in data.get("relationEntities") or []})
+            relations += data.get("relations") or []
+        device = {"ids": ref["ids"], "name": name, "tagCount": tag_count}
+    else:
+        detail = await api.get_json(f"/api/ontology/relation-entities/{ref['id']}")
+        name = detail.get("name")
+        area = areas.get(detail.get("areaCode")) or {}
+        anchors = {detail["id"]: name}
+        relations = (detail.get("incomingRelations") or []) + (detail.get("outgoingRelations") or [])
+        device = {"id": ref["id"], "name": name, "type": detail.get("type")}
+
+    # 设备实例继承所属设备组的拓扑与控制关系：进料、介质等通常登记在设备组上
+    groups = [
+        (rel.get("subject") or {}).get("id")
+        for rel in relations
+        if rel.get("predicate") == "包含实例" and (rel.get("object") or {}).get("id") in anchors
+    ]
+    for group_id in groups:
+        if group_id and group_id not in anchors and str(group_id).startswith("robj-"):
+            detail = await api.get_json(f"/api/ontology/relation-entities/{group_id}")
+            anchors[group_id] = detail.get("name")
+            relations += (detail.get("incomingRelations") or []) + (detail.get("outgoingRelations") or [])
+    if anchors:
+        device["ontologyObjects"] = [f"{n}（{i}）" for i, n in anchors.items()]
+
+    def sid(rel: dict[str, Any], side: str) -> str:
+        return str((rel.get(side) or {}).get("id") or "")
+
+    upstream, downstream, parents, members, components, properties, control, alarms = [], [], [], [], [], [], [], []
+    causal = 0
+    seen: set[str] = set()
+    for rel in relations:
+        if rel.get("id") in seen:
+            continue
+        seen.add(rel.get("id"))
+        cat, pred = rel.get("category"), rel.get("predicate")
+        subj_in, obj_in = sid(rel, "subject") in anchors, sid(rel, "object") in anchors
+        s_name, o_name = rel.get("subjectEntity"), rel.get("objectEntity")
+        if cat in _TOPOLOGY_CATEGORIES:
+            if obj_in and not subj_in:
+                upstream.append({"name": s_name, "id": sid(rel, "subject"), "via": pred, "into": o_name, "source": _source_text(rel)})
+            elif subj_in and not obj_in:
+                downstream.append({"name": o_name, "id": sid(rel, "object"), "via": pred, "from": s_name, "source": _source_text(rel)})
+        elif cat == "结构关系":
+            if pred in _MEMBERSHIP_PREDICATES and obj_in and not subj_in:
+                parents.append(f"{s_name} {pred} {o_name}")
+            elif pred in _MEMBERSHIP_PREDICATES and subj_in:
+                members.append(o_name)
+            elif pred == "具有部件" and subj_in:
+                components.append(_clip(o_name.split("·")[-1] if o_name else o_name, 20))
+            elif pred == "具有属性" and subj_in:
+                properties.append(o_name)
+        elif cat == _CONTROL_CATEGORY:
+            control.append(f"{s_name} {pred} {o_name}")
+        elif cat == "报警联锁关系":
+            alarms.append(f"{s_name} {pred} {o_name}")
+        elif cat in _CAUSAL_CATEGORIES:
+            causal += 1
+
+    # 上游再往上推一层：上游停了会影响到谁，要看上游的上游
+    chains = []
+    for up in upstream[:6]:
+        if not up["id"].startswith("robj-"):
+            continue
+        detail = await api.get_json(f"/api/ontology/relation-entities/{up['id']}")
+        feeders = [
+            f"{r.get('subjectEntity')} {r.get('predicate')}"
+            for r in detail.get("incomingRelations") or []
+            if r.get("category") in _TOPOLOGY_CATEGORIES
+        ]
+        if feeders:
+            chains.append(f"{up['name']} ← " + "、".join(feeders[:4]))
+
+    def area_side(key: str) -> list[str]:
+        return [f"{x.get('code')} {(areas.get(x.get('code')) or {}).get('name', '')}（{x.get('material')}）" for x in area.get(key) or []]
+
+    area_info = {
+        "code": area.get("code"),
+        "name": area.get("name"),
+        "upstreamAreas": area_side("upstream"),
+        "downstreamAreas": area_side("downstream"),
+    }
+    device_level = bool(upstream or downstream or parents or members or control)
+    if device_level:
+        conclusion = (
+            f"「{name}」在本体中登记了设备级关系：上游 {len(upstream)} 个、下游 {len(downstream)} 个"
+            + (f"，所属 {('、'.join(parents))}" if parents else "")
+            + (f"，控制关系 {len(control)} 条" if control else "")
+            + "。上游停止供料/介质会直接影响它；工段层面的上下游见 area。"
+        )
+    else:
+        conclusion = (
+            f"本体中没有登记「{name}」的设备级关系（无上下游拓扑、无所属设备组关系、无控制关系），"
+            "无法在设备层面判断上游停机对它的影响；只能到工段层面：所在工段 "
+            f"{area.get('code')} {area.get('name')} 的上游工段为 {('、'.join(area_info['upstreamAreas']) or '无')}。"
+            "这是本体数据缺口，不必再换关键词查找。"
+        )
+    result: dict[str, Any] = {
+        "analysisType": "设备关联与上下游",
+        "device": device,
+        "area": area_info,
+        "deviceLevelRecorded": device_level,
+        "upstream": upstream[:10],
+        "upstreamChains": chains,
+        "downstream": downstream[:10],
+        "memberOf": parents,
+        "instances": members[:12],
+        "components": components[:10],
+        "properties": properties[:15],
+        "control": control[:8],
+        "alarms": alarms[:6],
+        "causalRelationCount": causal,
+        "conclusion": conclusion,
+        "next": "关联已完整，请直接作答；因果影响细节需要时用 map_causal_neighborhood，不要再逐个查关系。",
+    }
+    return {k: v for k, v in result.items() if v not in ([], None, "")}
+
+
 # ================================================================ 注册
 
 
@@ -1244,5 +1532,47 @@ ANALYSIS_TOOLS: list[ToolSpec] = [
         summary="影响因素与后果梳理：原因/后果、机理、来源、有无测点",
         returns="target（含自身有无测点）、causes[]、consequences[]（名称、路径、方向、机理、来源、measurable、tags、current、limit）、conclusion、note。",
         handler=map_causal_neighborhood,
+    ),
+    ToolSpec(
+        name="audit_data_gaps",
+        description=(
+            "数据缺口盘点（确定性分析，优先使用）。问'哪些参数还没有限值/需要现场补什么''哪些限值是推断的、依据是什么'"
+            "'哪些工艺量有记载但没有测点'时直接调用，不要用查询类工具分页翻限值或关系对象（返回体会被裁剪、翻不全）。"
+            "程序一次取全量，按工段分组输出紧凑的完整清单，并统计已确认限值数、有数值却落不到测点的限值、"
+            "无测点工艺量中有多少出现在因果关系里（这些路径无法用数据验证）。"
+        ),
+        path="",
+        parameters=(
+            ToolParameter(
+                "kind",
+                "string",
+                "概览（各类数量 + 每类前 5 条，默认）/ 缺限值（待现场提供数值的限值清单）/ 推断限值（有数值但未确认，含依据与置信度）/ 无测点（有记载但没有现场测点的对象）。",
+                enum=_GAP_KINDS,
+            ),
+            ToolParameter("area", "string", "只看某个工段，可传 S11 或 酶法水解；不填为全车间。"),
+            ToolParameter("types", "string", "kind=无测点 时看哪些对象类型，逗号分隔，默认 工艺属性,质量指标,业务指标。"),
+        ),
+        group="analysis",
+        summary="数据缺口盘点：缺限值 / 推断限值 / 无测点的完整清单",
+        returns="summary（各类数量）、missingLimits / inferredLimits / unmeasured（按工段分组的清单）、limitsWithoutTags、impact、note。",
+        handler=audit_data_gaps,
+    ),
+    ToolSpec(
+        name="describe_equipment_links",
+        description=(
+            "设备关联与上下游（确定性分析，优先使用）。问'某设备和哪些设备有关联''它的上游/下游是什么''上游停了会不会影响它'"
+            "'它属于哪个设备组、有哪些部件'时直接调用，不要自己换关键词反复查关系。"
+            "程序从设备对应的本体对象出发，按物理拓扑（上游/下游，并再往上推一层）、结构（所属设备组、实例、部件、属性）、"
+            "控制、报警联锁归类，并给出所在工段的上下游工段与衔接物料；"
+            "设备级没有登记关系时会明确说明，并退到工段层面给出确定结论。"
+        ),
+        path="",
+        parameters=(
+            ToolParameter("equipment", "string", "设备名称（如 一层排渣泵、水解罐A）、equip- ID，或设备类本体对象 robj- ID。", required=True),
+        ),
+        group="analysis",
+        summary="设备关联与上下游：拓扑上下游、所属设备组、部件、控制，及工段衔接",
+        returns="device、area（工段上下游与衔接物料）、deviceLevelRecorded、upstream[] / upstreamChains / downstream[]、memberOf、instances、components、properties、control、alarms、conclusion。",
+        handler=describe_equipment_links,
     ),
 ]
