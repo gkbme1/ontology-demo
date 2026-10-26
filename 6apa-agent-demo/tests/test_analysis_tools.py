@@ -176,7 +176,7 @@ def run_unit_tests() -> None:
     minute = 60_000
     run_series = {i * 3 * minute: v for i, v in enumerate([34, 36, 36, 34, 36, 37.5, 36, 34, 32.5, 34])}
     prof = at.exceedance_profile(run_series, limit, 3 * minute)
-    check(prof["minutes"] == {"aboveHighHigh": 3, "aboveHigh": 15, "aboveNormal": 15, "belowNormal": 3}, f"各档越限时长 = 样本数 × 间隔：{prof['minutes']}")
+    check(prof["越限分钟"] == {"高于高高限": 3, "高于高限": 15, "高于正常上沿": 15, "低于正常下沿": 3}, f"各档越限时长 = 样本数 × 间隔：{prof['越限分钟']}")
     check(prof["runCount"] == 3 and "（9分钟）" in prof["longestRuns"][0], f"连续越限时段按长度排序：{prof['longestRuns']}")
     check(prof["max"] == 37.5 and prof["worst"] == "高于高高限", "最值与最严重档位")
     low_only = at.exceedance_profile({i * minute: v for i, v in enumerate([34, 32.8, 31, 34])}, limit, minute)
@@ -267,7 +267,7 @@ async def run_live_tests() -> None:
         rows = idata.get("anomaly", {}).get("tags") or []
         window_min = 24 * 60
         check(
-            all("aboveNormal" not in r and all(m <= window_min + 60 for m in (r.get("minutes") or {}).values()) for r in rows),
+            all("aboveNormal" not in r and all(m <= window_min + 60 for m in (r.get("越限分钟") or {}).values()) for r in rows),
             "异常溯源对外给的是越限分钟数而不是样本数",
         )
         check("模拟数据" in idata.get("conclusion", ""), "模拟数据声明写进了 conclusion")
@@ -294,8 +294,13 @@ async def run_live_tests() -> None:
             w = win.result or {}
             check(w.get("limit", {}).get("id") == picked["id"], "越限统计用的是该工艺量本身的限值")
             check(w.get("abnormalTagCount", 0) + len(w.get("normalTags") or []) == w.get("tagCount"), "越限测点 + 正常测点 = 全部测点（不漏表）")
-            longest = max((sum((r.get("minutes") or {}).values()) for r in w.get("abnormal") or []), default=0)
-            check(all(m <= 24 * 60 + w["window"]["intervalMinutes"] for r in w.get("abnormal") or [] for m in (r.get("minutes") or {}).values()), f"单档越限时长不超过时间窗（最大合计 {longest} 分钟）")
+            longest = max((sum((r.get("越限分钟") or {}).values()) for r in w.get("abnormal") or []), default=0)
+            check(all(m <= 24 * 60 + w["window"]["intervalMinutes"] for r in w.get("abnormal") or [] for m in (r.get("越限分钟") or {}).values()), f"单档越限时长不超过时间窗（最大合计 {longest} 分钟）")
+            lim = w.get("limit") or {}
+            check(
+                "正常区间" in lim and "高限H" in lim and "normal" not in lim and "high" not in lim,
+                f"限值用不会混淆的中文档位标签：{ {k: v for k, v in lim.items() if k != '依据'} }",
+            )
             check(not win.truncated and len(win.to_llm_content()) <= budget + 200, f"越限统计返回体在 local32k 预算内（{len(win.to_llm_content())} 字符）")
             now = await call("check_limit_exceedance", target=picked["appliesTo"])
             check(now.result.get("mode") == "当前值" and now.result.get("tagCount"), "不给时间窗时核对当前值")

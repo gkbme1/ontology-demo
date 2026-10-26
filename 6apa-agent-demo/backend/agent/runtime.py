@@ -66,6 +66,8 @@ class AgentRuntime:
         # 本轮已执行过的 (工具名, 参数) → 第几次调用。模型偶尔会原样重复调用，
         # 重复的不再执行：既省一次本体查询，也不让同一份结果在上下文里出现两遍。
         executed: dict[tuple[str, str], int] = {}
+        # 本轮是否有工具用到了模拟数据；最终回答漏写声明时由这里兜底补上
+        used_simulated = False
 
         yield AgentEvent(events.TURN_START, {"conversationId": conversation.conversation_id, "turn": turn})
         yield events.status("理解用户问题", phase="understanding", done=True)
@@ -120,6 +122,10 @@ class AgentRuntime:
                 answer = (response.content or "").strip()
                 if not answer:
                     answer = "（模型未返回内容。请重试，或换一种问法。）"
+                elif used_simulated and "模拟" not in answer:
+                    # 硬性规则要求声明模拟数据；模型（尤其关闭思考时）偶尔会漏，这里确定性补上
+                    yield AgentEvent(events.ANSWER_DELTA, {"text": SIMULATED_FOOTER})
+                    answer += SIMULATED_FOOTER
                 conversation.add_assistant({"role": "assistant", "content": answer})
                 yield AgentEvent(events.ANSWER, {"text": answer})
                 yield AgentEvent(events.CONTEXT, conversation.public_state())
@@ -210,6 +216,7 @@ class AgentRuntime:
                 executed[call_key] = tool_calls_used
 
                 execution = await self.executor.execute(spec, call.id, call.arguments)
+                used_simulated = used_simulated or execution.simulated
 
                 # 工具发现类工具可能要求下发更多工具，本轮后续请求立即带上。
                 # 另外：模型凭记忆直接调了一个尚未下发的工具且调成功了，
@@ -367,6 +374,9 @@ def _safe_json(raw: str) -> Any:
         return json.loads(raw) if raw.strip() else {}
     except ValueError:
         return {"_raw": raw[:500]}
+
+
+SIMULATED_FOOTER = "\n\n> 说明：本回答涉及的实时 / 历史数值来自模拟数据服务，不是现场真实读数。"
 
 
 def _canonical_args(raw: str) -> str:

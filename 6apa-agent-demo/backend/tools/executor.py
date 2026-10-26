@@ -51,6 +51,9 @@ class ToolExecution:
     # 本地工具可以要求把某些工具下发给模型（渐进解锁）。
     # Executor 只是把它原样带出来，不判断里面是什么。
     unlocked: list[str] = field(default_factory=list)
+    # 返回体里用到了模拟数据（dataSource.simulated=true，或分析工具注明来自模拟数据服务）。
+    # Runtime 据此在最终回答漏写声明时兜底补上。
+    simulated: bool = False
 
     # ------------------------------------------------------------ 对 LLM 的视图
 
@@ -197,6 +200,7 @@ class ToolExecutor:
             execution.truncated = truncated
             execution.truncation_note = note
             execution.status = "empty" if _is_empty(result) else "ok"
+            execution.simulated = uses_simulated_data(result)
             execution.duration_ms = _elapsed(started)
             logger.info(
                 "tool=%s status=%s local bytes=%s truncated=%s %dms",
@@ -253,6 +257,7 @@ class ToolExecutor:
         execution.truncated = truncated
         execution.truncation_note = note
         execution.status = "empty" if _is_empty(data) else "ok"
+        execution.simulated = uses_simulated_data(data)
         execution.duration_ms = _elapsed(started)
 
         logger.info(
@@ -310,6 +315,20 @@ def _body_snippet(response: httpx.Response, limit: int = 300) -> str:
         return (response.text or "").strip()[:limit]
     except Exception:  # pragma: no cover - 极端情况下的编码问题
         return "<无法读取响应体>"
+
+
+_SIMULATED_MARK = "模拟数据服务"
+
+
+def uses_simulated_data(data: Any) -> bool:
+    """返回体是否用到了模拟数据：任一层有 simulated=true，或文字注明来自模拟数据服务。"""
+    if isinstance(data, dict):
+        if data.get("simulated") is True:
+            return True
+        return any(uses_simulated_data(value) for value in data.values())
+    if isinstance(data, list):
+        return any(uses_simulated_data(item) for item in data)
+    return isinstance(data, str) and _SIMULATED_MARK in data
 
 
 def _is_empty(data: Any) -> bool:

@@ -470,16 +470,23 @@ def shift_during(cause: dict[int, float], mask: set[int]) -> float | None:
 def _limit_brief(limit: dict[str, Any] | None) -> dict[str, Any] | None:
     if not limit:
         return None
-    return {
+    # 用不会混淆的中文标签：正常区间的上下沿不是"高限 / 低限"，模型以前把 35.0（正常上沿）说成过高限
+    unit = limit.get("unit") or ""
+
+    def with_unit(value: Any) -> str | None:
+        return None if value is None else f"{value}{unit}"
+
+    brief = {
         "id": limit.get("id"),
-        "normal": f"{limit.get('normalLow')}~{limit.get('normalHigh')} {limit.get('unit') or ''}".strip(),
-        "low": limit.get("low"),
-        "lowLow": limit.get("lowLow"),
-        "high": limit.get("high"),
-        "highHigh": limit.get("highHigh"),
-        "status": limit.get("status"),
-        "basis": (limit.get("basis") or "")[:60],
+        "正常区间": f"{_range_text(limit.get('normalLow'), limit.get('normalHigh'))}{unit}",
+        "低低限LL": with_unit(limit.get("lowLow")),
+        "低限L": with_unit(limit.get("low")),
+        "高限H": with_unit(limit.get("high")),
+        "高高限HH": with_unit(limit.get("highHigh")),
+        "状态": limit.get("status"),
+        "依据": (limit.get("basis") or "")[:60],
     }
+    return {k: v for k, v in brief.items() if v is not None}
 
 
 def _judge_target(
@@ -540,9 +547,9 @@ def _judge_target(
     public = []
     for t in shown:
         row = {k: v for k, v in t.items() if not k.startswith("_") and k not in ("up", "down") and k not in band_keys}
-        minutes = {k: int(round(t[k] * step_min)) for k in band_keys if t.get(k)}
+        minutes = {_BAND_LABEL[k]: int(round(t[k] * step_min)) for k in band_keys if t.get(k)}
         if minutes:
-            row["minutes"] = minutes
+            row["越限分钟"] = minutes
         public.append(row)
     return {
         "established": established,
@@ -862,6 +869,8 @@ async def _resolve_with_quantity(api: Any, target: str, quantity: str | None) ->
 
 
 # 判档顺序：高侧与低侧都从最严的一档往宽判断
+# 对外输出用中文档位名（aboveHigh → 高于高限），内部计算仍用英文键
+_BAND_LABEL = {key: label for key, _, _, label in _BANDS}
 _CLASSIFY_ORDER = ("aboveHighHigh", "aboveHigh", "aboveNormal", "belowLowLow", "belowLow", "belowNormal")
 
 
@@ -903,7 +912,7 @@ def exceedance_profile(series: dict[int, float], limit: dict[str, Any], interval
         if count:
             minutes[key] = int(round(count * step_min))
     if minutes:
-        out["minutes"] = minutes
+        out["越限分钟"] = {_BAND_LABEL[k]: v for k, v in minutes.items()}
 
     lo, hi = limit.get("normalLow"), limit.get("normalHigh")
     runs: list[tuple[int, int]] = []
@@ -994,7 +1003,7 @@ async def check_limit_exceedance(registry: Any, arguments: dict[str, Any], api: 
     # 排序：高高 / 低低最严重，其次高限 / 低限，最后正常区间外
     severity = {"高于高高限": 0, "低于低低限": 0, "高于高限": 1, "低于低限": 1, "高于正常上沿": 2, "低于正常下沿": 2}
     abnormal = [p for p in profiles if p["worst"] != "正常"]
-    abnormal.sort(key=lambda p: (severity.get(p["worst"], 9), -sum((p.get("minutes") or {}).values())))
+    abnormal.sort(key=lambda p: (severity.get(p["worst"], 9), -sum((p.get("越限分钟") or {}).values())))
     peak = max(profiles, key=lambda p: p["max"])
     trough = min(profiles, key=lambda p: p["min"])
     conclusion = (
@@ -1721,7 +1730,7 @@ ANALYSIS_TOOLS: list[ToolSpec] = [
         summary="越限统计：最值、各档越限时长、越限测点清单（时间窗或当前值）",
         returns=(
             "limit、mode（时间窗/当前值）、tagCount、abnormalTagCount、abnormal[]（测点、最值及时刻、"
-            "minutes 各档越限分钟数、longestRuns 最长连续越限时段、runCount；当前值模式为 value 与 status）、"
+            "越限分钟（按档位）、longestRuns 最长连续越限时段、runCount；当前值模式为 value 与 status）、"
             "normalTags、conclusion、method。"
         ),
         handler=check_limit_exceedance,

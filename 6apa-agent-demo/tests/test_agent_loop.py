@@ -233,6 +233,23 @@ async def main() -> int:
     duplicate_msgs = [m for m in llm7.seen_messages[-1] if m.get("role") == "tool" and '"duplicate": true' in (m.get("content") or "")]
     ok &= check(len(duplicate_msgs) == 2, "回灌给模型的是一句提示，而不是第二份完整结果（参数顺序不同也能识别）")
 
+    # ---------------------------------------------------------------- 用例 8
+    print("\n[8] 用到模拟数据而回答没声明时，Runtime 兜底补上声明")
+    footer = "模拟数据服务，不是现场真实读数"
+    cases = [
+        ("漏写声明 → 补上", [("investigate_process_anomaly", {"target": "釜内反应温度", "symptom": "偏高"})], "釜温全天偏高。", 1),
+        ("已写声明 → 不重复", [("investigate_process_anomaly", {"target": "釜内反应温度", "symptom": "偏高"})], "釜温全天偏高（模拟数据）。", 0),
+        ("没用到模拟数据 → 不加", [("query_ontology_overview", {})], "共 1340 台设备。", 0),
+    ]
+    for label, step, text, expected in cases:
+        runtime8, _ = build_runtime([step, text], executor)
+        conversation8 = store.get_or_create(f"t8-{label}")
+        events8 = await collect(runtime8, conversation8, "问题")
+        answer = next(e.data["text"] for e in events8 if e.type == "answer")
+        streamed = "".join(e.data["text"] for e in events8 if e.type == "answer_delta")
+        ok &= check(answer.count(footer) == expected and streamed.count(footer) == expected, f"{label}（流式与最终回答一致）")
+        ok &= check(conversation8.wire_messages()[-1]["content"] == answer, f"{label}：写入会话历史的是同一份回答")
+
     await executor.aclose()
     print("\n全部通过" if ok else "\n存在失败用例")
     return 0 if ok else 1
