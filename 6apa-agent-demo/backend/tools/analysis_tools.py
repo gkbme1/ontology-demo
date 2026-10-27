@@ -1016,7 +1016,7 @@ async def _check_limit_batch(api: Any, quantities: list[dict[str, Any]], argumen
         }
         if abnormal and one.get("mode") == "时间窗":
             row["abnormalTagCount"] = one.get("abnormalTagCount")
-            row["maxOutsideMinutes"] = max(_outside_minutes(a) for a in abnormal)
+            row["单表累计越出正常区间分钟（最多的一支）"] = max(_outside_minutes(a) for a in abnormal)
         if one.get("mode") == "当前值":
             row["abnormal"] = [f"{a['tag']}={a.get('value')}（{a['status']}）" for a in abnormal]
             row.pop("abnormalTags")
@@ -1034,7 +1034,12 @@ async def _check_limit_batch(api: Any, quantities: list[dict[str, Any]], argumen
         "noLimit": no_limit,
         "conclusion": (
             f"「{arguments.get('target')}」对应 {len(quantities)} 个有测点的工艺量，逐个按各自限值统计："
-            + (f"越限的有 {'、'.join(flagged)}。" if flagged else "全部在正常区间内。")
+            + (
+                f"越限的有 {len(flagged)} 个：{'、'.join(flagged)}，"
+                f"越限测点合计 {sum(r.get('abnormalTagCount') or len(r.get('abnormalTags') or r.get('abnormal') or []) for r in rows if r['worst'] != '正常')} 支。"
+                if flagged
+                else "全部在正常区间内。"
+            )
             + (f"另有 {len(no_limit)} 个没有已填数值的限值，无法判断（{'、'.join(no_limit)}）。" if no_limit else "")
             + _SIMULATED_TAIL
         ),

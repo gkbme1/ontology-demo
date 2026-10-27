@@ -293,7 +293,9 @@ async def run_live_tests() -> None:
         batch = await call("check_limit_exceedance", target="pH", startTime="2026-10-25 20:00:00", endTime="2026-10-26 06:00:00")
         bres = batch.result or {}
         check(bres.get("analysisType") == "越限统计（多工艺量）" and len(bres.get("quantities") or []) >= 2, f"只说物理量时逐个统计全部同类工艺量（{len(bres.get('quantities') or [])} 个）")
-        check(all(q.get("maxOutsideMinutes", 0) <= 10 * 60 + 5 for q in bres.get("quantities") or []), "多工艺量越限分钟不超过时间窗（各档嵌套不重复相加）")
+        check(all(q.get("单表累计越出正常区间分钟（最多的一支）", 0) <= 10 * 60 + 5 for q in bres.get("quantities") or []), "多工艺量越限分钟不超过时间窗（各档嵌套不重复相加）")
+        total_abnormal = sum(q.get("abnormalTagCount", 0) for q in bres.get("quantities") or [])
+        check(f"越限测点合计 {total_abnormal} 支" in bres.get("conclusion", ""), f"越限测点合计由程序算好写进结论（{total_abnormal} 支）")
         check("模拟数据" in bres.get("conclusion", "") and not batch.truncated, f"批量结果声明模拟数据且未被裁剪（{len(batch.to_llm_content())} 字符）")
 
         clarify = await call("investigate_process_anomaly", target="温度")
