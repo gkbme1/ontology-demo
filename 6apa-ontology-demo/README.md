@@ -102,6 +102,7 @@ DCS 点表使用现场位号命名（水解罐A、离心机B1、温度）。两�
 6apa-ontology-demo/
 ├── backend/                     本体服务（Python + FastAPI）
 │   ├── api/routes.py            REST 路由表（框架无关声明）
+│   ├── api/asset_routes.py      资产本体视图接口（导航树 / 搜索 / 对象本体档案）
 │   ├── ontology/
 │   │   ├── models.py            12 分类 / 9 核心内容 / 节点边样式（可配置）
 │   │   ├── identifiers.py       稳定 ID 生成
@@ -113,6 +114,7 @@ DCS 点表使用现场位号命名（水解罐A、离心机B1、温度）。两�
 │   │   ├── rule_loader.py           规则导入
 │   │   ├── object_matcher.py        三级对象匹配
 │   │   ├── graph_builder.py         局部语义图构建
+│   │   ├── asset_model.py           资产本体视图：本体域分类树 + 对象本体档案（属性/关系/能力/约束/规则）
 │   │   └── data_quality.py          数据一致性检查
 │   ├── tools/                   映射表 / 规则模板 / 离线演示构建脚本
 │   ├── export_static.py         导出静态 API 快照
@@ -155,6 +157,42 @@ cd frontend
 npm install
 npm run dev        # http://localhost:5173，/api 已代理到 8700 端口
 ```
+
+也可以直接用脚本：`run_service.bat`（后端）+ `run_frontend.bat`（前端，首次自动 `npm install`，
+起来后自动打开浏览器）；Linux / macOS 用 `bash run_frontend.sh`。
+Agent 目录下的 `run_demo.bat` / `run_demo.sh` 一键启动时也会拉起本前端（5173）。
+
+> `package-lock.json` 里的下载地址是 npmmirror 镜像。所在网络访问不了时，
+> 改用 `npm install --registry=https://registry.npmjs.org/`。
+
+打开 http://localhost:5173 默认进入 **资产本体** 页（见下节），原来的本体总览、工段与设备、
+关系图谱、关系清单、数据治理等页面都还在，从顶栏「本体总览」进入。
+
+### 资产本体页：导航树 + 对象本体
+
+左侧是资产导航树，按本体域分类，每个域再按各自的层级展开，可以一路点到具体设备；
+顶部搜索框支持设备名、DCS 位号、工段编号、工艺量名称，命中后自动展开到该对象。
+
+| 本体域 | 层级 |
+|---|---|
+| 空间与层级 | 工段 → 设备组 / 设备 |
+| 工业资产 | 设备大类 → 设备类型 → 标准设备组 → 设备（未入组设备按名称归到大类下的「未入组设备」） |
+| 工艺 / 物料与产品 / 质量 / 生产业务与经营指标 / 安全与风险 | 对象类型 → 工段 → 工业关系中的对象 |
+| 自动化与控制 | 控制站 → 设备；控制系统 / 仪表 / 执行机构 |
+| 组织与人员、设备维护与可靠性、能源、环保、成本与经营 | 暂无数据源，显示为 0 |
+
+选中对象后右侧是它的本体档案，按下面的定义组织（关联不单列，直接体现在属性里）：
+
+| 部分 | 内容 | 数据来源 |
+|---|---|---|
+| 类与层级 | 类名、父类路径、编码、工段、控制站、出处 | DCS 点表 / 工业关系 |
+| 属性 | 固有属性（编码、类型、所属…）、工艺属性、测量 / 状态 / 控制参数；每个属性直接带出关联的 DCS 位号 | DCS 点表 + 对象映射 + 工业关系 |
+| 关系 | 类间关系（所属、上下游、部件、实例、控制、报警联锁）与属性间关系（计算 / 传递 / 关联） | 工业关系 + DCS 层级 |
+| 能力 | 数据·时序、诊断、分析、动作、模型等挂载点，状态为 已挂载 / 具备挂载点 / 未挂载；只按对象已有点位与本体内置接口判断，不虚构 | 本体内置接口 + 点位类型 |
+| 约束 | 结构约束（加载器校验结果）、运行约束（工艺限值）、安全约束（报警联锁关系） | 工艺限值 + 工业关系 |
+| 规则 | 适用的推理规则（专属 / 同工段 / 通用层） | 规则表 |
+
+地址栏 `?id=` 记录当前对象，可以直接分享或刷新恢复，例如 `http://localhost:5173/?id=area-S11`。
 
 离线演示页也可以切换到实时后端：打开
 `demo/index.html?api=http://localhost:8700` 即可。
@@ -202,6 +240,10 @@ VITE_API_PROXY=http://localhost:9100
 前端不允许绕过 API 直接读取数据文件。
 
 ```
+GET /api/ontology/asset-tree?parent=            资产导航树：不带 parent 返回本体域，带上返回该节点的子节点
+GET /api/ontology/asset-tree/search             资产搜索 ?keyword= ?limit=，结果带逐级展开路径
+GET /api/ontology/asset-profile/{id}            对象本体档案（属性 / 关系 / 能力 / 约束 / 规则）
+                                                id 可传设备、设备组、工艺对象、工段、位号或 OWL Subject
 GET /api/ontology/overview                      本体概览（全部统计值动态计算）
 GET /api/ontology/categories                    12 个本体分类 + 9 项核心内容 + 图样式
 GET /api/ontology/process-areas                 工段列表（24 个，按编号排序）
@@ -360,9 +402,6 @@ Windows：`set RTDB_BASE_URL=http://10.0.0.5:9000` 后再启动；Linux：`RTDB_
 1. **对象映射需要现场确认。** 123 行映射全部是基于工段与工艺语义的推断，
    确认状态均为「待现场确认」。在现场核对之前，测量锚点部分不应作为正式依据。
 2. **规则、约束、能力、模型注册四类数据源尚未提供**，页面显示空状态。
-3. **Vue 前端未在本环境构建过。** 本次开发环境的 npm 与 PyPI registry 被
-   出口策略拦截（返回 403），无法执行 `npm install` 与 `pip install fastapi`，
-   因此 `frontend/` 是通过审阅保证正确性的源码，尚未做过运行时验证；
-   `demo/` 离线演示则是零依赖实现，已在 Chromium 中逐页验证过交互。
-   后端在本环境以 Starlette 回退模式跑通了全部 27 个接口，
-   安装 FastAPI 后走的是同一份路由表与同一批 handler。
+3. **离线演示页（`demo/`）没有资产本体页。** 资产导航树与对象本体档案只在 Vue 前端里，
+   需要本体服务在线。Vue 前端已能通过 `npm run build`（含 `vue-tsc` 类型检查），
+   并在 Chromium 中验证过导航树、搜索、档案与深链接。

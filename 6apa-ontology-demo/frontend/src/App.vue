@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { useOntologyMeta, fmt } from '@/composables/useOntologyMeta'
 import ObjectDetail from '@/components/ObjectDetail.vue'
@@ -9,8 +9,15 @@ const { sources, categories, load, error } = useOntologyMeta()
 
 onMounted(load)
 
+const fullWidth = computed(() => route.meta.fullWidth === true)
+
+const topTabs = [
+  { to: '/', label: '资产本体', match: (p: string) => p === '/' },
+  { to: '/overview', label: '本体总览', match: (p: string) => p !== '/' }
+]
+
 const navItems = [
-  { to: '/', label: '本体总览', match: (p: string) => p === '/' },
+  { to: '/overview', label: '本体总览', match: (p: string) => p === '/overview' },
   { to: '/areas', label: '工段与设备', match: (p: string) => p.startsWith('/areas') || p.startsWith('/equipment') || p.startsWith('/parameters') },
   { to: '/graph', label: '关系图谱', match: (p: string) => p.startsWith('/graph') },
   { to: '/relations', label: '关系清单', match: (p: string) => p.startsWith('/relations') }
@@ -34,8 +41,15 @@ const govItems = [
           Industrial Ontology · 6-APA Production Line
         </span>
       </div>
+      <nav class="flex items-center gap-1 ml-4">
+        <RouterLink
+          v-for="t in topTabs" :key="t.to" :to="t.to"
+          class="px-3 py-1 rounded-md text-[12.5px] no-underline border"
+          :class="t.match(route.path) ? 'bg-brand/[0.15] border-brand/60 text-fg font-medium' : 'border-transparent text-fg-dim hover:text-fg hover:bg-ink-panel2'"
+        >{{ t.label }}</RouterLink>
+      </nav>
       <div class="flex-1"></div>
-      <div class="flex gap-1.5 flex-wrap">
+      <div class="hidden 2xl:flex gap-1.5 flex-wrap">
         <span
           v-for="s in sources?.sources ?? []"
           :key="s.file"
@@ -51,7 +65,15 @@ const govItems = [
       </div>
     </header>
 
-    <div class="grid grid-cols-1 xl:grid-cols-[236px_minmax(0,1fr)_392px]">
+    <div v-if="fullWidth" class="min-w-0">
+      <div v-if="error" class="mx-5 mt-4 px-3 py-2.5 border-l-2 border-err bg-err/[0.07] text-fg-dim">
+        无法连接本体服务：{{ error }}。请确认已执行
+        <code class="font-mono">uvicorn backend.main:app --port 8700</code>。
+      </div>
+      <RouterView />
+    </div>
+
+    <div v-else class="grid grid-cols-1 xl:grid-cols-[236px_minmax(0,1fr)_392px]">
       <!-- 左栏：导航 + 12 个本体分类 -->
       <aside class="border-r border-line bg-ink-panel py-3.5 overflow-y-auto xl:sticky xl:top-[54px] xl:max-h-[calc(100vh-54px)]">
         <div class="px-4 pb-1.5 text-fg-mute text-[10.5px] tracking-widest uppercase">生产线</div>

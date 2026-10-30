@@ -34,12 +34,14 @@ pip install -r requirements.txt
 run_backend.bat                   :: Agent 服务 8800
 run_mock_dcs.bat                  :: 模拟 DCS 服务 8900（可选）
 run_frontend.bat                  :: Vue 前端 5174（可选，需要 Node）
-run_demo.bat                      :: 一键：本体 8700 + 模拟 DCS + Agent + 演示页，各开一个窗口
+run_demo.bat                      :: 一键：本体 8700 + 本体前端 5173 + 模拟 DCS + Agent + 演示页，各开一个窗口
 ```
 
 Windows 上 Python 命令通常是 `python` 而不是 `python3`，文档里的 `python3 -m xxx` 请换成 `python -m xxx`
 （`.bat` 会自动选 `python`，没有则用 `py -3`）。
 `run_demo.bat` 默认本体服务目录在同级的 `..\6apa-ontology-demo`，不在那里时先 `set ONTOLOGY_HOME=D:\路径\6apa-ontology-demo`。
+本体前端（资产本体导航，http://localhost:5173）需要 Node.js 18+，首次运行会在它自己的窗口里先 `npm install`，装完自动打开浏览器；
+没装 Node 时该窗口会提示，其余服务不受影响。`run_demo.bat` 会等本体服务就绪后再起模拟 DCS，保证模拟 DCS 拿到完整点表。
 
 ### Linux / macOS：三步跑起来
 
@@ -60,8 +62,9 @@ pip install -r requirements.txt
 本体服务、Agent 服务、演示页一起拉起：
 
 ```bash
-ONTOLOGY_HOME=../6apa-ontology-demo ./run_demo.sh
-# → http://localhost:8081/index.html?api=http://localhost:8800
+ONTOLOGY_HOME=../6apa-ontology-demo bash run_demo.sh
+# → http://localhost:8081/index.html?api=http://localhost:8800   Agent 演示页
+# → http://localhost:5173                                        本体前端（资产本体）
 ```
 
 命令行验收（不需要前端）：

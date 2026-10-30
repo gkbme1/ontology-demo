@@ -139,7 +139,8 @@ onMounted(async () => {
   await nextTick()
   if (!host.value) return
   chart.value = echarts.init(host.value)
-  chart.value.on('click', (p: { dataType?: string; data?: { raw?: GraphNode | GraphEdge } }) => {
+  chart.value.on('click', (params) => {
+    const p = params as unknown as { dataType?: string; data?: { raw?: GraphNode | GraphEdge } }
     const raw = p.data?.raw
     if (!raw) return
     if (p.dataType === 'node') emit('node-click', raw as GraphNode)

@@ -72,7 +72,7 @@ const catChips = computed(() => Object.entries(detail.value?.relationCategoryCou
   <!-- 工段详情 -->
   <div v-else-if="detail">
     <nav class="flex items-center gap-1.5 mb-3.5 text-xs text-fg-mute">
-      <RouterLink to="/" class="text-fg-dim no-underline hover:text-brand">6-APA 生产线</RouterLink>
+      <RouterLink to="/overview" class="text-fg-dim no-underline hover:text-brand">6-APA 生产线</RouterLink>
       <span class="text-line">/</span>
       <RouterLink to="/areas" class="text-fg-dim no-underline hover:text-brand">工段与设备</RouterLink>
       <span class="text-line">/</span>

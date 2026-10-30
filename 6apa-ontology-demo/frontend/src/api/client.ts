@@ -5,6 +5,7 @@
  * 关系或规则数据（需求文档第二十一、二十四章）。
  */
 import type {
+  AssetNode, AssetProfile, AssetSearchHit,
   CategoriesPayload, DataSourcesPayload, DcsTag, EmptySet, Equipment,
   GraphPayload, MeasurementAnchor, Overview, Paged, Parameter, ProcessArea,
   QualityReport, Relation, RelationDetail, RelationEntity, RelationEntityDetail, Rule
@@ -105,6 +106,12 @@ export const api = {
   objectRelations: (objectId: string) =>
     get<Record<string, unknown>>(`${P}/${encodeURIComponent(objectId)}/relations`),
 
+  // 资产本体视图：导航树（按需展开）、搜索、对象本体档案
+  assetTree: (parent?: string) => get<{ parent: string | null; items: AssetNode[]; total: number }>(`${P}/asset-tree`, { parent }),
+  assetSearch: (keyword: string, limit = 30) =>
+    get<{ items: AssetSearchHit[]; total: number }>(`${P}/asset-tree/search`, { keyword, limit }),
+  assetProfile: (objectId: string) => get<AssetProfile>(`${P}/asset-profile/${encodeURIComponent(objectId)}`),
+
   // 数据治理
   dataSources: () => get<DataSourcesPayload>(`${P}/data-sources`),
   dataQuality: () => get<QualityReport>(`${P}/data-quality`),
@@ -118,5 +125,6 @@ export const API_ENDPOINTS = [
   `${P}/relation-entities`, `${P}/relation-entities/{id}`, `${P}/graph`, `${P}/rules`,
   `${P}/capabilities`, `${P}/constraints`, `${P}/model-registry`, `${P}/semantics`,
   `${P}/measurement-anchors`, `${P}/causal-relations`, `${P}/{id}/relations`,
-  `${P}/data-sources`, `${P}/data-quality`
+  `${P}/data-sources`, `${P}/data-quality`,
+  `${P}/asset-tree`, `${P}/asset-tree/search`, `${P}/asset-profile/{id}`
 ]

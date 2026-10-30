@@ -36,7 +36,7 @@ const mismatch = computed(() => {
 <template>
   <div v-if="d">
     <nav class="flex items-center gap-1.5 mb-3.5 text-xs text-fg-mute">
-      <RouterLink to="/" class="text-fg-dim no-underline hover:text-brand">6-APA 生产线</RouterLink>
+      <RouterLink to="/overview" class="text-fg-dim no-underline hover:text-brand">6-APA 生产线</RouterLink>
       <span class="text-line">/</span>
       <RouterLink :to="`/areas/${d.areaId}`" class="text-fg-dim no-underline hover:text-brand">{{ d.area?.nameZh }}</RouterLink>
       <span class="text-line">/</span><span class="text-fg">{{ d.name }}</span>

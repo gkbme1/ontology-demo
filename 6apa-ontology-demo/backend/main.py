@@ -222,6 +222,10 @@ _mount_relation_view(app)
 from backend.api.limits_routes import mount as _mount_limits # noqa: E402
 _mount_limits(app, get_store)
 
+# 资产本体视图：资产导航树、搜索、对象本体档案（只新增接口）
+from backend.api.asset_routes import mount as _mount_assets # noqa: E402
+_mount_assets(app, get_store)
+
 if __name__ == "__main__":  # pragma: no cover
     import uvicorn
 

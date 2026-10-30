@@ -76,7 +76,7 @@ const allRels = computed(() =>
 <template>
   <div>
     <nav v-if="entity" class="flex items-center gap-1.5 mb-3.5 text-xs text-fg-mute">
-      <RouterLink to="/" class="text-fg-dim no-underline hover:text-brand">6-APA 生产线</RouterLink>
+      <RouterLink to="/overview" class="text-fg-dim no-underline hover:text-brand">6-APA 生产线</RouterLink>
       <span class="text-line">/</span>
       <RouterLink to="/graph" class="text-fg-dim no-underline hover:text-brand">关系图谱</RouterLink>
       <span class="text-line">/</span><span class="text-fg">{{ entity.name }}</span>

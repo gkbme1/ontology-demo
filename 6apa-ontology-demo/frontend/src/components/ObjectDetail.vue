@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** 右栏对象详情：按当前选中对象的类型分派到不同的展示形态。 */
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/api/client'
 import { useSelection } from '@/composables/useSelection'
@@ -37,6 +37,8 @@ const structuralHelp: Record<string, [string, string]> = {
   tag: ['boundToTag', '参数语义 → DCS Tag，来自 DCS 点表。'],
   structure: ['本体结构边', '工段 hasEquipment 设备、设备 hasParameter 参数，来自 DCS 点表层级。']
 }
+const edgePayload = computed(() => (selection.value.payload ?? {}) as { edgeKind?: string; label?: string })
+const edgeHelp = computed(() => structuralHelp[edgePayload.value.edgeKind ?? ''])
 </script>
 
 <template>
@@ -46,11 +48,11 @@ const structuralHelp: Record<string, [string, string]> = {
   <!-- 结构边 -->
   <div v-else-if="selection.kind === 'structuralEdge'">
     <div class="text-fg-mute text-[10.5px] tracking-widest uppercase">
-      {{ structuralHelp[(selection.payload as { edgeKind: string }).edgeKind]?.[0] ?? '结构边' }}
+      {{ edgeHelp?.[0] ?? '结构边' }}
     </div>
-    <h2 class="mt-1 mb-2.5 text-base font-semibold">{{ (selection.payload as { label: string }).label }}</h2>
+    <h2 class="mt-1 mb-2.5 text-base font-semibold">{{ edgePayload.label }}</h2>
     <p class="text-fg-dim m-0">
-      {{ structuralHelp[(selection.payload as { edgeKind: string }).edgeKind]?.[1] }}
+      {{ edgeHelp?.[1] }}
       本边不是工业关系 Excel 中的关系记录，而是本体内部的结构连接。
     </p>
   </div>

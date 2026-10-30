@@ -359,3 +359,138 @@ export interface DataSourcesPayload {
 }
 
 export interface Paged<T> { items: T[]; total: number; offset: number }
+
+// ------------------------------------------------------------ 资产本体视图（导航树 + 本体档案）
+
+export type AssetNodeKind = 'domain' | 'area' | 'class' | 'type' | 'group' | 'bucket' | 'equipment' | 'entity'
+
+export interface AssetNode {
+  id: string
+  label: string
+  kind: AssetNodeKind
+  hasChildren: boolean
+  count?: number
+  objectId?: string
+  badge?: string
+  hint?: string
+}
+
+export interface AssetSearchHit {
+  objectId: string
+  label: string
+  kind: AssetNodeKind
+  hint: string
+  path: string[]
+}
+
+export interface DataLink {
+  tagId: string
+  tag: string
+  desc?: string | null
+  unit?: string | null
+  blockType?: string | null
+  station?: string | null
+}
+
+export interface ProfileAttribute {
+  kind: '固有' | '工艺属性' | '测量' | '状态' | '控制' | string
+  name: string
+  valueType?: string
+  value?: string | number | null
+  note?: string | null
+  refId?: string | null
+  category?: string
+  description?: string | null
+  dataLinks?: DataLink[]
+  dataLinkTotal?: number
+  matchStatus?: string
+  pendingConfirmation?: boolean
+  inheritedFrom?: string
+  entityId?: string
+  parameterId?: string
+}
+
+export interface ProfileRelation {
+  role: string
+  category?: string
+  predicate?: string
+  direction?: 'in' | 'out'
+  from?: string
+  to?: string
+  target: string
+  targetId?: string | null
+  targetType?: string
+  mechanism: string
+  tags?: string[]
+  source?: string
+}
+
+export interface AttributeRelation {
+  kind: '计算' | '传递' | '关联' | string
+  from: string
+  to: string
+  predicate: string
+  category?: string
+  mechanism: string
+  source?: string
+}
+
+export interface ProfileCapability {
+  type: string
+  name: string
+  status: '已挂载' | '具备挂载点' | '未挂载' | string
+  mount: string
+  basis: string
+}
+
+export interface StructureCheck { text: string; satisfied: boolean; detail: string }
+
+export interface OperatingConstraint {
+  id: string
+  appliesTo?: string
+  parameter?: string
+  unit?: string
+  operatingMode?: string
+  normal?: string | null
+  alarm: Record<string, number>
+  hasValues?: boolean
+  status?: string
+  confidence?: string
+  basis?: string
+  matchedTargets?: string[]
+}
+
+export interface ProfileRule {
+  id: string
+  name?: string
+  condition?: string
+  conclusion?: string
+  severity?: string
+  limitRefs?: string[]
+  draft?: boolean
+  matchedBy?: string
+}
+
+export interface AssetProfile {
+  objectId: string
+  kind: 'equipment' | 'group' | 'entity' | 'area'
+  name: string
+  header: {
+    className: string
+    classPath: string[]
+    code?: string | null
+    area?: string | null
+    station?: string | null
+    overview?: string | null
+    badges: string[]
+    source?: Provenance | null
+  }
+  instances?: { id: string; name: string; tagCount: number; station?: string }[]
+  attributes: ProfileAttribute[]
+  relations: { classRelations: ProfileRelation[]; attributeRelations: AttributeRelation[] }
+  capabilities: ProfileCapability[]
+  constraints: { structure: StructureCheck[]; operating: OperatingConstraint[]; safety: { text: string; mechanism: string; source: string }[] }
+  rules: ProfileRule[]
+  treePath: string[]
+  focusTag?: string
+}
