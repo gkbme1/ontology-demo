@@ -10,7 +10,7 @@ v2 起的口径变化（重要）
 v2 改用流程图口径的「工段编号(流程图口径)」+「工艺工段(流程图口径)」，
 两者一一对应，共 24 个取值（S01–S23、S99）。控制站从"分类依据"降级为"属性"。
 
-由此带来一处模型变化：**设备不再只属于一个工段**。1340 台设备中有 46 台的点位
+由此带来一处模型变化：**设备不再只属于一个工段**。1340 台设备（按设备归并表合并前）中有 46 台的点位
 落在多个工段。处理方式是 areaId 仍给主工段（取自「设备统计」的声明），
 另加 areaIds / areaCodes 列出实际覆盖的全部工段，过滤时按任一命中。
 设备与控制站仍是一对一（已核查：0 台设备跨站），station 字段含义不变。
@@ -131,6 +131,7 @@ class DcsDataset:
         self.screen_diff_rows: list[dict[str, Any]] = []
         self.issues: list[dict[str, Any]] = []
         self.load_stats: dict[str, Any] = {}
+        self.merge_stats: dict[str, Any] | None = None
         # 工段编号 → areaId，供其它加载器按编号或名称回查
         self.area_by_code: dict[str, str] = {}
         self.area_by_name: dict[str, str] = {}
@@ -168,7 +169,8 @@ class DcsDataset:
         return self.tags.get(ids.tag_id(tag_name))
 
 
-def load_dcs(path: str | Path) -> DcsDataset:
+def load_dcs(path: str | Path, merge_path: str | Path | None = None) -> DcsDataset:
+    """加载 DCS 点表。merge_path 指向设备归并表时，按表把同一台设备的多种写法合并成一台。"""
     path = Path(path)
     ds = DcsDataset(path.name)
 
@@ -181,6 +183,13 @@ def load_dcs(path: str | Path) -> DcsDataset:
     _load_tags(ds, path)
     _load_stats(ds, path)
     _load_screen_sheets(ds, path)
+    ds.merge_stats = None
+    if merge_path is not None:
+        from backend.services import equipment_merge
+
+        merge_path = Path(merge_path)
+        ds.merge_stats = equipment_merge.apply(ds, equipment_merge.load_table(merge_path), merge_path.name)
+        ds.merge_stats["available"] = merge_path.exists()
     _finalise(ds)
     return ds
 
@@ -692,6 +701,11 @@ def _finalise(ds: DcsDataset) -> None:
     ds._equipment_name_index = {}
     for equip in ds.equipment.values():
         ds._equipment_name_index.setdefault(equip["name"], []).append(equip)
+        # 归并前的写法仍可按名称查到合并后的设备
+        for alias in equip.get("aliases") or []:
+            bucket = ds._equipment_name_index.setdefault(alias["name"], [])
+            if equip not in bucket:
+                bucket.append(equip)
     ds._parameter_name_index = {}
     for param in ds.parameters.values():
         ds._parameter_name_index.setdefault(param["name"], []).append(param)
@@ -748,4 +762,5 @@ def _finalise(ds: DcsDataset) -> None:
         "stationCount": len(ds.stations),
         "equipmentGroupCount": len(ds.equipment_groups),
         "multiAreaEquipmentCount": len([e for e in ds.equipment.values() if e["areaSpan"] > 1]),
+        "equipmentMerge": ds.merge_stats,
     }

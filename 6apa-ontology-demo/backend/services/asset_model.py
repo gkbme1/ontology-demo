@@ -384,6 +384,11 @@ class AssetIndex:
             if kw in name or lower in (equip.get("owlSubject") or "").lower():
                 add(equip["id"], name, "equipment", f"{equip.get('areaCode')} · {equip.get('equipmentGroup') or '未入组'}",
                     0 if name == kw else 1)
+                continue
+            alias = next((a for a in equip.get("aliases") or [] if kw in a["name"]), None)
+            if alias:
+                add(equip["id"], name, "equipment", f"点表写法「{alias['name']}」（{alias['station']} 站）已归并到此设备",
+                    0 if alias["name"] == kw else 1)
         for group in self.groups.values():
             if kw in group["name"] or any(kw in inst for inst in group["instances"]):
                 add(group["id"], group["name"], "group", f"标准设备组 · {group.get('equipmentType')}", 0 if group["name"] == kw else 2)
@@ -626,8 +631,12 @@ def _safety_constraints(class_relations: list[dict[str, Any]]) -> list[dict[str,
     ]
 
 
-def _entity_attribute(store: Any, entity: dict[str, Any]) -> dict[str, Any]:
-    """工艺属性（关系对象）作为一条属性：数据关联取它匹配到的测点。"""
+def _entity_attribute(store: Any, entity: dict[str, Any], own_tags: set[str] | None = None) -> dict[str, Any]:
+    """工艺属性（关系对象）作为一条属性：数据关联取它匹配到的测点。
+
+    own_tags 给定时（设备继承设备组的属性），数据关联只保留属于本台设备的测点，
+    组里其它设备的测点不算在本台名下。
+    """
     tags = []
     for match in entity["match"]["matches"]:
         if match["objectType"] == "parameter":
@@ -641,7 +650,7 @@ def _entity_attribute(store: Any, entity: dict[str, Any]) -> dict[str, Any]:
             seen.add(t["id"])
             unique.append(t)
     units = [t.get("unit") for t in unique]
-    return {
+    attr = {
         "kind": "工艺属性",
         "name": entity["name"],
         "entityId": entity["id"],
@@ -652,6 +661,16 @@ def _entity_attribute(store: Any, entity: dict[str, Any]) -> dict[str, Any]:
         "matchStatus": entity["match"]["matchStatusLabel"],
         "pendingConfirmation": entity["match"].get("pendingConfirmation"),
     }
+    if own_tags is not None:
+        own = [t for t in unique if t["id"] in own_tags]
+        attr["dataLinks"] = [_tag_link(t) for t in own[:12]]
+        attr["dataLinkTotal"] = len(own)
+        attr["groupLinkTotal"] = len(unique)
+        if unique and not own:
+            attr["note"] = f"设备组共 {len(unique)} 个测点，均不在本台设备上"
+        elif len(own) < len(unique):
+            attr["note"] = f"本台 {len(own)} 个 / 设备组共 {len(unique)} 个测点"
+    return attr
 
 
 def _sort_attributes(attrs: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -692,7 +711,7 @@ def _equipment_profile(store: Any, index: AssetIndex, eid: str) -> dict[str, Any
          "refId": group["id"] if group else None},
         {"kind": "固有", "name": "主工段", "valueType": "引用", "value": f"{equip.get('areaCode')} {equip.get('areaName')}",
          "refId": equip.get("areaId")},
-        {"kind": "固有", "name": "DCS 控制站", "valueType": "文本", "value": str(equip.get("station"))},
+        {"kind": "固有", "name": "DCS 控制站", "valueType": "文本", "value": "、".join(equip.get("stations") or [str(equip.get("station"))])},
     ]
     if equip.get("areaSpan", 1) > 1:
         attrs.append({"kind": "固有", "name": "点位覆盖工段", "valueType": "引用列表",
@@ -700,6 +719,11 @@ def _equipment_profile(store: Any, index: AssetIndex, eid: str) -> dict[str, Any
     if group and group.get("components"):
         attrs.append({"kind": "固有", "name": "主要部件", "valueType": "列表", "value": "、".join(group["components"])})
     attrs.append({"kind": "固有", "name": "归属置信度", "valueType": "枚举", "value": equip.get("confidence")})
+    aliases = equip.get("aliases") or []
+    if aliases:
+        attrs.append({"kind": "固有", "name": "点表中的其他写法", "valueType": "列表",
+                      "value": "、".join(f"{a['name']}（{a['station']} 站）" for a in aliases),
+                      "note": "已按设备归并表合并为本设备"})
 
     property_entities = []
     from_group: set[str] = set()
@@ -710,9 +734,11 @@ def _equipment_profile(store: Any, index: AssetIndex, eid: str) -> dict[str, Any
                 property_entities.append(entity)
                 if (rel.get("subject") or {}).get("id") in inherited:
                     from_group.add(entity["id"])
+    own_tag_ids = set(equip["tagIds"])
     for entity in property_entities:
-        attr = _entity_attribute(store, entity)
-        if entity["id"] in from_group:
+        inherited_attr = entity["id"] in from_group
+        attr = _entity_attribute(store, entity, own_tag_ids if inherited_attr else None)
+        if inherited_attr:
             attr["inheritedFrom"] = group["name"]
         attrs.append(attr)
 
@@ -769,12 +795,14 @@ def _equipment_profile(store: Any, index: AssetIndex, eid: str) -> dict[str, Any
             "classPath": ["设备", cls] + ([group.get("equipmentType"), group["name"]] if group else ["未入组设备"]),
             "code": equip.get("owlSubject"),
             "area": f"{equip.get('areaCode')} {equip.get('areaName')}",
-            "station": equip.get("station"),
+            "station": "、".join(equip.get("stations") or [equip.get("station") or ""]),
             "stats": equip.get("stats"),
             "overview": equip.get("overview"),
             "badges": [f"{equip['tagCount']} 个 DCS 点", f"{equip['parameterCount']} 个参数"]
-                      + ([f"跨 {equip['areaSpan']} 个工段"] if equip.get("areaSpan", 1) > 1 else []),
+                      + ([f"跨 {equip['areaSpan']} 个工段"] if equip.get("areaSpan", 1) > 1 else [])
+                      + ([f"合并 {len(equip['aliases'])} 种写法"] if equip.get("aliases") else []),
             "source": equip.get("source"),
+            "aliases": equip.get("aliases") or [],
         },
         "attributes": _sort_attributes(attrs),
         "relations": {"classRelations": class_relations, "attributeRelations": attribute_relations},
@@ -986,7 +1014,8 @@ def profile(store: Any, object_id: str) -> dict[str, Any]:
     index = asset_index(store)
     oid = ids.normalize(object_id) or ""
     if oid.startswith(":"):
-        oid = next((e["id"] for e in store.dcs.equipment.values() if e.get("owlSubject") == oid), oid)
+        equip = store.dcs.equipment_by_owl(oid)  # 含已归并的旧写法
+        oid = equip["id"] if equip else oid
     if oid.startswith("tag-") and oid in store.dcs.tags:
         tag = store.dcs.tags[oid]
         if tag.get("equipmentId") in store.dcs.equipment:
@@ -994,7 +1023,8 @@ def profile(store: Any, object_id: str) -> dict[str, Any]:
             result["focusTag"] = tag["name"]
             return result
     if oid in store.dcs.equipment:
-        return _equipment_profile(store, index, oid)
+        # 已归并设备的旧 ID 转到合并后的设备
+        return _equipment_profile(store, index, store.dcs.equipment[oid]["id"])
     if oid in store.dcs.equipment_groups:
         return _group_profile(store, index, oid)
     resolved_group = store.resolve_group_id(oid)

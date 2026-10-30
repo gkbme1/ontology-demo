@@ -210,7 +210,7 @@ def resolve_object(store, object_id: str) -> tuple[dict[str, Any], list[dict[str
         if not equip:
             raise ApiError(404, f"未找到对象：{object_id}")
         tags = [dcs.tags[t] for t in equip["tagIds"] if t in dcs.tags]
-        scope = {"objectId": object_id, "objectKind": "equipment", "objectName": equip["name"],
+        scope = {"objectId": equip["id"], "objectKind": "equipment", "objectName": equip["name"],
                  "owlSubject": equip.get("owlSubject"), "areaName": equip.get("areaName")}
         return scope, tags, notes
 

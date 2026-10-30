@@ -2,6 +2,7 @@
 # 一键重建离线演示：解析 Excel → 导出 API 快照 → 组装 demo/index.html
 set -euo pipefail
 cd "$(dirname "$0")"
+python3 -m backend.tools.build_equipment_merge   # 设备归并表，已存在时不覆盖
 python3 -m backend.tools.build_mapping_template
 python3 backend/tools/build_rule_template.py
 python3 -m backend.tools.build_static_demo_data

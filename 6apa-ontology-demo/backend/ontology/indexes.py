@@ -38,13 +38,14 @@ DCS_FILE = SOURCE_DIR / "6APA_DCS.xlsx"
 RELATION_FILE = SOURCE_DIR / "6APA_工业关系.xlsx"
 MAPPING_FILE = SOURCE_DIR / "6APA_对象映射.xlsx"
 RULE_FILE = SOURCE_DIR / "6APA_规则.xlsx"
+MERGE_FILE = SOURCE_DIR / "6APA_设备归并.xlsx"
 
 
 class OntologyStore:
     def __init__(self, source_dir: Path | None = None) -> None:
         base = Path(source_dir) if source_dir else SOURCE_DIR
         self.loaded_at = _dt.datetime.now().isoformat(timespec="seconds")
-        self.dcs = load_dcs(base / DCS_FILE.name)
+        self.dcs = load_dcs(base / DCS_FILE.name, base / MERGE_FILE.name)
         self.relations = load_relations(base / RELATION_FILE.name)
         self.mapping = load_mapping(base / MAPPING_FILE.name)
         self.rules = load_rules(base / RULE_FILE.name)
@@ -1087,7 +1088,9 @@ class OntologyStore:
             "loadedAt": self.loaded_at,
             "sources": [
                 block(SOURCE_DCS, DCS_FILE, self.dcs.load_stats, True,
-                      "现场基础事实：控制站 / 生产工段 / 设备 / 参数语义 / DCS 点"),
+                      "现场基础事实：控制站 / 生产工段 / 设备 / 参数语义 / DCS 点"
+                      + (f"；设备名称按 {MERGE_FILE.name} 统一（{self.dcs.merge_stats['applied']} 个写法归并）"
+                         if (self.dcs.merge_stats or {}).get("available") else "")),
                 block(SOURCE_RELATION, RELATION_FILE, self.relations.load_stats, True,
                       "工业关系事实：结构 / 控制 / 物理拓扑 / 影响 / 质量关系"),
                 block(SOURCE_MAPPING, MAPPING_FILE, self.mapping.load_stats, self.mapping.available,

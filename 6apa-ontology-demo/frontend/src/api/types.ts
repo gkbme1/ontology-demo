@@ -403,6 +403,7 @@ export interface ProfileAttribute {
   description?: string | null
   dataLinks?: DataLink[]
   dataLinkTotal?: number
+  groupLinkTotal?: number
   matchStatus?: string
   pendingConfirmation?: boolean
   inheritedFrom?: string
@@ -471,6 +472,17 @@ export interface ProfileRule {
   matchedBy?: string
 }
 
+export interface EquipmentAlias {
+  id: string
+  name: string
+  owlSubject: string
+  station?: string | null
+  tagCount: number
+  mergeKind: string
+  rule?: string
+  basis?: string
+}
+
 export interface AssetProfile {
   objectId: string
   kind: 'equipment' | 'group' | 'entity' | 'area'
@@ -484,6 +496,7 @@ export interface AssetProfile {
     overview?: string | null
     badges: string[]
     source?: Provenance | null
+    aliases?: EquipmentAlias[]
   }
   instances?: { id: string; name: string; tagCount: number; station?: string }[]
   attributes: ProfileAttribute[]

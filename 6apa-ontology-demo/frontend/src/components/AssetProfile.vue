@@ -96,6 +96,14 @@ const KIND_TITLE: Record<string, string> = {
               {{ profile.header.source?.file ?? '—' }}<span v-if="profile.header.source?.sheet"> · {{ profile.header.source.sheet }}</span><span v-if="profile.header.source?.row"> · 第 {{ profile.header.source.row }} 行</span>
             </dd></div>
         </dl>
+        <div v-if="profile.header.aliases?.length" class="mt-2 flex flex-wrap items-center gap-1.5 text-[12px]">
+          <span class="text-fg-mute">已归并点表写法</span>
+          <span
+            v-for="al in profile.header.aliases" :key="al.id" class="pill pill-plain"
+            :title="`${al.mergeKind} · ${al.rule ?? ''}\n${al.basis ?? ''}\n${al.owlSubject}`"
+          >{{ al.name }}<span class="text-fg-mute">{{ al.station }}站 · {{ al.mergeKind }} · {{ al.tagCount }}点</span></span>
+          <span class="text-fg-mute text-[11px]">依据 6APA_设备归并.xlsx</span>
+        </div>
         <div v-if="profile.focusTag" class="mt-2 text-[12px] text-warn">由位号 {{ profile.focusTag }} 定位到本设备，属性表中已高亮。</div>
       </div>
     </section>
@@ -147,7 +155,7 @@ const KIND_TITLE: Record<string, string> = {
                       >→ {{ l.tag }}<span v-if="l.unit" class="text-fg-mute">{{ l.unit }}</span></span>
                       <span v-if="(a.dataLinkTotal ?? 0) > 5" class="pill pill-plain">+{{ (a.dataLinkTotal ?? 0) - 5 }}</span>
                     </div>
-                    <span v-else-if="!valueCell(a) && a.kind !== '固有'" class="text-fg-mute text-[11.5px]">无现场测点</span>
+                    <span v-else-if="!valueCell(a) && a.kind !== '固有' && !a.note" class="text-fg-mute text-[11.5px]">无现场测点</span>
                   </td>
                 </tr>
               </tbody>
