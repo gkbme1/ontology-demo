@@ -347,6 +347,8 @@ Agent 收到的和手敲进去完全一样。案例里的 `referenceToolChain` �
 | `analyze_switch_signals` | 昨天启停了几次、什么时候、运行多久；现在在运行吗、有没有报故障 | 取原始变位按测点描述区分运行反馈 / 启停指令 / 故障，数出上升 / 下降沿时刻与累计运行时长，核对指令与反馈次数（对不上提示启动或停机失败）；不给时间窗时读当前状态 |
 | `audit_data_gaps` | 哪些参数没限值、哪些限值是推断的、哪些工艺量没测点 | 一次取全量，按工段分组输出完整清单；统计已确认限值、有数值却落不到测点的限值、无测点量中有多少卡住了因果验证 |
 
+| `calculate_quantity` | 某某速度 / 速率 / 消耗量 / 加料量 / 累计量能不能算、是多少 | 派生量计算统一入口：按本体写明的关系判断用哪种计算方法、从哪个对象取数，取全部测点完成计算（见下方「计算模块」） |
+
 - **通用**：算法只依赖本体的图结构与数据接口，不认识任何具体设备、参数或位号；
   换工艺量、换工段、新增设备都只需要补本体数据。
 - **对象解析**：工艺量名称、`robj-` ID、DCS 位号（`TI_1301A`）、测点描述（`水解罐A温度`）都能落到本体对象上；
@@ -360,6 +362,42 @@ Agent 收到的和手敲进去完全一样。案例里的 `referenceToolChain` �
 每条案例的考察点、本体里实际能查到什么、什么样的回答算合格，见 `docs/工艺调查案例.md`。
 
 ---
+
+### 计算模块（`backend/tools/calculations/`）
+
+"速度、消耗量、加料量、累计量"这类量往往没有直接测点，而是由别的测点按本体里写明的方法算出来的
+（例如「氨水累计加量」描述为"由计量罐液位差计算"，关系"计量罐液位下降量即加氨量"）。
+这类计算统一走 `calculate_quantity`：模型只传"要算什么"，用哪种方法、从哪些测点取数、怎么算都由程序完成，
+数字全部由程序算好；没有适用方法时返回 `status=no_method`，模型如实说明算不了，不会估算。
+
+```
+calculations/
+  base.py               CalcMethod / CalcSource / CalcContext 与注册表 register()
+  __init__.py           入口 calculate_quantity：解析对象（含"X速度"→核心词）、按 detect 挑方法、分发、无方法兜底
+  level_consumption.py  方法 1：液位差消耗量 / 加料速率
+```
+
+已实现的方法：
+
+| key | 适用对象（只看本体结构） | 算法 |
+| --- | --- | --- |
+| `level_consumption` | 液位量本身；或本体写明由液位差算出的量（存在"某液位 →负向影响→ 它"，且描述 / 机理里提到液位） | 只累计下降段为消耗 / 加出量，上升段视为补液单独统计；死区过滤仪表抖动；给出合计、逐表、平均与近期速率；默认最近 60 分钟 |
+
+**新增一种计算方法**（入口工具、提示词、分发逻辑都不用改）：
+
+1. 在 `calculations/` 下新建模块，实现两个 async 函数：
+   - `detect(api, entity, detail) -> CalcSource | None`：只看本体结构（名称、描述、关系）判断这个对象能不能用本方法算，
+     能算就返回从哪个对象取数（`source`）、被求的派生量（`derived`）和本体依据（`basis`）；
+   - `run(ctx: CalcContext) -> dict`：取数计算，返回结构化结果，必须带 `conclusion`（结论里的数字由程序算好）和 `method`（计算口径），
+     用到模拟数据时在结论里声明。
+2. 模块末尾 `register(CalcMethod(key=..., title=..., summary=..., detect=detect, run=run))`；
+   `summary` 一句话说明能算什么，会自动拼进工具描述，模型据此判断。
+3. 在 `calculations/__init__.py` 的 import 行和 `_METHOD_MODULES` 里加上新模块。
+4. 判定口径（死区、默认时间窗、阈值等）写成模块级常量；在 `tests/test_calculations.py` 补单元测试与真实本体用例。
+
+```bash
+ONTOLOGY_BASE_URL=http://localhost:8700 python3 -m tests.test_calculations
+```
 
 ## 9.2 换本地模型（千问 32B 等）
 

@@ -40,6 +40,7 @@ ID_PROVIDERS: dict[str, tuple[str, dict, str | dict[str, str]]] = {
     "map_causal_neighborhood": ("query_relations", {"category": "影响关系", "limit": 1}, "items.0.object.id"),
     "describe_equipment_links": ("query_equipment_list", {"keyword": "水解罐A", "limit": 1}, "items.0.id"),
     "analyze_switch_signals": ("query_equipment_list", {"keyword": "一层排渣泵", "limit": 1}, "items.0.id"),
+    "calculate_quantity": ("query_relation_entities", {"keyword": "液位", "type": "工艺属性", "matched": True, "limit": 1}, "items.0.id"),
 }
 
 EXTRA_ARGS: dict[str, dict] = {
