@@ -20,6 +20,7 @@ from backend.ontology.models import (
     ONTOLOGY_CATEGORIES,
     SOURCE_CAPABILITY,
     SOURCE_DCS,
+    SOURCE_INSTANCE_LINK,
     SOURCE_MAPPING,
     SOURCE_PROCEDURE,
     SOURCE_RELATION,
@@ -29,6 +30,7 @@ from backend.ontology.models import (
 from backend.services import object_matcher
 from backend.services.capability_loader import CAPABILITY_FILE_NAME, load_capabilities
 from backend.services.procedure_model import PROCEDURE_FILE_NAME, load_procedures
+from backend.services import instance_links as _instance_links
 from backend.services.data_quality import build_quality_report
 from backend.services.dcs_loader import load_dcs
 from backend.services.mapping_loader import load_mapping
@@ -45,6 +47,7 @@ RULE_FILE = SOURCE_DIR / "6APA_规则.xlsx"
 MERGE_FILE = SOURCE_DIR / "6APA_设备归并.xlsx"
 CAPABILITY_FILE = SOURCE_DIR / CAPABILITY_FILE_NAME
 PROCEDURE_FILE = SOURCE_DIR / PROCEDURE_FILE_NAME
+LINK_FILE = SOURCE_DIR / _instance_links.LINK_FILE_NAME
 
 
 class OntologyStore:
@@ -62,6 +65,8 @@ class OntologyStore:
         self.quality = build_quality_report(self.dcs, self.relations, self.mapping, self.rules, self.matches)
         # 报警处置规程要把卡片里的名称对应到本体对象，放在对象与关系都就绪之后加载
         self.procedures = load_procedures(base / PROCEDURE_FILE.name, self)
+        # 组间拓扑按连接方式落到实例（类 / 设备组 / 实例 三层分开）
+        self.instance_links = _instance_links.build(self, base / LINK_FILE.name)
 
     # ------------------------------------------------------------ 组装
 
@@ -1117,6 +1122,8 @@ class OntologyStore:
                       "推理规则数据源；未提供时规则页显示空状态，不生成任何规则"),
                 block(SOURCE_CAPABILITY, CAPABILITY_FILE, self.capability_set.load_stats, self.capability_set.available,
                       "能力登记：外部系统提供的能力、调用契约与参数绑定；本体不实现能力"),
+                block(SOURCE_INSTANCE_LINK, LINK_FILE, self.instance_links.load_stats, self.instance_links.available,
+                      "实例连接：组间拓扑落到实例的连接方式（单台直连 / 按台号 / 汇管 / 指定 / 不展开）"),
                 block(SOURCE_PROCEDURE, PROCEDURE_FILE, self.procedures.load_stats, self.procedures.available,
                       "报警处置规程：处置卡的触发、可能原因、处置步骤、禁止操作，锚定到本体对象"),
             ],
@@ -1127,6 +1134,7 @@ class OntologyStore:
                 "RULE_FILE": "什么条件下可以得出什么判断",
                 "CAPABILITY_FILE": "对象能做什么、由谁提供、怎么调用",
                 "PROCEDURE_FILE": "报警后怎么判断、怎么处置、什么不能做",
+                "INSTANCE_LINK_FILE": "设备组之间的连接落到哪几台实例之间",
             },
         }
 

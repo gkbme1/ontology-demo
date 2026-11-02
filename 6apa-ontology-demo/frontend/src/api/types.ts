@@ -415,6 +415,12 @@ export interface ProfileAttribute {
 
 export interface ProfileRelation {
   role: string
+  /** 关系所在的层：归属 / 类间 / 组间 / 实例间 / 对象间 / 工段间 / 所属组（背景） */
+  layer?: string
+  /** 实例间关系由组间关系推导时的连接方式与状态 */
+  linkMode?: string
+  linkStatus?: string
+  groupRelation?: string
   category?: string
   predicate?: string
   direction?: 'in' | 'out'
@@ -577,7 +583,7 @@ export interface ProcedureCard {
 
 export interface AssetProfile {
   objectId: string
-  kind: 'equipment' | 'group' | 'entity' | 'area'
+  kind: 'equipment' | 'group' | 'entity' | 'area' | 'class'
   name: string
   header: {
     className: string
@@ -594,7 +600,7 @@ export interface AssetProfile {
   instances?: { id: string; name: string; tagCount: number; station?: string; nature?: string }[]
   splitFrom?: { id: string; name: string; owlSubject: string; groupId: string; instanceIds: string[] }
   attributes: ProfileAttribute[]
-  relations: { classRelations: ProfileRelation[]; attributeRelations: AttributeRelation[] }
+  relations: { classRelations: ProfileRelation[]; attributeRelations: AttributeRelation[]; groupRelations?: ProfileRelation[] }
   capabilities: ProfileCapability[]
   constraints: {
     structure: StructureCheck[]

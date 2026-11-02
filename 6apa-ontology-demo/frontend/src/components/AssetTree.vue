@@ -113,7 +113,7 @@ const KIND_ICON: Record<string, string> = {
 }
 /** 叶子是不是单台设备：实例不加标记，其余标出性质 */
 const NATURE_PILL: Record<string, string> = {
-  类: 'pill-info', 组公共点位: 'pill-warn', '合集·未拆分': 'pill-warn', 兜底归类: 'pill-mute'
+  类: 'pill-info', 设备组: 'pill-plain', 组公共点位: 'pill-warn', '合集·未拆分': 'pill-warn', 兜底归类: 'pill-mute'
 }
 function natureIcon(node: AssetNode) {
   if (node.kind === 'equipment' && node.nature && node.nature !== '实例') return '◌'
@@ -121,7 +121,7 @@ function natureIcon(node: AssetNode) {
 }
 
 const KIND_LABEL: Record<string, string> = {
-  equipment: '设备', group: '设备组', area: '工段', entity: '工艺对象'
+  equipment: '设备', group: '设备组', area: '工段', entity: '工艺对象', class: '类'
 }
 
 onMounted(() => load(ROOT))
@@ -200,7 +200,7 @@ onMounted(() => load(ROOT))
           ]"
         >{{ node.label }}</span>
         <span class="ml-auto flex items-center gap-1 shrink-0">
-          <span v-if="node.nature && node.nature !== '实例'" class="pill !text-[10px]" :class="NATURE_PILL[node.nature] ?? 'pill-plain'">{{ node.nature === '合集·未拆分' ? '合集' : node.nature === '组公共点位' ? '公共点位' : node.nature }}</span>
+          <span v-if="node.nature && node.nature !== '实例'" class="pill !text-[10px]" :class="NATURE_PILL[node.nature] ?? 'pill-plain'">{{ node.nature === '合集·未拆分' ? '合集' : node.nature === '组公共点位' ? '公共点位' : node.nature === '设备组' ? '组' : node.nature }}</span>
           <span v-if="node.badge" class="pill pill-plain !text-[10px]">{{ node.badge }}</span>
           <span v-if="node.count !== undefined" class="font-mono text-[10.5px] text-fg-mute tabular-nums">{{ node.count }}</span>
         </span>
@@ -208,8 +208,9 @@ onMounted(() => load(ROOT))
     </div>
 
     <div class="px-3 py-2 border-t border-line-soft text-[10.5px] text-fg-mute leading-relaxed">
-      <span class="mr-2"><span class="text-fg-mute">▣▢</span> 分类</span>
-      <span class="mr-2"><span class="text-equip">◇</span> 类（标准设备组）</span>
+      <span class="mr-2"><span class="text-fg-mute">▣</span> 大类</span>
+      <span class="mr-2"><span class="text-fg-mute">▢</span> 类（设备类型）</span>
+      <span class="mr-2"><span class="text-equip">◇</span> 设备组</span>
       <span class="mr-2"><span class="text-equip">●</span> 设备实例</span>
       <span><span class="text-equip">◌</span> 公共点位 / 合集，不是单台设备</span>
     </div>

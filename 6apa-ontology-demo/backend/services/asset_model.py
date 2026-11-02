@@ -92,6 +92,11 @@ PARAM_CATEGORY_KIND = {
 }
 ATTRIBUTE_KIND_ORDER = ["固有", "工艺属性", "测量", "状态", "控制"]
 
+def class_id(equipment_type: str) -> str:
+    """类（设备类型）的对象 ID。"""
+    return "class-" + ids._hash(["设备类型", equipment_type])
+
+
 TOPOLOGY_CATEGORIES = {"物理拓扑关系", "工段衔接"}
 CAUSAL_CATEGORIES = {"影响关系", "质量关系"}
 MEMBERSHIP_PREDICATES = {"包含实例", "包含设备"}
@@ -150,6 +155,15 @@ class AssetIndex:
             self.asset_class_of_equipment[equip["id"]] = (cls, "未入组设备", f"{basis}：{equip['name']}")
             self.ungrouped_by_class[cls].append(equip["id"])
 
+        # 类（设备类型）：类是独立的本体对象，定义属性模板与可连接的类型；设备组是它的成员集合
+        self.classes: dict[str, dict[str, Any]] = {}
+        self.class_of_type: dict[str, str] = {}
+        for (cls, etype), gids in self.groups_by_type.items():
+            cid = class_id(etype)
+            self.class_of_type[etype] = cid
+            entry = self.classes.setdefault(cid, {"id": cid, "name": etype, "assetClass": cls, "groupIds": []})
+            entry["groupIds"] += gids
+
         # 空间：工段 → 设备组 / 未入组设备
         self.ungrouped_by_area: dict[str, list[str]] = defaultdict(list)
         for equip in self.equipment.values():
@@ -203,9 +217,9 @@ class AssetIndex:
         declared = len([i for i in group.get("instances") or [] if i])
         node = self._node(f"{parent}|{gid}", group["name"], "group", count=len(group["equipmentIds"]),
                           object_id=gid, badge=group.get("areaCode"),
-                          hint=f"类 · 标准设备组（{group.get('equipmentType')}）"
+                          hint=f"设备组（一组真实设备）· 成员属于类「{group.get('equipmentType')}」"
                                + (f"，声明 {declared} 台实例" if declared else ""))
-        node["nature"] = "类"
+        node["nature"] = "设备组"
         return node
 
     def _entity_node(self, rid: str, parent: str) -> dict[str, Any]:
@@ -274,7 +288,11 @@ class AssetIndex:
             types = sorted({t for (c, t) in self.groups_by_type if c == cls})
             nodes = []
             for etype in types:
-                nodes.append(self._node(f"{node_id}|type:{etype}", etype, "type", count=self.type_count[(cls, etype)]))
+                node = self._node(f"{node_id}|type:{etype}", etype, "type", count=self.type_count[(cls, etype)],
+                                  object_id=self.class_of_type.get(etype),
+                                  hint=f"类（设备类型）· {len(self.groups_by_type[(cls, etype)])} 个设备组")
+                node["nature"] = "类"
+                nodes.append(node)
             loose = self.ungrouped_by_class.get(cls, [])
             if loose:
                 nodes.append(self._node(f"{node_id}|loose", "未入组设备", "bucket", count=len(loose),
@@ -363,6 +381,9 @@ class AssetIndex:
             cls = self.group_class(group)
             p = ["dom:assets", f"dom:assets|cls:{cls}", f"dom:assets|cls:{cls}|type:{gtype}"]
             return p + [f"{p[-1]}|{object_id}"]
+        if object_id in self.classes:
+            entry = self.classes[object_id]
+            return ["dom:assets", f"dom:assets|cls:{entry['assetClass']}", f"dom:assets|cls:{entry['assetClass']}|type:{entry['name']}"]
         if object_id.startswith("area-") and object_id in self.store.dcs.areas:
             return ["dom:space", f"dom:space|{object_id}"]
         if object_id.startswith("robj-") and object_id in self.entities:
@@ -400,6 +421,9 @@ class AssetIndex:
             if alias:
                 add(equip["id"], name, "equipment", f"点表写法「{alias['name']}」（{alias['station']} 站）已归并到此设备",
                     0 if alias["name"] == kw else 1)
+        for entry in self.classes.values():
+            if kw in entry["name"]:
+                add(entry["id"], entry["name"], "class", f"类（设备类型）· {len(entry['groupIds'])} 个设备组", 0 if entry["name"] == kw else 2)
         for group in self.groups.values():
             if kw in group["name"] or any(kw in inst for inst in group["instances"]):
                 add(group["id"], group["name"], "group", f"标准设备组 · {group.get('equipmentType')}", 0 if group["name"] == kw else 2)
@@ -787,14 +811,30 @@ def _equipment_profile(store: Any, index: AssetIndex, eid: str) -> dict[str, Any
     if group:
         class_relations.append({"role": "所属", "category": "设备分类", "predicate": "属于设备组", "direction": "in",
                                 "target": group["name"], "targetId": group["id"], "mechanism": "", "source": "DCS 点表 · 设备组"})
+        etype = group.get("equipmentType")
+        if etype:
+            class_relations.append({"role": "所属", "category": "设备分类", "predicate": "属于类", "direction": "in",
+                                    "target": etype, "targetId": index.class_of_type.get(etype), "targetType": "类（设备类型）",
+                                    "mechanism": "", "source": "DCS 点表 · 设备主数据"})
+    for view in class_relations:
+        view["layer"] = "归属"
+    # 三层分开：本台自己的关系是实例间关系；设备组的关系是组间关系，只作背景，不当成本台的关系
+    own_ids = anchor_ids - inherited
+    group_relations = []
     for view in _class_relations(relations_list, anchor_ids):
-        # 设备组"包含实例"的关系对单台设备而言是同组的兄弟实例
-        if view["role"] == "包含实例" and equip.get("nature", "实例") == "实例" \
-                and view["from"] in {a["name"] for i, a in anchors.items() if i in inherited}:
-            if view["target"] == equip["name"]:
+        rel = relations.get(view["relationId"]) or {}
+        ends = {(rel.get("subject") or {}).get("id"), (rel.get("object") or {}).get("id")}
+        if view.get("targetId") in anchor_ids:
+            continue  # 「设备组 包含实例 本台」这类两端都是本台锚点的关系，与上面的归属重复
+        if ends & own_ids:
+            view["layer"] = "归属" if view["role"] in ("所属", "包含实例") else "实例间"
+            class_relations.append(view)
+        else:
+            if view["role"] == "包含实例" and view["target"] == equip["name"]:
                 continue
-            view["role"] = "同组实例"
-        class_relations.append(view)
+            view["layer"] = "所属组"
+            group_relations.append(view)
+    class_relations += _instance_link_views(store, eid)
     attribute_relations = _attribute_relations(store, {e["id"] for e in property_entities} | _property_ids(store, anchor_ids),
                                                anchor_ids)
 
@@ -831,7 +871,8 @@ def _equipment_profile(store: Any, index: AssetIndex, eid: str) -> dict[str, Any
             "nature": equip.get("nature") or "实例",
         },
         "attributes": _sort_attributes(attrs),
-        "relations": {"classRelations": class_relations, "attributeRelations": attribute_relations},
+        "relations": {"classRelations": class_relations, "attributeRelations": attribute_relations,
+                      "groupRelations": group_relations},
         "capabilities": _capabilities(store, "equipment", eid, tags, rules, group.get("equipmentType") if group else None),
         "constraints": {
             "structure": structure,
@@ -875,7 +916,11 @@ def _group_profile(store: Any, index: AssetIndex, gid: str) -> dict[str, Any]:
         else:
             attrs.append({"kind": "工艺属性", "name": prop, "valueType": "—", "dataLinks": [], "dataLinkTotal": 0,
                           "matchStatus": "本体属性未登记为关系对象"})
-    class_relations = _class_relations(relations, anchor_ids)
+    class_relations = [{"role": "所属", "category": "设备分类", "predicate": "属于类", "direction": "in", "target": etype,
+                        "targetId": index.class_of_type.get(etype), "targetType": "类（设备类型）", "mechanism": "",
+                        "source": "DCS 点表 · 设备主数据"}] + _class_relations(relations, anchor_ids)
+    for view in class_relations:
+        view["layer"] = "归属" if view["role"] in ("所属", "包含实例") else "组间"
     instances = [store.dcs.equipment[e] for e in group["equipmentIds"] if e in store.dcs.equipment]
     tags = [store.dcs.tags[t] for t in group["tagIds"] if t in store.dcs.tags]
     limits = _limits_by_name(store, entity["id"]) if entity else []
@@ -892,11 +937,11 @@ def _group_profile(store: Any, index: AssetIndex, gid: str) -> dict[str, Any]:
         "kind": "group",
         "name": group["name"],
         "header": {
-            "className": group["name"],
+            "className": f"设备组 · {etype}",
             "classPath": ["设备", cls, etype, group["name"]],
             "code": group.get("uri"),
             "area": f"{group.get('areaCode')} {group.get('areaName')}",
-            "badges": [f"{len(instances)} 台实例", f"{group['tagCount']} 个 DCS 点", "类（标准设备组）"],
+            "badges": [f"{len(instances)} 台设备", f"{group['tagCount']} 个 DCS 点", f"属于类「{etype}」"],
             "source": group.get("source"),
         },
         "instances": [{"id": e["id"], "name": e["name"], "tagCount": e["tagCount"], "station": e.get("station"),
@@ -942,6 +987,10 @@ def _entity_profile(store: Any, index: AssetIndex, rid: str) -> dict[str, Any]:
     limits = _limits_by_name(store, rid)
     rules = store.rules_for_object(entity["name"], brief.get("areaId"))
     class_relations = _class_relations(relations, {rid})
+    # 关系对象所在的层：生产设备是设备组，设备实例是实例，其余是对象之间
+    layer = {"生产设备": "组间", "设备实例": "实例间"}.get(entity["type"], "对象间")
+    for view in class_relations:
+        view["layer"] = "归属" if view["role"] in ("所属", "包含实例") and layer != "对象间" else layer
     return {
         "objectId": rid,
         "kind": "entity",
@@ -999,6 +1048,8 @@ def _area_profile(store: Any, index: AssetIndex, aid: str) -> dict[str, Any]:
     entities = [e for e in store.relations.entities.values() if e.get("areaCode") == area["code"] and e["type"] == "工艺属性"]
     attrs += [_entity_attribute(store, e) for e in entities]
     class_relations = flow(area.get("upstream"), "上游") + flow(area.get("downstream"), "下游")
+    for view in class_relations:
+        view["layer"] = "工段间"
     class_relations += [{"role": "包含实例", "category": "空间层级", "predicate": "包含设备组", "direction": "out",
                          "target": g["name"], "targetId": g["id"], "mechanism": g.get("equipmentType") or "", "source": "DCS 点表"}
                         for g in groups]
@@ -1054,6 +1105,118 @@ def profile(store: Any, object_id: str) -> dict[str, Any]:
     return result
 
 
+def _instance_link_views(store: Any, eid: str) -> list[dict[str, Any]]:
+    """本台设备的实例间连接：由组间拓扑按连接方式推出（见 instance_links），标出连接方式与状态。"""
+    links = getattr(store, "instance_links", None)
+    out, seen = [], set()
+    for v in (links.by_equipment.get(eid, []) if links else []):
+        outgoing = v["fromId"] == eid
+        target, target_id = (v["to"], v["toId"]) if outgoing else (v["from"], v["fromId"])
+        key = (target, v["predicate"], outgoing)
+        if key in seen:
+            continue
+        seen.add(key)
+        is_equipment = bool(target_id and str(target_id).startswith("equip-"))
+        out.append({
+            "role": "下游" if outgoing else "上游", "layer": "实例间",
+            "category": v["category"], "predicate": v["predicate"], "direction": "out" if outgoing else "in",
+            "from": v["from"], "to": v["to"], "target": target, "targetId": target_id,
+            "targetType": "设备实例" if is_equipment else "物料 / 介质",
+            "mechanism": v["mechanism"], "linkMode": v["mode"], "linkStatus": v["status"],
+            "groupRelation": v["groupRelation"], "source": f"由组间关系推导（{v['relationCode']}）",
+        })
+    return out
+
+
+def _class_profile(store: Any, index: AssetIndex, cid: str) -> dict[str, Any]:
+    """类（设备类型）：属性模板、类间关系模式（由组间关系归纳）、设备组与实例。"""
+    entry = index.classes[cid]
+    etype, groups = entry["name"], [store.dcs.equipment_groups[g] for g in entry["groupIds"]]
+    gnames = {g["name"] for g in groups}
+    from backend.services.instance_links import principal_members
+
+    # 类的实例 = 各设备组的主体实例（组里挂着的附属泵、阀不算这一类的实例）
+    instances = [m for g in groups for m in principal_members(store, g)]
+
+    # 属性模板：各设备组声明的工艺属性，标出几个组声明了
+    prop_groups: dict[str, list[str]] = defaultdict(list)
+    for g in groups:
+        for prop in g.get("properties") or []:
+            prop_groups[prop].append(g["name"])
+    comps = Counter(c for g in groups for c in g.get("components") or [])
+    attrs: list[dict[str, Any]] = [
+        {"kind": "固有", "name": "类名", "valueType": "文本", "value": etype},
+        {"kind": "固有", "name": "资产大类", "valueType": "枚举", "value": entry["assetClass"]},
+        {"kind": "固有", "name": "设备组数", "valueType": "int", "value": len(groups)},
+        {"kind": "固有", "name": "实例数", "valueType": "int", "value": len(instances)},
+    ]
+    if comps:
+        attrs.append({"kind": "固有", "name": "典型部件", "valueType": "列表",
+                      "value": "、".join(f"{c}（{n}/{len(groups)}）" if len(groups) > 1 else c for c, n in comps.most_common())})
+    for prop, owners in sorted(prop_groups.items(), key=lambda kv: -len(kv[1])):
+        entity = next((e for e in index.entity_by_name.get(prop, []) if e["type"] in ("工艺属性", "质量指标", "业务指标")), None)
+        attrs.append({"kind": "工艺属性", "name": prop, "valueType": "属性模板", "entityId": entity["id"] if entity else None,
+                      "value": f"{len(owners)}/{len(groups)} 个设备组声明", "note": "、".join(owners[:3]) + ("…" if len(owners) > 3 else ""),
+                      "dataLinks": [], "dataLinkTotal": 0})
+
+    # 类间关系模式：把组间拓扑的两端换成「类」（物料保留名称），按方向 / 谓词 / 对端归纳
+    patterns: dict[tuple, dict[str, Any]] = {}
+    for row in getattr(store, "instance_links", None).rows if getattr(store, "instance_links", None) else []:
+        for side, other_name in (("subject", row["object"]), ("object", row["subject"])):
+            if row[side] not in gnames:
+                continue
+            other_group = store.dcs.equipment_groups.get(store.resolve_group_id(other_name) or "")
+            other_type = (other_group or {}).get("equipmentType")
+            target = other_type or other_name
+            target_id = index.class_of_type.get(other_type) if other_type else \
+                next((e["id"] for e in index.entity_by_name.get(other_name, [])), None)
+            outgoing = side == "subject"
+            key = (outgoing, row["predicate"], target)
+            p = patterns.setdefault(key, {
+                "role": "下游" if outgoing else "上游", "layer": "类间", "category": row["category"],
+                "predicate": row["predicate"], "direction": "out" if outgoing else "in",
+                "from": etype if outgoing else target, "to": target if outgoing else etype,
+                "target": target, "targetId": target_id,
+                "targetType": "类（设备类型）" if other_type else "物料 / 介质", "examples": [], "source": "由组间关系归纳",
+            })
+            p["examples"].append(f"{row['subject']} {row['predicate']} {row['object']}")
+    class_relations = []
+    for p in patterns.values():
+        n = len(p["examples"])
+        p["mechanism"] = f"由 {n} 条组间关系归纳：" + "；".join(p["examples"][:2]) + ("…" if n > 2 else "")
+        p.pop("examples")
+        class_relations.append(p)
+    class_relations.sort(key=lambda r: (r["role"], r["target"]))
+
+    return {
+        "objectId": cid,
+        "kind": "class",
+        "name": etype,
+        "header": {
+            "className": "类（设备类型）",
+            "classPath": ["设备", entry["assetClass"], etype],
+            "code": cid,
+            "area": "、".join(sorted({f"{g.get('areaCode')}" for g in groups if g.get("areaCode")})) or None,
+            "badges": [f"{len(groups)} 个设备组", f"{len(instances)} 台实例", f"{len(prop_groups)} 个属性模板"],
+            "source": {"file": "6APA_DCS.xlsx", "sheet": "设备主数据", "field": "设备类型"},
+        },
+        "instances": [{"id": g["id"], "name": g["name"], "tagCount": g["tagCount"], "station": g.get("areaCode"), "nature": "设备组"}
+                      for g in sorted(groups, key=lambda g: g.get("areaCode") or "")]
+                     + [{"id": e["id"], "name": e["name"], "tagCount": e["tagCount"], "station": e.get("station"), "nature": "实例"}
+                        for e in sorted(instances, key=lambda e: e["name"])],
+        "attributes": _sort_attributes(attrs),
+        "relations": {"classRelations": class_relations, "attributeRelations": []},
+        "capabilities": [],
+        "constraints": {"structure": _structure_checks([
+            ("类下的设备组都声明了设备类型", True, f"{len(groups)} 个设备组"),
+            ("类下有实例", bool(instances), f"{len(instances)} 台"),
+        ]), "operating": [], "safety": []},
+        "rules": [],
+        "treePath": index.path_of(cid),
+        "graphEntityId": None,
+    }
+
+
 def _procedures_for(store: Any, result: dict[str, Any]) -> list[dict[str, Any]]:
     """与本对象相关的报警处置卡：触发位号落在本对象上（触发），或卡片提到了本对象（相关）。"""
     from backend.services.procedure_model import cards_for
@@ -1087,6 +1250,8 @@ def _profile(store: Any, object_id: str) -> dict[str, Any]:
             result = _equipment_profile(store, index, tag["equipmentId"])
             result["focusTag"] = tag["name"]
             return result
+    if oid in index.classes:
+        return _class_profile(store, index, oid)
     if oid in store.dcs.equipment_splits:
         # 整台拆回实例的原合集：转到所属设备组（类），由类列出拆出的实例
         result = _group_profile(store, index, store.dcs.equipment_splits[oid]["groupId"])

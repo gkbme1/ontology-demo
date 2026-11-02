@@ -5,7 +5,7 @@
 1. 拆分表：只拆名字是实例通名的合集，台号覆盖全部实例才拆，误拆样例不出现；
 2. 加载：滤液泵 拆成 滤液泵A～F 各 5 个点，参数名去掉台号；拆不开的点留作「…·公共点位」；
 3. 兼容：原合集的旧 ID 打开档案转到所属设备组，旧参数 ID 转到拆出的参数，按旧名称能查到拆出的实例；
-4. 导航树：设备组标「类」，叶子标出性质，实例在前；工业关系里的「滤液泵A」能匹配到 DCS 实例。
+4. 导航树：设备类型是「类」，设备组标「设备组」，叶子标出性质，实例在前；工业关系里的「滤液泵A」能匹配到 DCS 实例。
 """
 from __future__ import annotations
 
@@ -71,7 +71,9 @@ def main() -> int:
     index = am.asset_index(store)
     path = index.path_of(pump_a["id"])
     group_node = next(n for n in am.tree(store, path[-3])["items"] if n["id"] == path[-2])
-    check(group_node["nature"] == "类" and "类" in group_node["hint"], "设备组节点标为「类」")
+    check(group_node["nature"] == "设备组" and "成员属于类" in group_node["hint"], "设备组节点标为「设备组」，说明成员属于哪个类")
+    type_node = next(n for n in am.tree(store, path[-4])["items"] if n["id"] == path[-3])
+    check(type_node["nature"] == "类" and type_node["objectId"].startswith("class-"), "设备类型节点是「类」，可打开类档案")
     leaves = am.tree(store, path[-2])["items"]
     check(all(n["nature"] == "实例" for n in leaves), "滤液泵组下的叶子都是实例")
     shared = residual[0]

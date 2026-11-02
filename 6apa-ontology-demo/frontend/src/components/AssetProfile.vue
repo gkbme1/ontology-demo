@@ -23,7 +23,10 @@ const tabs = computed(() => {
   const list: { key: TabKey; count: number; hint: string }[] = [
     { key: '属性', count: p.attributes.length, hint: '固有属性、工艺属性与测量 / 状态 / 控制参数；数据关联（DCS 位号）直接体现在属性里' },
     { key: '关系', count: p.relations.classRelations.length + p.relations.attributeRelations.length,
-      hint: '类间关系（所属、上下游、部件、实例、控制、报警联锁）与属性间关系（计算 / 传递 / 关联）' },
+      hint: p.kind === 'class' ? '类间关系：这一类设备通常与哪些类、物料相连（由组间关系归纳的模式）'
+        : p.kind === 'group' ? '设备组层面的关系（组间）与归属；落到具体设备的连接见各实例'
+          : p.kind === 'equipment' ? '本台设备的归属与实例间关系；由组间关系推导的标出连接方式，所属设备组的关系作背景另列'
+            : '对象的关系与属性间关系（计算 / 传递 / 关联）' },
     { key: '能力', count: p.capabilities.length, hint: '能力由外部系统实现；本体登记能力描述与调用契约，并在本对象上绑定参数（6APA_能力.xlsx）' },
     { key: '约束', count: p.constraints.structure.length + p.constraints.operating.length + p.constraints.safety.length,
       hint: '约束属于本体：结构约束（加载器校验）、运行约束（工艺限值，可按当前值校验）、安全约束（报警联锁）' },
@@ -31,7 +34,11 @@ const tabs = computed(() => {
     { key: '处置', count: p.procedures?.length ?? 0,
       hint: '报警处置卡：触发、可能原因与验证方法、处置步骤、禁止操作；规程里的位号与对象已对应到本体（6APA_处置规程.xlsx）' },
   ]
-  if (p.instances?.length) list.push({ key: '实例', count: p.instances.length, hint: '本类（标准设备组）下的设备实例，以及整组共用的公共点位 / 未拆分合集' })
+  if (p.instances?.length) {
+    list.push({ key: '实例', count: p.instances.length, hint: p.kind === 'class'
+      ? '属于本类的设备组与设备实例（实例取各设备组的主体实例）'
+      : '本设备组的成员：设备实例，以及整组共用的公共点位 / 未拆分合集' })
+  }
   return list
 })
 const tab = computed<TabKey>(() => {
@@ -59,7 +66,7 @@ const notice = computed(() => {
 
 // ---------------------------------------------------------------- 关系页：类间 + 属性间统一成一张表，可多选筛选
 interface RelRow {
-  key: string; layer: '类间' | '属性间'; cat: string; label: string
+  key: string; layer: string; cat: string; label: string; linkMode?: string; linkStatus?: string
   from: string; fromId?: string | null; predicate: string; to: string; toId?: string | null
   mechanism: string; via?: string | null; kind?: string
 }
@@ -73,22 +80,31 @@ const CAT_STYLE: Record<string, string> = {
 }
 const relRows = computed<RelRow[]>(() => {
   const p = props.profile
-  const rows: RelRow[] = p.relations.classRelations.map((r, i) => {
+  const toRow = (r: (typeof p.relations.classRelations)[number], i: number, prefix: string, layer?: string): RelRow => {
     const out = r.direction !== 'in'
     return {
-      key: `c${i}`, layer: '类间', cat: CAT_OF[r.category ?? ''] ?? '结构', label: r.role,
+      key: `${prefix}${i}`, layer: layer ?? r.layer ?? '类间', cat: CAT_OF[r.category ?? ''] ?? '结构', label: r.role,
       from: r.from ?? (out ? p.name : r.target), fromId: out ? null : r.targetId,
       predicate: r.predicate ?? r.role, to: r.to ?? (out ? r.target : p.name), toId: out ? r.targetId : null,
-      mechanism: r.mechanism
+      mechanism: r.mechanism, linkMode: r.linkMode, linkStatus: r.linkStatus
     }
-  })
+  }
+  const rows: RelRow[] = p.relations.classRelations.map((r, i) => toRow(r, i, 'c'))
+  ;(p.relations.groupRelations ?? []).forEach((r, i) => rows.push(toRow(r, i, 'g', '所属组')))
   p.relations.attributeRelations.forEach((r, i) => rows.push({
     key: `a${i}`, layer: '属性间', cat: CAT_OF[r.category ?? ''] ?? '影响', label: r.kind,
     from: r.from, fromId: r.fromId, predicate: r.predicate, to: r.to, toId: r.toId, mechanism: r.mechanism, via: r.via, kind: r.kind
   }))
   return rows
 })
-const relLayers = ref<Set<string>>(new Set(['类间', '属性间']))
+// 关系分层：归属 / 类间 / 组间 / 实例间 / 对象间 / 工段间 / 属性间；所属设备组的关系只作背景，默认不选
+const LAYER_ORDER = ['归属', '类间', '组间', '实例间', '对象间', '工段间', '属性间', '所属组']
+const LAYER_LABEL: Record<string, string> = {
+  归属: '归属', 类间: '类间关系', 组间: '组间关系', 实例间: '实例间关系', 对象间: '对象间关系', 工段间: '工段间',
+  属性间: '属性间关系', 所属组: '所属设备组的关系（背景）'
+}
+const relLayers = ref<Set<string>>(new Set(LAYER_ORDER.filter((l) => l !== '所属组')))
+const layersPresent = computed(() => LAYER_ORDER.filter((l) => relRows.value.some((r) => r.layer === l)))
 const relCats = ref<Set<string>>(new Set(CAT_ORDER))
 const relKeyword = ref('')
 function toggled(set: Set<string>, key: string) {
@@ -117,7 +133,7 @@ const filteredRel = computed(() => {
     && (!kw || [r.from, r.to, r.predicate, r.mechanism, r.via ?? ''].some((t) => t?.includes(kw))))
 })
 const hubRelations = computed(() => props.profile.relations.classRelations.filter(
-  (r) => relLayers.value.has('类间') && relCats.value.has(CAT_OF[r.category ?? ''] ?? '结构')))
+  (r) => relLayers.value.has(r.layer ?? '类间') && relCats.value.has(CAT_OF[r.category ?? ''] ?? '结构')))
 function openGraph() {
   if (props.profile.graphEntityId) router.push(`/graph/${props.profile.graphEntityId}`)
 }
@@ -218,7 +234,7 @@ function alarmText(alarm: Record<string, number>) {
 }
 
 const KIND_TITLE: Record<string, string> = {
-  equipment: '设备实例', group: '类 · 标准设备组', entity: '工艺对象', area: '工段'
+  equipment: '设备实例', group: '设备组', entity: '工艺对象', area: '工段', class: '类 · 设备类型'
 }
 </script>
 
@@ -322,8 +338,8 @@ const KIND_TITLE: Record<string, string> = {
         <div class="flex flex-wrap items-center gap-x-3 gap-y-2 text-[12px]">
           <span class="text-fg-mute">层面</span>
           <div class="flex gap-1">
-            <button v-for="l in ['类间', '属性间']" :key="l" class="ctl !py-0.5 !px-2" :class="{ 'ctl-on': relLayers.has(l) }" @click="toggleLayer(l)">
-              {{ l === '类间' ? '类间关系' : '属性间关系' }}<span class="font-mono text-fg-mute">{{ layerCounts[l] ?? 0 }}</span></button>
+            <button v-for="l in layersPresent" :key="l" class="ctl !py-0.5 !px-2" :class="{ 'ctl-on': relLayers.has(l) }" @click="toggleLayer(l)">
+              {{ LAYER_LABEL[l] ?? l }}<span class="font-mono text-fg-mute">{{ layerCounts[l] ?? 0 }}</span></button>
           </div>
           <span class="text-fg-mute ml-2">类别</span>
           <div class="flex flex-wrap gap-1">
@@ -341,7 +357,7 @@ const KIND_TITLE: Record<string, string> = {
 
         <div class="grid gap-4" :class="hubRelations.length ? 'xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]' : ''">
           <div v-if="hubRelations.length">
-            <div class="text-fg-mute text-[11px] mb-1">类间关系示意 · {{ hubRelations.length }} 条</div>
+            <div class="text-fg-mute text-[11px] mb-1">关系示意 · {{ hubRelations.length }} 条</div>
             <ClassRelationHub
               :name="profile.name" :class-name="profile.header.className"
               :relations="hubRelations"
@@ -364,6 +380,10 @@ const KIND_TITLE: Record<string, string> = {
                       <span class="text-fg-mute mx-1">—{{ r.predicate }}→</span>
                       <span :class="r.toId ? 'cursor-pointer text-fg hover:text-brand' : 'text-fg'" @click="r.toId && emit('open', r.toId)">{{ r.to }}</span>
                       <div v-if="r.via" class="text-fg-mute text-[11px]">经本对象属性「{{ r.via }}」</div>
+                      <div v-if="r.linkMode" class="mt-0.5 flex flex-wrap gap-1">
+                        <span class="pill pill-plain !text-[10px]">{{ r.linkMode }}</span>
+                        <span class="pill !text-[10px]" :class="r.linkStatus === '推导' ? 'pill-info' : 'pill-warn'">{{ r.linkStatus }}</span>
+                      </div>
                     </td>
                     <td class="text-fg-dim text-[12px]">{{ r.mechanism || '—' }}</td>
                   </tr>
@@ -528,9 +548,11 @@ const KIND_TITLE: Record<string, string> = {
 
       <!-- 实例（设备组） -->
       <div v-else-if="tab === '实例' && profile.instances" class="p-4">
-        <div class="text-fg-mute text-[11px] mb-2">{{ profile.instances.filter((i) => !i.nature || i.nature === '实例').length }} 台实例<template v-if="profile.instances.some((i) => i.nature && i.nature !== '实例')"> + 公共点位 / 合集</template></div>
+        <div class="text-fg-mute text-[11px] mb-2">
+          <template v-if="profile.instances.some((i) => i.nature === '设备组')">{{ profile.instances.filter((i) => i.nature === '设备组').length }} 个设备组、</template>{{ profile.instances.filter((i) => !i.nature || i.nature === '实例').length }} 台实例<template v-if="profile.instances.some((i) => i.nature && !['实例', '设备组'].includes(i.nature))"> + 公共点位 / 合集</template>
+        </div>
         <div class="flex flex-wrap gap-1.5">
-          <button v-for="i in profile.instances" :key="i.id" class="ctl" :class="i.nature && i.nature !== '实例' ? 'italic border-dashed' : ''" @click="emit('open', i.id)">
+          <button v-for="i in profile.instances" :key="i.id" class="ctl" :class="i.nature && !['实例', '设备组'].includes(i.nature) ? 'italic border-dashed' : ''" @click="emit('open', i.id)">
             {{ i.name }}<span class="text-fg-mute font-mono text-[10.5px]">{{ i.tagCount }}点<template v-if="i.nature && i.nature !== '实例'"> · {{ i.nature }}</template></span>
           </button>
         </div>
