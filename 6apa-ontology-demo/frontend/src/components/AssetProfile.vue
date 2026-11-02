@@ -1,15 +1,48 @@
 <script setup lang="ts">
 /**
- * 对象本体档案：类与层级 / 属性（数据关联直接体现在属性里）/ 能力挂载 / 约束 / 规则 / 类间关系 / 属性间关系。
+ * 对象本体档案：头部是类与层级，下面按页签分为 属性 / 关系 / 能力 / 约束 / 规则（设备组另有 实例）。
  * 全部数据来自 /api/ontology/asset-profile/{id}，组件不内置任何设备、点位或关系。
+ * 当前页签记在地址栏 ?tab=，切换对象时保持不变。
  */
 import { computed, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/api/client'
 import type { AssetProfile, LimitCheckResult, ProfileAttribute } from '@/api/types'
 import ClassRelationHub from './ClassRelationHub.vue'
 
 const props = defineProps<{ profile: AssetProfile }>()
 const emit = defineEmits<{ open: [objectId: string] }>()
+
+// ---------------------------------------------------------------- 页签
+type TabKey = '属性' | '关系' | '能力' | '约束' | '规则' | '实例'
+const route = useRoute()
+const router = useRouter()
+const tabs = computed(() => {
+  const p = props.profile
+  const list: { key: TabKey; count: number; hint: string }[] = [
+    { key: '属性', count: p.attributes.length, hint: '固有属性、工艺属性与测量 / 状态 / 控制参数；数据关联（DCS 位号）直接体现在属性里' },
+    { key: '关系', count: p.relations.classRelations.length + p.relations.attributeRelations.length,
+      hint: '类间关系（所属、上下游、部件、实例、控制、报警联锁）与属性间关系（计算 / 传递 / 关联）' },
+    { key: '能力', count: p.capabilities.length, hint: '能力由外部系统实现；本体登记能力描述与调用契约，并在本对象上绑定参数（6APA_能力.xlsx）' },
+    { key: '约束', count: p.constraints.structure.length + p.constraints.operating.length + p.constraints.safety.length,
+      hint: '约束属于本体：结构约束（加载器校验）、运行约束（工艺限值，可按当前值校验）、安全约束（报警联锁）' },
+    { key: '规则', count: p.rules.length, hint: '适用于本对象的推理规则；规则在推理引擎中定义与执行（6APA_规则.xlsx）' },
+  ]
+  if (p.instances?.length) list.push({ key: '实例', count: p.instances.length, hint: '本类（标准设备组）下的设备实例，以及整组共用的公共点位 / 未拆分合集' })
+  return list
+})
+const tab = computed<TabKey>(() => {
+  const want = route.query.tab as TabKey | undefined
+  return tabs.value.some((t) => t.key === want) ? (want as TabKey) : '属性'
+})
+const activeTab = computed(() => tabs.value.find((t) => t.key === tab.value)!)
+function setTab(key: TabKey) {
+  router.replace({ query: { ...route.query, tab: key === '属性' ? undefined : key } })
+}
+const structureIssues = computed(() => props.profile.constraints.structure.filter((c) => !c.satisfied).length)
+
+const RULE_FILTERS = ['全部', '专属 / 同工段', '通用层'] as const
+const ruleFilter = ref<(typeof RULE_FILTERS)[number]>('全部')
 
 const KINDS = ['全部', '固有', '工艺属性', '测量', '状态', '控制'] as const
 const kindFilter = ref<(typeof KINDS)[number]>('全部')
@@ -38,7 +71,7 @@ watch(() => props.profile.objectId, () => {
   checkResult.value = null
   checkError.value = null
   kindFilter.value = '全部'
-  showAllRules.value = false
+  ruleFilter.value = '全部'
   showAllRelations.value = false
 })
 
@@ -71,16 +104,16 @@ const ATTR_REL_STYLE: Record<string, string> = {
 
 const showAllRelations = ref(false)
 const relationRows = computed(() =>
-  showAllRelations.value ? props.profile.relations.classRelations : props.profile.relations.classRelations.slice(0, 12)
+  showAllRelations.value ? props.profile.relations.classRelations : props.profile.relations.classRelations.slice(0, 20)
 )
 
-const showAllRules = ref(false)
 const specificRules = computed(() => props.profile.rules.filter((r) => r.matchedBy !== '通用层规则（未限定工段）'))
 const genericRules = computed(() => props.profile.rules.filter((r) => r.matchedBy === '通用层规则（未限定工段）'))
-const ruleRows = computed(() => {
-  const all = [...specificRules.value, ...genericRules.value]
-  return showAllRules.value ? all : all.slice(0, 6)
-})
+const ruleRows = computed(() =>
+  ruleFilter.value === '专属 / 同工段' ? specificRules.value
+    : ruleFilter.value === '通用层' ? genericRules.value
+      : [...specificRules.value, ...genericRules.value]
+)
 
 const attrRelGroups = computed(() => {
   const groups: Record<string, typeof props.profile.relations.attributeRelations> = {}
@@ -142,23 +175,30 @@ const KIND_TITLE: Record<string, string> = {
       </div>
     </section>
 
-    <div class="grid gap-4 2xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-      <!-- 左列：属性 / 能力 / 约束 / 规则 -->
-      <div class="space-y-4 min-w-0">
-        <section class="panel">
-          <div class="panel-head">
-            <h3>属性</h3>
-            <span class="text-fg-mute text-[11.5px]">数据关联直接体现在属性里</span>
-            <div class="ml-auto flex flex-wrap gap-1">
-              <button
-                v-for="k in KINDS" :key="k" class="ctl !py-0.5 !px-2"
-                :class="{ 'ctl-on': kindFilter === k }"
-                :disabled="k !== '全部' && !kindCounts[k]"
-                @click="kindFilter = k"
-              >{{ k }}<span class="font-mono text-fg-mute">{{ k === '全部' ? profile.attributes.length : (kindCounts[k] ?? 0) }}</span></button>
-            </div>
-          </div>
-          <div class="max-h-[520px] overflow-auto">
+    <!-- 页签 -->
+    <section class="panel">
+      <div class="flex items-end gap-1 px-3 pt-2 border-b border-line bg-ink-panel2/70 overflow-x-auto">
+        <button
+          v-for="t in tabs" :key="t.key"
+          class="px-4 py-2 -mb-px text-[13px] whitespace-nowrap border-b-2 transition-colors"
+          :class="tab === t.key ? 'border-brand text-fg font-semibold' : 'border-transparent text-fg-dim hover:text-fg'"
+          @click="setTab(t.key)"
+        >{{ t.key }}<span class="ml-1.5 font-mono text-[11px] text-fg-mute">{{ t.count }}</span><span
+          v-if="t.key === '约束' && structureIssues" class="ml-1 text-warn text-[11px]">!{{ structureIssues }}</span></button>
+      </div>
+      <div class="px-4 py-2 text-[11.5px] text-fg-mute border-b border-line-soft">{{ activeTab.hint }}</div>
+
+      <!-- 属性 -->
+      <div v-if="tab === '属性'">
+        <div class="flex flex-wrap gap-1 px-4 py-2">
+          <button
+            v-for="k in KINDS" :key="k" class="ctl !py-0.5 !px-2"
+            :class="{ 'ctl-on': kindFilter === k }"
+            :disabled="k !== '全部' && !kindCounts[k]"
+            @click="kindFilter = k"
+          >{{ k }}<span class="font-mono text-fg-mute">{{ k === '全部' ? profile.attributes.length : (kindCounts[k] ?? 0) }}</span></button>
+        </div>
+        <div class="overflow-x-auto">
             <table class="tbl">
               <thead><tr><th class="w-[84px]">类别</th><th>属性</th><th class="w-[132px]">类型 · 单位</th><th>值 / 数据关联</th></tr></thead>
               <tbody>
@@ -194,17 +234,57 @@ const KIND_TITLE: Record<string, string> = {
                 </tr>
               </tbody>
             </table>
-          </div>
-        </section>
+        </div>
+      </div>
 
-        <section class="panel">
-          <div class="panel-head">
-            <h3>能力挂载</h3>
-            <span class="text-fg-mute text-[11.5px]">能力由外部系统实现；本体登记能力描述、调用契约，并在本对象上绑定参数</span>
-            <span class="ml-auto font-mono text-fg-mute text-[11px]">6APA_能力.xlsx</span>
+      <!-- 关系 -->
+      <div v-else-if="tab === '关系'" class="p-4 space-y-4">
+        <div v-if="!profile.relations.classRelations.length" class="empty">本体中没有登记该对象的类间关系</div>
+        <div v-else class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <div>
+            <div class="text-fg-mute text-[11px] mb-1">类间关系 · {{ profile.relations.classRelations.length }} 条</div>
+            <ClassRelationHub
+              :name="profile.name" :class-name="profile.header.className"
+              :relations="profile.relations.classRelations"
+              @open="emit('open', $event)"
+            />
           </div>
+          <div class="min-w-0">
+            <table class="tbl">
+              <thead><tr><th class="w-[72px]">关系</th><th>对象</th><th>说明</th></tr></thead>
+              <tbody>
+                <tr v-for="r in relationRows" :key="r.role + r.target + r.predicate" @click="r.targetId && emit('open', r.targetId)">
+                  <td class="text-fg-dim whitespace-nowrap">{{ r.role }}</td>
+                  <td :class="r.targetId ? 'text-fg hover:text-brand' : 'text-fg-dim'">{{ r.target }}
+                    <div class="text-fg-mute text-[11px]">{{ r.predicate }}<span v-if="r.targetType"> · {{ r.targetType }}</span></div></td>
+                  <td class="text-fg-dim text-[12px]">{{ r.mechanism || '—' }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <button v-if="profile.relations.classRelations.length > 20" class="ctl mt-2" @click="showAllRelations = !showAllRelations">
+              {{ showAllRelations ? '收起' : `展开全部 ${profile.relations.classRelations.length} 条` }}
+            </button>
+          </div>
+        </div>
+        <div>
+          <div class="text-fg-mute text-[11px] mb-1">属性间关系 · {{ profile.relations.attributeRelations.length }} 条</div>
+          <div v-if="!profile.relations.attributeRelations.length" class="text-fg-mute text-[12.5px]">本体中没有登记涉及该对象属性的因果关系</div>
+          <div class="grid gap-3 lg:grid-cols-3 text-[12.5px]">
+            <div v-for="(list, kind) in attrRelGroups" :key="kind" class="rounded border border-line-soft bg-ink-panel2/40 px-3 py-2">
+              <div class="font-semibold mb-1" :class="ATTR_REL_STYLE[kind] ?? 'text-fg'">{{ kind }} <span class="font-mono text-fg-mute text-[11px]">{{ list.length }}</span></div>
+              <div v-for="r in list" :key="r.from + r.to + r.predicate" class="py-0.5">
+                {{ r.from }} <span class="text-fg-mute">→{{ r.predicate }}→</span> {{ r.to }}
+                <div v-if="r.mechanism" class="text-fg-mute text-[11.5px]">{{ r.mechanism }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 能力 -->
+      <div v-else-if="tab === '能力'" class="grid xl:grid-cols-2 xl:divide-x divide-line-soft">
           <div v-if="!profile.capabilities.length" class="empty">能力登记表中没有适用于本对象的能力</div>
-          <div v-for="c in profile.capabilities" :key="c.id" class="px-4 py-3 border-b border-line-soft last:border-0">
+          <div v-for="c in profile.capabilities" :key="c.id" class="px-4 py-3 border-b border-line-soft">
             <div class="flex flex-wrap items-center gap-2">
               <span class="font-semibold text-[13px]">{{ c.name }}</span>
               <span class="pill pill-plain">{{ c.type }}</span>
@@ -250,20 +330,19 @@ const KIND_TITLE: Record<string, string> = {
             </table>
             <div v-if="c.note" class="text-fg-mute text-[11px] mt-1">{{ c.note }}</div>
           </div>
-        </section>
+      </div>
 
-        <div class="grid gap-4 xl:grid-cols-2">
-          <section class="panel border-info/40">
-            <div class="panel-head"><h3>约束</h3><span class="text-fg-mute text-[11.5px]">属于本体</span></div>
-            <div class="panel-body space-y-3 text-[12.5px]">
-              <div v-if="profile.constraints.structure.length">
-                <div class="text-fg-mute text-[11px] mb-1">结构约束（加载器校验）</div>
-                <div v-for="c in profile.constraints.structure" :key="c.text" class="flex gap-2 py-0.5">
-                  <span :class="c.satisfied ? 'text-ok' : 'text-warn'">{{ c.satisfied ? '✓' : '!' }}</span>
-                  <span>{{ c.text }}<span class="text-fg-mute"> · {{ c.detail }}</span></span>
-                </div>
-              </div>
-              <div>
+      <!-- 约束 -->
+      <div v-else-if="tab === '约束'" class="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)] text-[12.5px]">
+        <div>
+          <div class="text-fg-mute text-[11px] mb-1">结构约束（加载器校验）</div>
+          <div v-if="!profile.constraints.structure.length" class="text-fg-mute">无</div>
+          <div v-for="c in profile.constraints.structure" :key="c.text" class="flex gap-2 py-0.5">
+            <span :class="c.satisfied ? 'text-ok' : 'text-warn'">{{ c.satisfied ? '✓' : '!' }}</span>
+            <span>{{ c.text }}<span class="text-fg-mute"> · {{ c.detail }}</span></span>
+          </div>
+        </div>
+        <div>
                 <div class="flex items-center gap-2 mb-1">
                   <span class="text-fg-mute text-[11px]">运行约束（工艺限值）</span>
                   <button
@@ -298,96 +377,45 @@ const KIND_TITLE: Record<string, string> = {
                     <span v-if="l.operatingMode" class="text-fg-mute"> · {{ l.operatingMode }}</span>
                   </div>
                 </div>
-              </div>
-              <div v-if="profile.constraints.safety.length">
-                <div class="text-fg-mute text-[11px] mb-1">安全约束（报警联锁）</div>
-                <div v-for="s in profile.constraints.safety" :key="s.text" class="py-0.5">{{ s.text }}<span class="text-fg-mute"> · {{ s.mechanism }}</span></div>
-              </div>
-            </div>
-          </section>
-
-          <section class="panel border-equip/40">
-            <div class="panel-head"><h3>规则</h3><span class="text-fg-mute text-[11.5px]">在推理引擎中定义与执行</span>
-              <span class="ml-auto font-mono text-fg-mute text-[11px]">{{ specificRules.length }} 专属/同工段 · {{ genericRules.length }} 通用层</span></div>
-            <div class="panel-body text-[12.5px]">
-              <div v-if="!profile.rules.length" class="text-fg-mute">暂无适用规则</div>
-              <div v-for="r in ruleRows" :key="r.id" class="py-1.5 border-b border-line-soft last:border-0">
-                <div class="flex items-center gap-1.5">
-                  <span class="font-mono text-equip">{{ r.id }}</span>
-                  <span class="truncate">{{ r.name }}</span>
-                  <span v-if="r.draft" class="pill pill-warn">草案</span>
-                  <span class="ml-auto text-fg-mute text-[11px] shrink-0">{{ r.matchedBy }}</span>
-                </div>
-                <div v-if="r.condition" class="text-fg-dim text-[12px]">{{ r.condition }} <span class="text-fg-mute">→</span> {{ r.conclusion }}</div>
-              </div>
-              <button v-if="profile.rules.length > 6" class="ctl mt-2" @click="showAllRules = !showAllRules">
-                {{ showAllRules ? '收起' : `展开全部 ${profile.rules.length} 条` }}
-              </button>
-            </div>
-          </section>
+        </div>
+        <div>
+          <div class="text-fg-mute text-[11px] mb-1">安全约束（报警联锁）</div>
+          <div v-if="!profile.constraints.safety.length" class="text-fg-mute">本体中没有登记涉及本对象的报警联锁</div>
+          <div v-for="s in profile.constraints.safety" :key="s.text" class="py-0.5">{{ s.text }}<span class="text-fg-mute"> · {{ s.mechanism }}</span></div>
         </div>
       </div>
 
-      <!-- 右列：类间关系 / 属性间关系 / 实例 -->
-      <div class="space-y-4 min-w-0">
-        <section class="panel">
-          <div class="panel-head"><h3>类间关系</h3><span class="text-fg-mute text-[11.5px]">拓扑、所属、部件、控制、报警联锁</span>
-            <span class="ml-auto font-mono text-fg-mute text-[11px]">{{ profile.relations.classRelations.length }} 条</span></div>
-          <div class="panel-body">
-            <ClassRelationHub
-              v-if="profile.relations.classRelations.length"
-              :name="profile.name" :class-name="profile.header.className"
-              :relations="profile.relations.classRelations"
-              @open="emit('open', $event)"
-            />
-            <div v-else class="empty">本体中没有登记该对象的类间关系</div>
-            <table v-if="profile.relations.classRelations.length" class="tbl mt-3">
-              <thead><tr><th class="w-[72px]">关系</th><th>对象</th><th>说明</th></tr></thead>
-              <tbody>
-                <tr v-for="r in relationRows" :key="r.role + r.target + r.predicate" @click="r.targetId && emit('open', r.targetId)">
-                  <td class="text-fg-dim whitespace-nowrap">{{ r.role }}</td>
-                  <td :class="r.targetId ? 'text-fg hover:text-brand' : 'text-fg-dim'">{{ r.target }}
-                    <div class="text-fg-mute text-[11px]">{{ r.predicate }}<span v-if="r.targetType"> · {{ r.targetType }}</span></div></td>
-                  <td class="text-fg-dim text-[12px]">{{ r.mechanism || '—' }}</td>
-                </tr>
-              </tbody>
-            </table>
-            <button v-if="profile.relations.classRelations.length > 12" class="ctl mt-2" @click="showAllRelations = !showAllRelations">
-              {{ showAllRelations ? '收起' : `展开全部 ${profile.relations.classRelations.length} 条` }}
-            </button>
-          </div>
-        </section>
-
-        <section class="panel">
-          <div class="panel-head"><h3>属性间关系</h3><span class="text-fg-mute text-[11.5px]">因果 / 影响 / 质量关系，按计算、传递、关联归类</span></div>
-          <div class="panel-body text-[12.5px] max-h-[360px] overflow-y-auto">
-            <div v-if="!profile.relations.attributeRelations.length" class="text-fg-mute">本体中没有登记涉及该对象属性的因果关系</div>
-            <div v-for="(list, kind) in attrRelGroups" :key="kind" class="mb-2">
-              <div class="font-semibold mb-0.5" :class="ATTR_REL_STYLE[kind] ?? 'text-fg'">{{ kind }}</div>
-              <div v-for="r in list" :key="r.from + r.to + r.predicate" class="py-0.5 pl-3">
-                {{ r.from }} <span class="text-fg-mute">→{{ r.predicate }}→</span> {{ r.to }}
-                <div v-if="r.mechanism" class="text-fg-mute text-[11.5px]">{{ r.mechanism }}</div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section v-if="profile.instances?.length" class="panel">
-          <div class="panel-head"><h3>类的实例</h3><span class="ml-auto font-mono text-fg-mute text-[11px]">{{ profile.instances.filter((i) => !i.nature || i.nature === '实例').length }} 台实例<template v-if="profile.instances.some((i) => i.nature && i.nature !== '实例')"> + 公共点位/合集</template></span></div>
-          <div class="panel-body flex flex-wrap gap-1.5">
-            <button v-for="i in profile.instances" :key="i.id" class="ctl" :class="i.nature && i.nature !== '实例' ? 'italic border-dashed' : ''" @click="emit('open', i.id)">
-              {{ i.name }}<span class="text-fg-mute font-mono text-[10.5px]">{{ i.tagCount }}点<template v-if="i.nature && i.nature !== '实例'"> · {{ i.nature }}</template></span>
-            </button>
-          </div>
-        </section>
-
-        <section class="panel bg-ink-panel2/60">
-          <div class="panel-body text-[12px] text-fg-dim leading-relaxed">
-            <span class="font-semibold text-fg">定义要点：</span>类描述"是什么、能挂什么"。属性带出数据关联（DCS 位号）；
-            约束属于本体；业务规则在推理引擎中定义与执行；能力与动作的实现在本体之外，本体只提供挂载点。
-          </div>
-        </section>
+      <!-- 规则 -->
+      <div v-else-if="tab === '规则'">
+        <div class="flex flex-wrap items-center gap-1 px-4 py-2">
+          <button v-for="f in RULE_FILTERS" :key="f" class="ctl !py-0.5 !px-2" :class="{ 'ctl-on': ruleFilter === f }" @click="ruleFilter = f">
+            {{ f }}<span class="font-mono text-fg-mute">{{ f === '全部' ? profile.rules.length : f === '通用层' ? genericRules.length : specificRules.length }}</span>
+          </button>
+        </div>
+        <div v-if="!profile.rules.length" class="empty">暂无适用规则</div>
+        <table v-else class="tbl">
+          <thead><tr><th class="w-[96px]">规则</th><th>名称</th><th>条件 → 结论</th><th class="w-[72px]">程度</th><th class="w-[150px]">适用依据</th></tr></thead>
+          <tbody>
+            <tr v-for="r in ruleRows" :key="r.id" class="!cursor-default">
+              <td class="font-mono text-equip whitespace-nowrap">{{ r.id }} <span v-if="r.draft" class="pill pill-warn">草案</span></td>
+              <td>{{ r.name }}</td>
+              <td class="text-fg-dim text-[12px]">{{ r.condition || '—' }} <span class="text-fg-mute">→</span> {{ r.conclusion || '—' }}</td>
+              <td class="text-fg-dim">{{ r.severity || '—' }}</td>
+              <td class="text-fg-mute text-[11.5px]">{{ r.matchedBy }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
-    </div>
+
+      <!-- 实例（设备组） -->
+      <div v-else-if="tab === '实例' && profile.instances" class="p-4">
+        <div class="text-fg-mute text-[11px] mb-2">{{ profile.instances.filter((i) => !i.nature || i.nature === '实例').length }} 台实例<template v-if="profile.instances.some((i) => i.nature && i.nature !== '实例')"> + 公共点位 / 合集</template></div>
+        <div class="flex flex-wrap gap-1.5">
+          <button v-for="i in profile.instances" :key="i.id" class="ctl" :class="i.nature && i.nature !== '实例' ? 'italic border-dashed' : ''" @click="emit('open', i.id)">
+            {{ i.name }}<span class="text-fg-mute font-mono text-[10.5px]">{{ i.tagCount }}点<template v-if="i.nature && i.nature !== '实例'"> · {{ i.nature }}</template></span>
+          </button>
+        </div>
+      </div>
+    </section>
   </div>
 </template>
