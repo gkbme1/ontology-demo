@@ -15,6 +15,7 @@ SOURCE_RELATION = "RELATION_EXCEL"
 SOURCE_RULE = "RULE_FILE"
 SOURCE_MAPPING = "MAPPING_FILE"
 SOURCE_SCHEMA = "DCS_EXCEL_SCHEMA"
+SOURCE_CAPABILITY = "CAPABILITY_FILE"
 
 SOURCE_TYPE_LABELS = {
     SOURCE_DCS: "DCS 点表 Excel",
@@ -22,6 +23,7 @@ SOURCE_TYPE_LABELS = {
     SOURCE_RULE: "规则 Excel / 规则文件",
     SOURCE_MAPPING: "对象映射 Excel",
     SOURCE_SCHEMA: "DCS 点表 Excel · 本体架构与设计规范 Sheet",
+    SOURCE_CAPABILITY: "能力登记 Excel",
 }
 
 
@@ -115,7 +117,7 @@ ONTOLOGY_CATEGORIES: list[dict[str, Any]] = [
         "core": True,
         "coreIndex": 5,
         "group": "描述工业对象能做什么、如何理解",
-        "description": "对象可提供的判断与计算能力，需由独立能力数据源提供。",
+        "description": "对象能做什么、由哪个外部系统提供、如何调用，来自独立能力登记表；本体只做描述与参数绑定。",
         "endpoint": "/api/ontology/capabilities",
     },
     {

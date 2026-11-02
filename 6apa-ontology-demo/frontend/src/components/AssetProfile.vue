@@ -4,7 +4,8 @@
  * 全部数据来自 /api/ontology/asset-profile/{id}，组件不内置任何设备、点位或关系。
  */
 import { computed, ref, watch } from 'vue'
-import type { AssetProfile, ProfileAttribute } from '@/api/types'
+import { api } from '@/api/client'
+import type { AssetProfile, LimitCheckResult, ProfileAttribute } from '@/api/types'
 import ClassRelationHub from './ClassRelationHub.vue'
 
 const props = defineProps<{ profile: AssetProfile }>()
@@ -12,7 +13,30 @@ const emit = defineEmits<{ open: [objectId: string] }>()
 
 const KINDS = ['全部', '固有', '工艺属性', '测量', '状态', '控制'] as const
 const kindFilter = ref<(typeof KINDS)[number]>('全部')
+// 运行约束按当前值校验（本体约束校验接口，按需调用）
+const checking = ref(false)
+const checkResult = ref<LimitCheckResult | null>(null)
+const checkError = ref<string | null>(null)
+async function runCheck() {
+  checking.value = true
+  checkError.value = null
+  try {
+    checkResult.value = await api.limitCheck(props.profile.objectId)
+  } catch (e) {
+    checkError.value = (e as Error).message
+  } finally {
+    checking.value = false
+  }
+}
+const CHECK_LABEL: Record<string, string> = { NORMAL: '正常', UNKNOWN: '无法判断' }
+function statusLabel(key: string) {
+  const hit = checkResult.value?.results?.find((r) => r.status === key)
+  return hit?.statusLabel ?? CHECK_LABEL[key] ?? key
+}
+
 watch(() => props.profile.objectId, () => {
+  checkResult.value = null
+  checkError.value = null
   kindFilter.value = '全部'
   showAllRules.value = false
   showAllRelations.value = false
@@ -37,6 +61,7 @@ function valueCell(a: ProfileAttribute) {
 }
 
 const STATUS_PILL: Record<string, string> = {
+  可调用: 'pill-ok', 提供方待登记: 'pill-mute',
   已挂载: 'pill-ok', 具备挂载点: 'pill-info', 未挂载: 'pill-mute'
 }
 
@@ -175,22 +200,56 @@ const KIND_TITLE: Record<string, string> = {
         <section class="panel">
           <div class="panel-head">
             <h3>能力挂载</h3>
-            <span class="text-fg-mute text-[11.5px]">本体只提供挂载点；状态按对象已有点位与本体内置接口判断</span>
+            <span class="text-fg-mute text-[11.5px]">能力由外部系统实现；本体登记能力描述、调用契约，并在本对象上绑定参数</span>
+            <span class="ml-auto font-mono text-fg-mute text-[11px]">6APA_能力.xlsx</span>
           </div>
-          <table class="tbl">
-            <thead><tr><th class="w-[92px]">类型</th><th class="w-[150px]">能力</th><th class="w-[96px]">挂载状态</th><th>挂载点 / 依据</th></tr></thead>
-            <tbody>
-              <tr v-for="c in profile.capabilities" :key="c.type + c.name" class="!cursor-default">
-                <td class="text-fg-dim">{{ c.type }}</td>
-                <td>{{ c.name }}</td>
-                <td><span class="pill" :class="STATUS_PILL[c.status] ?? 'pill-plain'">{{ c.status }}</span></td>
-                <td>
-                  <div class="font-mono text-[11.5px] text-fg-dim break-all">{{ c.mount }}</div>
-                  <div class="text-fg-mute text-[11.5px]">{{ c.basis }}</div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <div v-if="!profile.capabilities.length" class="empty">能力登记表中没有适用于本对象的能力</div>
+          <div v-for="c in profile.capabilities" :key="c.id" class="px-4 py-3 border-b border-line-soft last:border-0">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="font-semibold text-[13px]">{{ c.name }}</span>
+              <span class="pill pill-plain">{{ c.type }}</span>
+              <span class="pill" :class="STATUS_PILL[c.status] ?? 'pill-plain'">{{ c.status }}</span>
+              <span class="ml-auto font-mono text-fg-mute text-[11px]">{{ c.id }}</span>
+            </div>
+            <div class="text-fg-dim text-[12px] mt-0.5">{{ c.description }}</div>
+            <dl class="mt-2 grid gap-x-4 gap-y-1 text-[12px]" style="grid-template-columns: 72px minmax(0, 1fr)">
+              <dt class="text-fg-mute">提供方</dt><dd class="m-0">{{ c.provider || '—' }}</dd>
+              <dt class="text-fg-mute">调用</dt>
+              <dd class="m-0">
+                <span class="text-fg-dim">{{ c.protocol || '待定' }}</span>
+                <span v-if="c.endpoint" class="ml-1.5 font-mono text-[11.5px] break-all">{{ c.endpoint }}</span>
+                <span v-else class="ml-1.5 text-fg-mute">提供方接口待登记</span>
+              </dd>
+              <template v-if="c.gateway">
+                <dt class="text-fg-mute">本体代调</dt>
+                <dd class="m-0"><span class="font-mono text-[11.5px] break-all">{{ c.gateway }}</span>
+                  <span class="text-fg-mute text-[11px]">（本体解析参数后转调提供方）</span></dd>
+              </template>
+              <dt class="text-fg-mute">输出</dt><dd class="m-0 text-fg-dim">{{ c.output || '—' }}</dd>
+              <template v-if="c.preconditions">
+                <dt class="text-fg-mute">前置条件</dt><dd class="m-0 text-warn">{{ c.preconditions }}</dd>
+              </template>
+            </dl>
+            <table v-if="c.parameters.length" class="tbl mt-2">
+              <thead><tr><th class="w-[96px]">参数</th><th class="w-[72px]">类型</th><th>本对象上的绑定</th></tr></thead>
+              <tbody>
+                <tr v-for="prm in c.parameters" :key="prm.name" class="!cursor-default">
+                  <td class="font-mono text-[11.5px]">{{ prm.name }}<span v-if="prm.required" class="text-err">*</span>
+                    <div v-if="prm.description" class="font-sans text-fg-mute text-[11px]">{{ prm.description }}</div></td>
+                  <td class="font-mono text-[11px] text-fg-dim">{{ prm.type }}</td>
+                  <td>
+                    <div class="text-[12px]" :class="prm.bound.bound === null ? 'text-fg-mute' : 'text-fg'">{{ prm.bound.text }}</div>
+                    <div v-if="prm.bound.values.length && prm.binding !== '本对象ID'" class="flex flex-wrap gap-1 mt-0.5">
+                      <span v-for="v in prm.bound.values" :key="v" class="pill pill-info font-mono">{{ v }}</span>
+                      <span v-if="prm.bound.total > prm.bound.values.length" class="pill pill-plain">+{{ prm.bound.total - prm.bound.values.length }}</span>
+                    </div>
+                    <div class="font-mono text-[10.5px] text-fg-mute mt-0.5">绑定规则：{{ prm.binding }}</div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <div v-if="c.note" class="text-fg-mute text-[11px] mt-1">{{ c.note }}</div>
+          </div>
         </section>
 
         <div class="grid gap-4 xl:grid-cols-2">
@@ -205,7 +264,27 @@ const KIND_TITLE: Record<string, string> = {
                 </div>
               </div>
               <div>
-                <div class="text-fg-mute text-[11px] mb-1">运行约束（工艺限值）</div>
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="text-fg-mute text-[11px]">运行约束（工艺限值）</span>
+                  <button
+                    v-if="profile.constraints.check?.available" class="ctl !py-0.5 !px-2 ml-auto"
+                    :disabled="checking" @click="runCheck"
+                  >{{ checking ? '校验中…' : '按当前值校验' }}</button>
+                  <span v-else-if="profile.constraints.check" class="ml-auto text-fg-mute text-[11px]">{{ profile.constraints.check.reason }}</span>
+                </div>
+                <div v-if="checkError" class="text-err text-[12px] mb-1">{{ checkError }}</div>
+                <div v-if="checkResult" class="mb-2 px-2 py-1.5 rounded border border-line-soft bg-ink-panel2/60">
+                  <div class="flex flex-wrap gap-1.5 items-center text-[12px]">
+                    <span class="text-fg-dim">校验 {{ checkResult.checked ?? 0 }} 个测点</span>
+                    <span v-for="(n, k) in checkResult.summary ?? {}" :key="k" class="pill" :class="String(k) === 'NORMAL' ? 'pill-ok' : String(k) === 'UNKNOWN' ? 'pill-mute' : 'pill-warn'">{{ statusLabel(String(k)) }} {{ n }}</span>
+                    <span v-if="checkResult.dataSource?.simulated" class="pill pill-mute">模拟数据</span>
+                  </div>
+                  <div v-for="r in (checkResult.results ?? []).filter((x) => x.status !== 'NORMAL' && x.status !== 'UNKNOWN').slice(0, 6)" :key="r.limitId + r.tagName" class="text-[11.5px] mt-0.5">
+                    <span class="font-mono">{{ r.tagName }}</span> {{ r.value ?? '—' }} {{ r.unit ?? '' }}
+                    <span class="text-warn">· {{ r.statusLabel }}</span><span class="text-fg-mute"> · {{ r.limitId }}</span>
+                  </div>
+                  <div v-if="checkResult.notice" class="text-fg-mute text-[11px] mt-0.5">{{ checkResult.notice }}</div>
+                </div>
                 <div v-if="!profile.constraints.operating.length" class="text-fg-mute">本体中暂无适用的工艺限值</div>
                 <div v-for="l in profile.constraints.operating" :key="l.id" class="py-1 border-b border-line-soft last:border-0">
                   <div class="flex flex-wrap items-center gap-1.5">

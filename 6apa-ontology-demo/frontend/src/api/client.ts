@@ -5,7 +5,7 @@
  * 关系或规则数据（需求文档第二十一、二十四章）。
  */
 import type {
-  AssetNode, AssetProfile, AssetSearchHit,
+  AssetNode, AssetProfile, LimitCheckResult, AssetSearchHit,
   CategoriesPayload, DataSourcesPayload, DcsTag, EmptySet, Equipment,
   GraphPayload, MeasurementAnchor, Overview, Paged, Parameter, ProcessArea,
   QualityReport, Relation, RelationDetail, RelationEntity, RelationEntityDetail, Rule
@@ -111,6 +111,7 @@ export const api = {
   assetSearch: (keyword: string, limit = 30) =>
     get<{ items: AssetSearchHit[]; total: number }>(`${P}/asset-tree/search`, { keyword, limit }),
   assetProfile: (objectId: string) => get<AssetProfile>(`${P}/asset-profile/${encodeURIComponent(objectId)}`),
+  limitCheck: (objectId: string) => get<LimitCheckResult>(`${P}/${encodeURIComponent(objectId)}/limit-check`),
 
   // 数据治理
   dataSources: () => get<DataSourcesPayload>(`${P}/data-sources`),

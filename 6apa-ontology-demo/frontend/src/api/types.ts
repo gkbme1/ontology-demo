@@ -438,12 +438,54 @@ export interface AttributeRelation {
   source?: string
 }
 
-export interface ProfileCapability {
-  type: string
+/** 能力参数在本对象上的绑定 */
+export interface CapabilityBinding {
+  /** true：已绑定；false：取不到值；null：调用方提供 */
+  bound: boolean | null
+  values: string[]
+  total: number
+  text: string
+}
+
+export interface CapabilityParameter {
   name: string
-  status: '已挂载' | '具备挂载点' | '未挂载' | string
-  mount: string
-  basis: string
+  type: string
+  required: boolean
+  description: string
+  binding: string
+  bound: CapabilityBinding
+}
+
+/** 本体挂载的能力：能力描述 + 调用契约 + 本对象参数绑定（能力由外部系统实现） */
+export interface ProfileCapability {
+  id: string
+  name: string
+  type: string
+  description: string
+  provider: string
+  protocol: string
+  endpoint: string
+  gateway: string
+  output: string
+  preconditions: string
+  registration: '已登记' | '待登记' | string
+  status: '可调用' | '提供方待登记' | string
+  note: string
+  parameters: CapabilityParameter[]
+  source?: Provenance | null
+}
+
+export interface LimitCheckInfo { available: boolean; endpoint: string; limitIds: string[]; reason: string }
+
+export interface LimitCheckResult {
+  available?: boolean
+  checked?: number
+  summary?: Record<string, number>
+  results?: { limitId: string; tagName: string; description?: string | null; value?: number | null; unit?: string | null
+              status: string; statusLabel: string; reason?: string; timeText?: string | null }[]
+  dataSource?: { simulated?: boolean } | null
+  notice?: string
+  emptyReason?: string
 }
 
 export interface StructureCheck { text: string; satisfied: boolean; detail: string }
@@ -506,7 +548,12 @@ export interface AssetProfile {
   attributes: ProfileAttribute[]
   relations: { classRelations: ProfileRelation[]; attributeRelations: AttributeRelation[] }
   capabilities: ProfileCapability[]
-  constraints: { structure: StructureCheck[]; operating: OperatingConstraint[]; safety: { text: string; mechanism: string; source: string }[] }
+  constraints: {
+    structure: StructureCheck[]
+    operating: OperatingConstraint[]
+    check?: LimitCheckInfo
+    safety: { text: string; mechanism: string; source: string }[]
+  }
   rules: ProfileRule[]
   treePath: string[]
   focusTag?: string

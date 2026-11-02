@@ -102,7 +102,8 @@ def main() -> int:
     check(any(r["role"] == "所属" for r in p["relations"]["classRelations"]), "类间关系包含所属工段 / 设备组")
     limits = {l["id"] for l in process_limits.limits_for_object(store, equip["id"]).get("items") or []}
     check({c["id"] for c in p["constraints"]["operating"]} == limits, "运行约束 = 该设备适用的工艺限值")
-    check(all(c["status"] in ("已挂载", "具备挂载点", "未挂载") for c in p["capabilities"]), "能力挂载状态只取 已挂载 / 具备挂载点 / 未挂载")
+    check(p["capabilities"] and all(c["status"] in ("可调用", "提供方待登记") for c in p["capabilities"]),
+          "能力挂载来自能力登记表，状态只取 可调用 / 提供方待登记")
     check(p["treePath"] == index.path_of(equip["id"]), "档案带出它在导航树中的路径")
 
     entity = next(e for e in store.relations.entities.values() if e["type"] == "工艺属性" and e["match"]["tagCount"])

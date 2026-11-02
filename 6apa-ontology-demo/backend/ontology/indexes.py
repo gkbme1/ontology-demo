@@ -18,6 +18,7 @@ from backend.ontology.models import (
     EDGE_CATEGORY_STYLES,
     NODE_TYPE_STYLES,
     ONTOLOGY_CATEGORIES,
+    SOURCE_CAPABILITY,
     SOURCE_DCS,
     SOURCE_MAPPING,
     SOURCE_RELATION,
@@ -25,6 +26,7 @@ from backend.ontology.models import (
     SOURCE_TYPE_LABELS,
 )
 from backend.services import object_matcher
+from backend.services.capability_loader import CAPABILITY_FILE_NAME, load_capabilities
 from backend.services.data_quality import build_quality_report
 from backend.services.dcs_loader import load_dcs
 from backend.services.mapping_loader import load_mapping
@@ -39,6 +41,7 @@ RELATION_FILE = SOURCE_DIR / "6APA_工业关系.xlsx"
 MAPPING_FILE = SOURCE_DIR / "6APA_对象映射.xlsx"
 RULE_FILE = SOURCE_DIR / "6APA_规则.xlsx"
 MERGE_FILE = SOURCE_DIR / "6APA_设备归并.xlsx"
+CAPABILITY_FILE = SOURCE_DIR / CAPABILITY_FILE_NAME
 
 
 class OntologyStore:
@@ -49,6 +52,7 @@ class OntologyStore:
         self.relations = load_relations(base / RELATION_FILE.name)
         self.mapping = load_mapping(base / MAPPING_FILE.name)
         self.rules = load_rules(base / RULE_FILE.name)
+        self.capability_set = load_capabilities(base / CAPABILITY_FILE.name)
         self.matches = object_matcher.match_entities(self.relations, self.dcs, self.mapping)
         self._attach_matches()
         self._attach_area_relation_counts()
@@ -156,7 +160,7 @@ class OntologyStore:
             "coreContentCount": len(CORE_CONTENTS),
             "ruleCount": len(self.rules.rules),
             "constraintCount": 0,
-            "capabilityCount": 0,
+            "capabilityCount": len(self.capability_set.items),
             "causalRelationCount": len([r for r in self.relations.relations if r["isCausal"]]),
             "mappingCount": len(self.mapping.entries),
             "tagStats": stats,
@@ -926,12 +930,21 @@ class OntologyStore:
         }
 
     def capabilities(self) -> dict[str, Any]:
-        return {
-            "items": [],
-            "total": 0,
-            "emptyReason": "当前暂无项目能力数据。能力需由独立能力数据源提供，本 Demo 不使用 Mock 能力。",
-            "expectedSource": "能力 Excel / 能力文件",
+        """能力登记（类级的能力描述与调用契约）；对象上的参数绑定见 /api/ontology/asset-profile/{id}。"""
+        from backend.services.capability_loader import expand_endpoint
+
+        items = [{**c, "endpoint": expand_endpoint(c["endpoint"]) if c["endpoint"] else ""}
+                 for c in self.capability_set.items]
+        result: dict[str, Any] = {
+            "items": items,
+            "total": len(items),
+            "registeredCount": sum(1 for c in items if c["registration"] == "已登记"),
+            "expectedSource": CAPABILITY_FILE.name,
         }
+        if not items:
+            result["emptyReason"] = (f"未提供能力登记表 {CAPABILITY_FILE.name}。能力由外部系统实现，"
+                                     "需在登记表中写明提供方、调用方式与参数，本 Demo 不使用 Mock 能力。")
+        return result
 
     def model_registry(self) -> dict[str, Any]:
         return {
@@ -1052,7 +1065,7 @@ class OntologyStore:
             "relation": len(self.relations.relations),
             "constraint": 0,
             "rule": len(self.rules.rules),
-            "capability": 0,
+            "capability": len(self.capability_set.items),
             "semantic": len(self.dcs.tags),
             "measurementAnchor": len(self.measurement_anchors()),
             "causal": len([r for r in self.relations.relations if r["isCausal"]]),
@@ -1097,12 +1110,15 @@ class OntologyStore:
                       "关系对象 → DCS 本体对象的人工映射，全部条目需现场确认"),
                 block(SOURCE_RULE, RULE_FILE, self.rules.load_stats, self.rules.available,
                       "推理规则数据源；未提供时规则页显示空状态，不生成任何规则"),
+                block(SOURCE_CAPABILITY, CAPABILITY_FILE, self.capability_set.load_stats, self.capability_set.available,
+                      "能力登记：外部系统提供的能力、调用契约与参数绑定；本体不实现能力"),
             ],
             "boundary": {
                 "DCS_EXCEL": "现场有什么：工段 / 设备 / 参数 / DCS点",
                 "RELATION_EXCEL": "它们如何关联：关系 / 部件 / 属性 / 因果",
                 "MAPPING_FILE": "抽象对象与现场位号如何对齐",
                 "RULE_FILE": "什么条件下可以得出什么判断",
+                "CAPABILITY_FILE": "对象能做什么、由谁提供、怎么调用",
             },
         }
 

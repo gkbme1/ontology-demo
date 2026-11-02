@@ -17,6 +17,12 @@ const { select } = useSelection()
 
 const rows = ref<Record<string, unknown>[]>([])
 const empty = ref<{ emptyReason: string; expectedSource: string } | null>(null)
+interface CapabilityEntry {
+  id: string; name: string; type: string; description: string; appliesTo: string[]; provider: string
+  protocol: string; endpoint: string; registration: string; preconditions: string
+  parameters: { name: string; type: string; required: boolean; binding: string }[]
+}
+const capabilityRows = ref<CapabilityEntry[]>([])
 const extra = ref<Record<string, unknown> | null>(null)
 const loading = ref(false)
 
@@ -24,7 +30,7 @@ const category = computed(() => categoryByKey(props.categoryKey))
 
 watch(() => props.categoryKey, async (key) => {
   loading.value = true
-  rows.value = []; empty.value = null; extra.value = null
+  rows.value = []; empty.value = null; extra.value = null; capabilityRows.value = []
   await load()
   try {
     switch (key) {
@@ -46,7 +52,12 @@ watch(() => props.categoryKey, async (key) => {
         break
       }
       case 'constraint': empty.value = await api.constraints() as never; break
-      case 'capability': empty.value = await api.capabilities() as never; break
+      case 'capability': {
+        const res = await api.capabilities() as unknown as { items: CapabilityEntry[]; emptyReason?: string; expectedSource: string }
+        if (res.items?.length) capabilityRows.value = res.items
+        else empty.value = { emptyReason: res.emptyReason ?? '', expectedSource: res.expectedSource }
+        break
+      }
       case 'modelRegistry': empty.value = await api.modelRegistry() as never; break
       case 'rule': router.replace('/rules'); break
       case 'semantic': extra.value = await api.semantics({ limit: 150 }) as never; break
@@ -77,6 +88,32 @@ const relSemantics = computed(() => (extra.value?.relationSemantics ?? []) as Re
     </header>
 
     <div v-if="loading" class="py-16 text-center text-fg-mute">正在加载…</div>
+
+    <!-- 能力登记：类级的能力描述与调用契约；对象上的参数绑定在资产本体页 -->
+    <section v-else-if="categoryKey === 'capability' && capabilityRows.length" class="panel">
+      <div class="panel-head"><h3>能力登记</h3>
+        <span class="text-fg-mute text-[11.5px]">能力由外部系统实现，本体登记描述、调用契约与参数绑定规则 · 6APA_能力.xlsx</span></div>
+      <div class="overflow-x-auto">
+        <table class="tbl">
+          <thead><tr><th>能力</th><th>类型</th><th>适用对象</th><th>提供方</th><th>调用</th><th>参数（绑定规则）</th><th>登记</th></tr></thead>
+          <tbody>
+            <tr v-for="c in capabilityRows" :key="c.id" class="cursor-default">
+              <td><span class="font-mono text-fg-mute text-[11px]">{{ c.id }}</span> <strong>{{ c.name }}</strong>
+                <div class="text-fg-dim text-[11.5px]">{{ c.description }}</div></td>
+              <td>{{ c.type }}</td>
+              <td class="text-fg-dim">{{ c.appliesTo.join('、') }}</td>
+              <td>{{ c.provider }}</td>
+              <td><span class="text-fg-dim">{{ c.protocol }}</span>
+                <div class="font-mono text-[11px] break-all">{{ c.endpoint || '—' }}</div></td>
+              <td class="text-[11.5px]">
+                <div v-for="p in c.parameters" :key="p.name"><span class="font-mono">{{ p.name }}</span><span v-if="p.required" class="text-err">*</span>
+                  <span class="text-fg-mute"> ← {{ p.binding }}</span></div></td>
+              <td><span class="pill" :class="c.registration === '已登记' ? 'pill-ok' : 'pill-mute'">{{ c.registration }}</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
     <!-- 空数据源分类：约束 / 能力 / 模型注册 -->
     <section v-else-if="empty" class="panel">

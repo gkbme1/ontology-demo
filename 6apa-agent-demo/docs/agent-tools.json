@@ -486,7 +486,7 @@
     "type": "function",
     "function": {
       "name": "query_capabilities",
-      "description": "查询本体声明的项目能力清单。为空时返回 emptyReason，说明数据源未提供，不要编造。\n返回：items[]、total、emptyReason、expectedSource。",
+      "description": "查询本体登记的能力清单：对象能做什么、由哪个外部系统提供、怎么调用、需要哪些参数（来自能力登记表）。registration=待登记 表示只声明了能力，提供方接口未知，回答时不能说成可以执行；为空时返回 emptyReason，不要编造。\n返回：items[]（id、name、type、description、appliesTo 适用对象、provider 提供方、protocol、endpoint、registration 已登记/待登记、preconditions、parameters[] 含 binding 绑定规则）、total、registeredCount、emptyReason（为空时）、expectedSource。",
       "parameters": {
         "type": "object",
         "properties": {},
@@ -853,6 +853,315 @@
   {
     "type": "function",
     "function": {
+      "name": "investigate_process_anomaly",
+      "description": "异常溯源（确定性分析，优先使用）。用户问'某参数异常/偏高/偏低/波动，帮我查原因''是什么引起的'时，直接调用本工具，不要自己逐步调限值、历史、关系工具。程序会按固定算法一次完成：查工艺限值 → 取时间窗历史确认异常是否成立 → 沿本体因果关系往上游推（正负向逐层传播）→ 逐个原因查测点 → 同期历史对比（领先滞后、方向、异常期偏移）→ 排序并列出数据缺口。target 可传本体工艺量名称（如 釜内反应温度）、robj- ID、DCS 位号（TI_1301A）或测点描述（水解罐A温度）；不确定时直接传用户的说法，没有唯一匹配时工具会返回候选让你选。\n返回：limit（限值及确认状态）、anomaly（异常是否成立、越限测点与次数、首末越限时刻）、candidates[]（因素、路径、本体方向、机理、来源行、预期方向、测点、相关系数、领先分钟、异常期偏移σ、判断）、dataGaps、conclusion（程序给出的分层结论）、method（判定口径与模拟数据声明）。status=needs_clarification 时返回 candidates 供选择。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string",
+            "description": "出现异常的工艺量 / 位号 / 测点描述。"
+          },
+          "symptom": {
+            "type": "string",
+            "description": "异常表现；用户没说具体方向时用 异常。",
+            "enum": [
+              "偏高",
+              "偏低",
+              "波动",
+              "异常"
+            ]
+          },
+          "startTime": {
+            "type": "string",
+            "description": "分析时间窗开始，yyyy-MM-dd HH:mm:ss（东八区）；按【当前时间】换算'昨天''夜班'等。不填默认最近 24 小时。"
+          },
+          "endTime": {
+            "type": "string",
+            "description": "分析时间窗结束，格式同上，默认当前时刻。"
+          },
+          "focus": {
+            "type": "string",
+            "description": "只看该工艺量下的某个测点，如 TI_1301A 或 水解罐A；不填则自动选越限最多的测点。"
+          },
+          "depth": {
+            "type": "integer",
+            "description": "沿因果关系往上游推几层，默认 2，最多 3。"
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "verify_process_influence",
+      "description": "影响验证（确定性分析，优先使用）。用户问'X 是不是 Y 引起的''X 会不会影响 Y''用数据验证一下 X 对 Y 的影响'时直接调用。程序会查本体里 cause→effect 的影响路径与正负向（上推 3 层），取同一时间窗两端的历史值，按本体方向判断数据是否支持，并说明本体有没有记载这条路径。用户点名了疑似原因（'是不是稀硫酸加多了'）时优先用本工具，而不是异常溯源。cause / effect 的写法同 investigate_process_anomaly 的 target。\n返回：ontology（是否记载、路径、方向、机理、来源）、limit、effectAnomaly、evidence（预期方向、测点、相关系数、领先分钟、判断）、conclusion、method。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "cause": {
+            "type": "string",
+            "description": "疑似原因的工艺量 / 位号 / 测点描述。"
+          },
+          "effect": {
+            "type": "string",
+            "description": "被影响的工艺量 / 位号 / 测点描述。"
+          },
+          "symptom": {
+            "type": "string",
+            "description": "结果一侧的异常表现，默认 异常。",
+            "enum": [
+              "偏高",
+              "偏低",
+              "波动",
+              "异常"
+            ]
+          },
+          "startTime": {
+            "type": "string",
+            "description": "分析时间窗开始，yyyy-MM-dd HH:mm:ss（东八区）；按【当前时间】换算'昨天''夜班'等。不填默认最近 24 小时。"
+          },
+          "endTime": {
+            "type": "string",
+            "description": "分析时间窗结束，格式同上，默认当前时刻。"
+          },
+          "focus": {
+            "type": "string",
+            "description": "结果一侧只看某个测点，如 AT_1301A1。"
+          }
+        },
+        "required": [
+          "cause",
+          "effect"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "summarize_area_relations",
+      "description": "工段关系结构统计（确定性分析，优先使用）。问'某工段的关系结构/哪些设备关联较多/关系主要是什么类型'时直接调用。程序取该工段全量关系精确计数：各类别数量与谓词分布、关联最多的对象与设备、对象类型分布。不要自己分页拉关系再数，容易漏类别。\n返回：total、byCategory[]（类别、数量、谓词分布）、topEntities[]、topEquipment[]、entityTypes、note。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "area": {
+            "type": "string",
+            "description": "工段 ID（area-S11）、编号（S11）或名称（酶法水解）。"
+          }
+        },
+        "required": [
+          "area"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "check_limit_exceedance",
+      "description": "越限统计（确定性分析，优先使用）。问'某参数昨天/夜班最高到多少、超没超限、超了多久、哪几支表越限'或'现在是多少、在不在工艺范围内'时直接调用，不要自己逐个查参数、限值、历史值。程序按本体工艺限值逐档判断每个测点：给时间窗时统计最值及时刻、各档越限累计时长、最长连续越限时段；不给时间窗时核对当前值。只采用该工艺量本身的限值，没有限值就如实说没有。target 写法同 investigate_process_anomaly；也可以 target=设备名、quantity=物理量（如 水解罐A + 温度）。\n返回：limit、mode（时间窗/当前值）、tagCount、abnormalTagCount、abnormal[]（测点、最值及时刻、越限分钟（按档位）、longestRuns 最长连续越限时段、runCount；当前值模式为 value 与 status）、normalTags、conclusion、method。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string",
+            "description": "工艺量 / 位号 / 测点描述 / 设备名。"
+          },
+          "quantity": {
+            "type": "string",
+            "description": "target 是设备名时补充物理量，如 温度、pH、液位。"
+          },
+          "startTime": {
+            "type": "string",
+            "description": "时间窗开始，yyyy-MM-dd HH:mm:ss（东八区），按【当前时间】换算。问'现在'时不要填。"
+          },
+          "endTime": {
+            "type": "string",
+            "description": "时间窗结束，格式同上；只给 startTime 时默认到当前时刻。"
+          },
+          "focus": {
+            "type": "string",
+            "description": "只看该工艺量下的某个测点，如 TI_1301A。"
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "map_causal_neighborhood",
+      "description": "影响因素与后果梳理（确定性分析，优先使用）。问'X 受哪些因素影响''X 偏高/超温会带来什么后果、本体记了哪些机理''哪些量会影响 X、这些量有没有测点 / 现在什么状态'时直接调用，不要自己分页翻关系。程序沿本体因果关系列出上游原因与下游后果（正负向逐层传播、机理、来源行号），并标出每个量有没有现场测点；withValues=true 时附带当前值与适用限值。不做历史数据对比——要验证原因请用 investigate_process_anomaly。\n返回：target（含自身有无测点）、causes[]、consequences[]（名称、路径、方向、机理、来源、measurable、tags、current、limit）、conclusion、note。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string",
+            "description": "工艺量 / 质量指标 / 位号 / 测点描述，写法同 investigate_process_anomaly。"
+          },
+          "scope": {
+            "type": "string",
+            "description": "只看原因、只看后果，或全部（默认）。",
+            "enum": [
+              "全部",
+              "原因",
+              "后果"
+            ]
+          },
+          "depth": {
+            "type": "integer",
+            "description": "沿因果关系推几层，默认 1，最多 3。"
+          },
+          "withValues": {
+            "type": "boolean",
+            "description": "问到'现在是什么状态'时设为 true，附带各量当前值与限值。"
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "audit_data_gaps",
+      "description": "数据缺口盘点（确定性分析，优先使用）。问'哪些参数还没有限值/需要现场补什么''哪些限值是推断的、依据是什么''哪些工艺量有记载但没有测点'时直接调用，不要用查询类工具分页翻限值或关系对象（返回体会被裁剪、翻不全）。程序一次取全量，按工段分组输出紧凑的完整清单，并统计已确认限值数、有数值却落不到测点的限值、无测点工艺量中有多少出现在因果关系里（这些路径无法用数据验证）。\n返回：summary（各类数量）、missingLimits / inferredLimits / unmeasured（按工段分组的清单）、limitsWithoutTags、impact、note。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "description": "概览（各类数量 + 每类前 5 条，默认）/ 缺限值（待现场提供数值的限值清单）/ 推断限值（有数值但未确认，含依据与置信度）/ 无测点（有记载但没有现场测点的对象）。",
+            "enum": [
+              "概览",
+              "缺限值",
+              "推断限值",
+              "无测点"
+            ]
+          },
+          "area": {
+            "type": "string",
+            "description": "只看某个工段，可传 S11 或 酶法水解；不填为全车间。"
+          },
+          "types": {
+            "type": "string",
+            "description": "kind=无测点 时看哪些对象类型，逗号分隔，默认 工艺属性,质量指标,业务指标。"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "describe_equipment_links",
+      "description": "设备关联与上下游（确定性分析，优先使用）。问'某设备和哪些设备有关联''它的上游/下游是什么''上游停了会不会影响它''它属于哪个设备组、有哪些部件'时直接调用，不要自己换关键词反复查关系。程序从设备对应的本体对象出发，按物理拓扑（上游/下游，并再往上推一层）、结构（所属设备组、实例、部件、属性）、控制、报警联锁归类，并给出所在工段的上下游工段与衔接物料；设备级没有登记关系时会明确说明，并退到工段层面给出确定结论。注意：本工具只回答'关联与上下游'，不返回参数和测点清单；'介绍一下某设备'这类概况问题请用 query_equipment_list 拿到 ID 后调 query_object_relations（参数、测点、关系一次拿全）。\n返回：device、area（工段上下游与衔接物料）、deviceLevelRecorded、upstream[] / upstreamChains / downstream[]、memberOf、instances、components、properties、control、alarms、conclusion。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "equipment": {
+            "type": "string",
+            "description": "设备名称（如 一层排渣泵、水解罐A）、equip- ID，或设备类本体对象 robj- ID。"
+          }
+        },
+        "required": [
+          "equipment"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "analyze_switch_signals",
+      "description": "开关量分析（确定性分析，优先使用）。问'某设备昨天/夜班启停了几次、分别什么时候、运行了多久、报过几次故障'时给时间窗调用；问'现在在运行吗、有没有报故障'时不给时间窗调用。不要自己取原始变位再数。程序取历史库原始变位，按测点描述区分运行反馈 / 启停指令 / 故障 / 远程就地，数出每个点的上升沿与下降沿时刻、累计运行时长，并核对启停指令与运行反馈次数是否一致（不一致提示启动或停机失败）。\n返回：mode、equipment、window、signals[]（位号、描述、角色、初始状态、各沿时刻、次数、onMinutes；当前状态模式为 value）、conclusion、method。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "equipment": {
+            "type": "string",
+            "description": "设备名称（如 一层排渣泵）、equip- ID，或设备类本体对象 robj- ID。"
+          },
+          "startTime": {
+            "type": "string",
+            "description": "分析时间窗开始，yyyy-MM-dd HH:mm:ss（东八区）；按【当前时间】换算'昨天''夜班'等。不填默认最近 24 小时。"
+          },
+          "endTime": {
+            "type": "string",
+            "description": "时间窗结束，格式同上；只给 startTime 时默认到当前时刻。问'现在'时两个时间都不要填。"
+          },
+          "signal": {
+            "type": "string",
+            "description": "只看某类开关量，如 运行、故障、搅拌；不填看该设备全部开关量。"
+          }
+        },
+        "required": [
+          "equipment"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "calculate_quantity",
+      "description": "派生量计算（确定性计算，优先使用）。用户问'某某速度/速率/累计量/消耗量/加料量能不能算出来、是多少'时直接调用，不要自己取历史值手算，也不要先反问用户。程序会按本体写明的关系判断这个量由哪个测点、用哪种方法算，取全部相关测点的历史值完成计算，并写明计算口径与本体依据；算不了时返回 status=no_method，此时如实说明算不了、缺什么。目前支持的计算方法：level_consumption（液位差消耗量 / 加料速率）：液位量本身，或本体写明由液位差算出的量（如加料量、消耗量）：算时间窗内的消耗/加出量与平均、近期速率，补液段单独扣除。target 直接传用户说的量（如 氨水滴加速度、氨水累计加量、氨水计量罐液位）。\n返回：target、source（取数对象）、basis（本体依据）、window、unit、total、byTag[]、conclusion、method；算不了时 status=no_method。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string",
+            "description": "要计算的量，直接传用户的说法，如 氨水滴加速度。"
+          },
+          "method": {
+            "type": "string",
+            "description": "指定计算方法；不填由程序按本体自动判断。",
+            "enum": [
+              "level_consumption"
+            ]
+          },
+          "startTime": {
+            "type": "string",
+            "description": "时间段开始，yyyy-MM-dd HH:mm:ss（东八区），按【当前时间】换算；用户说'当前一段时间'且没给范围时不填，由程序取默认时间窗。"
+          },
+          "endTime": {
+            "type": "string",
+            "description": "时间段结束，格式同上，默认当前时刻。"
+          },
+          "focus": {
+            "type": "string",
+            "description": "只算某一支表，如 LT_1302A。"
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
       "name": "list_available_tools",
       "description": "查看并获取当前还没下发给你的工具。你手上的工具不足以回答问题时调用它，不要因为没有合适的工具就直接说查不到。不带参数调用会返回工具分组菜单（只告诉你有哪些类别，不解锁）；带 group 或 keyword 调用会解锁匹配的工具，解锁后当轮即可直接调用。\n返回：不带参数时返回 groups[]（组名 + 覆盖范围 + 工具数）；带 group/keyword 时返回 unlocked[]（工具名 + 一句话说明），这些工具随即可用。",
       "parameters": {
@@ -860,7 +1169,7 @@
         "properties": {
           "group": {
             "type": "string",
-            "description": "工具组名。取值：core（核心）、structure（结构与关系）、values（运行时数据）、limits（工艺限值与越限判断）、rules（生产规则、约束、能力、模型注册）、meta（元数据）"
+            "description": "工具组名。取值：core（核心）、analysis（确定性分析）、structure（结构与关系）、values（运行时数据）、limits（工艺限值与越限判断）、rules（生产规则、约束、能力、模型注册）、meta（元数据）"
           },
           "keyword": {
             "type": "string",

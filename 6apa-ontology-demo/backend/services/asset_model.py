@@ -562,57 +562,26 @@ def _attribute_relations(relations: list[dict[str, Any]], names: set[str]) -> li
     return out
 
 
-def _capabilities(store: Any, object_id: str, tags: list[dict[str, Any]], limits: list[dict[str, Any]],
-                  rules: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """能力挂载：本体只提供挂载点。按对象已有的点位与本体内置接口判断，不编造模型或程序。"""
-    caps = []
-    analog = [t for t in tags if t.get("blockType") in ("AI", "PID") or (t.get("parameterType") or "").startswith("过程测量")]
-    if tags:
-        caps.append({
-            "type": "数据·时序", "name": "实时值 / 历史值查询", "status": "已挂载",
-            "mount": f"本体时序网关 /api/ontology/{object_id}/realtime · /history",
-            "basis": f"对象解析出 {len(tags)} 个 DCS 点（其中模拟量 {len(analog)} 个）",
-        })
+def _capabilities(store: Any, kind: str, object_id: str, tags: list[dict[str, Any]], rules: list[dict[str, Any]],
+                  equipment_type: str | None = None) -> list[dict[str, Any]]:
+    """能力挂载：取能力登记表（6APA_能力.xlsx）中适用于本对象的能力，并在本对象上绑定参数。
+
+    能力由外部系统实现，本体只给出能力描述、调用契约与参数绑定；不在这里按点位推断或编造能力。
+    """
+    from backend.services.capability_loader import capabilities_for
+
+    return capabilities_for(store.capability_set, kind, object_id, tags=tags, rules=rules, equipment_type=equipment_type)
+
+
+def _limit_check(object_id: str, limits: list[dict[str, Any]]) -> dict[str, Any]:
+    """运行约束的当前值校验（本体约束校验接口），属于约束而不是能力。"""
     with_values = [l for l in limits if l.get("hasValues")]
-    if with_values:
-        caps.append({
-            "type": "能力·分析", "name": "越限判断", "status": "已挂载",
-            "mount": f"本体限值检查 /api/ontology/{object_id}/limit-check",
-            "basis": "适用工艺限值 " + "、".join(l["id"] for l in with_values[:4]) + ("…" if len(with_values) > 4 else ""),
-        })
-    elif limits:
-        caps.append({
-            "type": "能力·分析", "name": "越限判断", "status": "未挂载",
-            "mount": "—", "basis": "适用的限值 " + "、".join(l["id"] for l in limits[:4]) + " 待现场提供数值",
-        })
-    specific = [r for r in rules if r.get("matchedBy") != "通用层规则（未限定工段）"]
-    if rules:
-        caps.append({
-            "type": "能力·诊断", "name": "规则诊断", "status": "已挂载",
-            "mount": "推理引擎 · 规则文件",
-            "basis": f"适用规则 {len(rules)} 条（专属 / 同工段 {len(specific)} 条，通用层 {len(rules) - len(specific)} 条）",
-        })
-    onoff = [t for t in tags if t.get("blockType") in ("DOV", "DO") or "启停" in (t.get("variableCategory") or "")]
-    if onoff:
-        caps.append({
-            "type": "动作", "name": "启停", "status": "具备挂载点",
-            "mount": "、".join(t["name"] for t in onoff[:3]) + ("…" if len(onoff) > 3 else ""),
-            "basis": "有启停 / 开关指令点；动作程序（如 OPAS）尚未挂载",
-        })
-    adjust = [t for t in tags if t.get("blockType") in ("AO",) or "开度指令" in (t.get("variableCategory") or "")
-              or (t.get("parameterType") or "").startswith("控制输出")]
-    if adjust:
-        caps.append({
-            "type": "动作", "name": "调节", "status": "具备挂载点",
-            "mount": "、".join(t["name"] for t in adjust[:3]) + ("…" if len(adjust) > 3 else ""),
-            "basis": "有调节阀开度 / 控制输出点；调节程序尚未挂载",
-        })
-    registry = store.model_registry()
-    caps.append({
-        "type": "能力·模型", "name": "机理 / 时序模型", "status": "未挂载" if not registry.get("total") else "已挂载",
-        "mount": "—", "basis": "模型注册表暂无数据源" if not registry.get("total") else f"模型注册 {registry['total']} 项",
-    })
-    return caps
+    return {
+        "available": bool(with_values),
+        "endpoint": f"/api/ontology/{object_id}/limit-check",
+        "limitIds": [l["id"] for l in with_values],
+        "reason": "" if with_values else ("适用的限值都还没有数值" if limits else "没有适用的工艺限值"),
+    }
 
 
 def _rules_view(rules: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -833,10 +802,11 @@ def _equipment_profile(store: Any, index: AssetIndex, eid: str) -> dict[str, Any
         },
         "attributes": _sort_attributes(attrs),
         "relations": {"classRelations": class_relations, "attributeRelations": attribute_relations},
-        "capabilities": _capabilities(store, eid, tags, limits, rules),
+        "capabilities": _capabilities(store, "equipment", eid, tags, rules, group.get("equipmentType") if group else None),
         "constraints": {
             "structure": structure,
             "operating": [_limit_constraint(l) for l in limits],
+            "check": _limit_check(eid, limits),
             "safety": _safety_constraints(class_relations),
         },
         "rules": _rules_view(rules),
@@ -905,10 +875,11 @@ def _group_profile(store: Any, index: AssetIndex, gid: str) -> dict[str, Any]:
             "classRelations": class_relations,
             "attributeRelations": _attribute_relations(store.relations.relations, names | {group["name"]}),
         },
-        "capabilities": _capabilities(store, entity["id"] if entity else gid, tags, limits, rules),
+        "capabilities": _capabilities(store, "group", entity["id"] if entity else gid, tags, rules, group.get("equipmentType")),
         "constraints": {
             "structure": structure,
             "operating": [_limit_constraint(l) for l in limits],
+            "check": _limit_check(entity["id"] if entity else gid, limits),
             "safety": _safety_constraints(class_relations),
         },
         "rules": _rules_view(rules),
@@ -954,12 +925,13 @@ def _entity_profile(store: Any, index: AssetIndex, rid: str) -> dict[str, Any]:
             "classRelations": class_relations,
             "attributeRelations": _attribute_relations(relations, {entity["name"]}),
         },
-        "capabilities": _capabilities(store, rid, tags, limits, rules),
+        "capabilities": _capabilities(store, "entity", rid, tags, rules),
         "constraints": {
             "structure": _structure_checks([
                 ("工艺对象应有现场测点", bool(tags), f"{len(tags)} 个测点" if tags else "未匹配 DCS 实例，相关路径无法用数据验证"),
             ]),
             "operating": [_limit_constraint(l) for l in limits],
+            "check": _limit_check(rid, limits),
             "safety": _safety_constraints(class_relations),
         },
         "rules": _rules_view(rules),
@@ -1013,9 +985,10 @@ def _area_profile(store: Any, index: AssetIndex, aid: str) -> dict[str, Any]:
             "classRelations": class_relations,
             "attributeRelations": _attribute_relations(store.relations.relations, {e["name"] for e in entities}),
         },
-        "capabilities": _capabilities(store, aid, [store.dcs.tags[t] for t in area.get("tagIds", [])[:400] if t in store.dcs.tags],
-                                      limits, rules),
-        "constraints": {"structure": [], "operating": [_limit_constraint(l) for l in limits], "safety": []},
+        "capabilities": _capabilities(store, "area", aid, [store.dcs.tags[t] for t in area.get("tagIds", []) if t in store.dcs.tags],
+                                      rules),
+        "constraints": {"structure": [], "operating": [_limit_constraint(l) for l in limits],
+                        "check": _limit_check(aid, limits), "safety": []},
         "rules": _rules_view(rules),
         "treePath": index.path_of(aid),
     }

@@ -384,11 +384,17 @@ ONTOLOGY_TOOLS: list[ToolSpec] = [
     ),
     ToolSpec(
         name="query_capabilities",
-        description="查询本体声明的项目能力清单。为空时返回 emptyReason，说明数据源未提供，不要编造。",
+        description=(
+            "查询本体登记的能力清单：对象能做什么、由哪个外部系统提供、怎么调用、需要哪些参数（来自能力登记表）。"
+            "registration=待登记 表示只声明了能力，提供方接口未知，回答时不能说成可以执行；"
+            "为空时返回 emptyReason，不要编造。"
+        ),
         path="/api/ontology/capabilities",
         group="rules",
-        summary="本体声明的项目能力清单",
-        returns="items[]、total、emptyReason、expectedSource。",
+        summary="本体登记的能力（外部系统提供的能力与调用契约）",
+        returns=("items[]（id、name、type、description、appliesTo 适用对象、provider 提供方、protocol、endpoint、"
+                 "registration 已登记/待登记、preconditions、parameters[] 含 binding 绑定规则）、total、registeredCount、"
+                 "emptyReason（为空时）、expectedSource。"),
     ),
     ToolSpec(
         name="query_constraints",
