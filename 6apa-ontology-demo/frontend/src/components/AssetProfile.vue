@@ -9,12 +9,13 @@ import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/api/client'
 import type { AssetProfile, LimitCheckResult, ProfileAttribute } from '@/api/types'
 import ClassRelationHub from './ClassRelationHub.vue'
+import ProcedureCardView from './ProcedureCardView.vue'
 
 const props = defineProps<{ profile: AssetProfile }>()
 const emit = defineEmits<{ open: [objectId: string] }>()
 
 // ---------------------------------------------------------------- 页签
-type TabKey = '属性' | '关系' | '能力' | '约束' | '规则' | '实例'
+type TabKey = '属性' | '关系' | '能力' | '约束' | '规则' | '处置' | '实例'
 const route = useRoute()
 const router = useRouter()
 const tabs = computed(() => {
@@ -27,6 +28,8 @@ const tabs = computed(() => {
     { key: '约束', count: p.constraints.structure.length + p.constraints.operating.length + p.constraints.safety.length,
       hint: '约束属于本体：结构约束（加载器校验）、运行约束（工艺限值，可按当前值校验）、安全约束（报警联锁）' },
     { key: '规则', count: p.rules.length, hint: '适用于本对象的推理规则；规则在推理引擎中定义与执行（6APA_规则.xlsx）' },
+    { key: '处置', count: p.procedures?.length ?? 0,
+      hint: '报警处置卡：触发、可能原因与验证方法、处置步骤、禁止操作；规程里的位号与对象已对应到本体（6APA_处置规程.xlsx）' },
   ]
   if (p.instances?.length) list.push({ key: '实例', count: p.instances.length, hint: '本类（标准设备组）下的设备实例，以及整组共用的公共点位 / 未拆分合集' })
   return list
@@ -119,6 +122,13 @@ function openGraph() {
   if (props.profile.graphEntityId) router.push(`/graph/${props.profile.graphEntityId}`)
 }
 
+// 处置页：左侧卡片列表，右侧选中卡片
+const procId = ref<string | null>(null)
+const currentProc = computed(() => {
+  const list = props.profile.procedures ?? []
+  return list.find((c) => c.id === procId.value) ?? list[0] ?? null
+})
+
 const structureIssues = computed(() => props.profile.constraints.structure.filter((c) => !c.satisfied).length)
 
 const RULE_FILTERS = ['全部', '专属 / 同工段', '通用层'] as const
@@ -150,6 +160,7 @@ function statusLabel(key: string) {
 watch(() => props.profile.objectId, () => {
   checkResult.value = null
   checkError.value = null
+  procId.value = null
   kindFilter.value = '全部'
   ruleFilter.value = '全部'
   showAllRelations.value = false
@@ -488,6 +499,31 @@ const KIND_TITLE: Record<string, string> = {
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- 处置 -->
+      <div v-else-if="tab === '处置'">
+        <div v-if="!profile.procedures?.length" class="empty">处置规程中没有与本对象相关的处置卡</div>
+        <div v-else class="grid lg:grid-cols-[260px_minmax(0,1fr)] lg:divide-x divide-line-soft">
+          <div class="py-2 max-h-[720px] overflow-y-auto">
+            <button
+              v-for="c in profile.procedures" :key="c.id"
+              class="block w-full text-left px-4 py-2 border-l-2 hover:bg-ink-panel2"
+              :class="currentProc?.id === c.id ? 'bg-brand/[0.13] border-brand' : 'border-transparent'"
+              @click="procId = c.id"
+            >
+              <div class="flex items-center gap-1.5">
+                <span class="font-mono text-[11px] text-equip">{{ c.id }}</span>
+                <span class="ml-auto pill !text-[10px]" :class="c.relation === '触发' ? 'pill-info' : 'pill-plain'">{{ c.relation }}</span>
+              </div>
+              <div class="text-[12.5px] text-fg">{{ c.name }}</div>
+              <div class="text-[11px] text-fg-mute">{{ c.trigger.level }} {{ c.trigger.setpoint }} · 原因 {{ c.summary.causeCount }} · 步骤 {{ c.summary.stepCount }}</div>
+            </button>
+          </div>
+          <div class="p-4 min-w-0">
+            <ProcedureCardView v-if="currentProc" :card="currentProc" @open="emit('open', $event)" />
+          </div>
+        </div>
       </div>
 
       <!-- 实例（设备组） -->

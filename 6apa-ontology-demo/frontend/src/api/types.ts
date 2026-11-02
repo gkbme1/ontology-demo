@@ -532,6 +532,49 @@ export interface EquipmentAlias {
   basis?: string
 }
 
+/** 规程中提到的名称在本体里的对应结果 */
+export interface ProcAnchor {
+  text: string
+  kind: 'tag' | 'entity' | 'equipment' | 'group' | 'area' | 'unknown' | string
+  id: string | null
+  status: '已对应' | '待确认' | string
+  type?: string
+  label?: string | null
+  objectId?: string | null
+  note?: string
+}
+
+/** 报警处置卡（6APA_处置规程.xlsx） */
+export interface ProcedureCard {
+  id: string
+  name: string
+  alarmName: string
+  relation?: '触发' | '相关' | '本工段' | string
+  trigger: {
+    objects: ProcAnchor[]; tags: ProcAnchor[]; level: string; setpoint: string; unit: string
+    limits: { id: string; status: string; appliesTo?: string | null }[]
+  }
+  area: { text: string; id: string | null }
+  equipment: ProcAnchor[]
+  interlocks: ProcAnchor[]
+  priority: string
+  responseTime: string
+  phenomena: { dcs: string; field: string }
+  consequence: { text: string; objects: ProcAnchor[] }
+  clearCondition: string
+  reportPoints: string
+  recordRequirement: string
+  status: string
+  basis: string
+  causes: { seq: string; category: string; description: string; objects: ProcAnchor[]; verifyMethod: string
+            verifyTags: ProcAnchor[]; criterion: string; autoCheck: boolean; basis: string }[]
+  steps: { seq: string; phase: string; role: string; action: string; description: string; objects: ProcAnchor[]
+           tags: ProcAnchor[]; precondition: string; auto: boolean; basis: string }[]
+  forbidden: { seq: string; text: string; objects: ProcAnchor[]; basis: string }[]
+  summary: { causeCount: number; autoCauseCount: number; stepCount: number; autoStepCount: number; anchored: number; pending: number }
+  source?: Provenance | null
+}
+
 export interface AssetProfile {
   objectId: string
   kind: 'equipment' | 'group' | 'entity' | 'area'
@@ -563,5 +606,7 @@ export interface AssetProfile {
   treePath: string[]
   /** 在关系图谱中展开时用的工艺对象 ID */
   graphEntityId?: string | null
+  /** 与本对象相关的报警处置卡 */
+  procedures?: ProcedureCard[]
   focusTag?: string
 }

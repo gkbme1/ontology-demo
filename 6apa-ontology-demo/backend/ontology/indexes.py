@@ -21,12 +21,14 @@ from backend.ontology.models import (
     SOURCE_CAPABILITY,
     SOURCE_DCS,
     SOURCE_MAPPING,
+    SOURCE_PROCEDURE,
     SOURCE_RELATION,
     SOURCE_RULE,
     SOURCE_TYPE_LABELS,
 )
 from backend.services import object_matcher
 from backend.services.capability_loader import CAPABILITY_FILE_NAME, load_capabilities
+from backend.services.procedure_model import PROCEDURE_FILE_NAME, load_procedures
 from backend.services.data_quality import build_quality_report
 from backend.services.dcs_loader import load_dcs
 from backend.services.mapping_loader import load_mapping
@@ -42,6 +44,7 @@ MAPPING_FILE = SOURCE_DIR / "6APA_对象映射.xlsx"
 RULE_FILE = SOURCE_DIR / "6APA_规则.xlsx"
 MERGE_FILE = SOURCE_DIR / "6APA_设备归并.xlsx"
 CAPABILITY_FILE = SOURCE_DIR / CAPABILITY_FILE_NAME
+PROCEDURE_FILE = SOURCE_DIR / PROCEDURE_FILE_NAME
 
 
 class OntologyStore:
@@ -57,6 +60,8 @@ class OntologyStore:
         self._attach_matches()
         self._attach_area_relation_counts()
         self.quality = build_quality_report(self.dcs, self.relations, self.mapping, self.rules, self.matches)
+        # 报警处置规程要把卡片里的名称对应到本体对象，放在对象与关系都就绪之后加载
+        self.procedures = load_procedures(base / PROCEDURE_FILE.name, self)
 
     # ------------------------------------------------------------ 组装
 
@@ -1112,6 +1117,8 @@ class OntologyStore:
                       "推理规则数据源；未提供时规则页显示空状态，不生成任何规则"),
                 block(SOURCE_CAPABILITY, CAPABILITY_FILE, self.capability_set.load_stats, self.capability_set.available,
                       "能力登记：外部系统提供的能力、调用契约与参数绑定；本体不实现能力"),
+                block(SOURCE_PROCEDURE, PROCEDURE_FILE, self.procedures.load_stats, self.procedures.available,
+                      "报警处置规程：处置卡的触发、可能原因、处置步骤、禁止操作，锚定到本体对象"),
             ],
             "boundary": {
                 "DCS_EXCEL": "现场有什么：工段 / 设备 / 参数 / DCS点",
@@ -1119,6 +1126,7 @@ class OntologyStore:
                 "MAPPING_FILE": "抽象对象与现场位号如何对齐",
                 "RULE_FILE": "什么条件下可以得出什么判断",
                 "CAPABILITY_FILE": "对象能做什么、由谁提供、怎么调用",
+                "PROCEDURE_FILE": "报警后怎么判断、怎么处置、什么不能做",
             },
         }
 

@@ -4,6 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 python3 -m backend.tools.build_equipment_merge   # 设备归并表，已存在时不覆盖
 python3 -m backend.tools.build_capability_table  # 能力登记表，已存在时不覆盖
+python3 -m backend.tools.build_procedure_skeleton  # 报警处置规程骨架与模板，已存在时不覆盖
 python3 -m backend.tools.build_mapping_template
 python3 backend/tools/build_rule_template.py
 python3 -m backend.tools.build_static_demo_data

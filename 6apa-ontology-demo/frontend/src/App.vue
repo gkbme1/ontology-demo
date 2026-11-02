@@ -41,24 +41,21 @@ const govItems = [
           Industrial Ontology · 6-APA Production Line
         </span>
       </div>
-      <nav class="flex items-center gap-1 ml-4">
+      <nav class="flex items-center gap-1 ml-4 shrink-0">
         <RouterLink
           v-for="t in topTabs" :key="t.to" :to="t.to"
-          class="px-3 py-1 rounded-md text-[12.5px] no-underline border"
+          class="px-3 py-1 rounded-md text-[12.5px] no-underline border whitespace-nowrap"
           :class="t.match(route.path) ? 'bg-brand/[0.15] border-brand/60 text-fg font-medium' : 'border-transparent text-fg-dim hover:text-fg hover:bg-ink-panel2'"
         >{{ t.label }}</RouterLink>
       </nav>
       <div class="flex-1"></div>
-      <div class="hidden 2xl:flex gap-1.5 flex-wrap">
-        <span
-          v-for="s in sources?.sources ?? []"
-          :key="s.file"
-          class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[11px] bg-ink-panel2"
-          :class="s.available ? 'border-line text-fg-dim' : 'border-line border-dashed text-fg-mute'"
-        >
-          <span :class="s.available ? 'text-ok' : 'text-fg-mute'">{{ s.available ? '✓' : '○' }}</span>{{ s.file }}
-        </span>
-      </div>
+      <RouterLink
+        to="/data-sources"
+        class="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded border border-line bg-ink-panel2 text-[11.5px] text-fg-dim no-underline hover:text-fg whitespace-nowrap"
+        :title="(sources?.sources ?? []).map((s) => (s.available ? '✓ ' : '○ ') + s.file).join('\n')"
+      >
+        <span class="text-ok">✓</span>数据源 {{ (sources?.sources ?? []).filter((s) => s.available).length }}/{{ (sources?.sources ?? []).length }}
+      </RouterLink>
       <div class="flex items-center gap-2 px-3 py-1 border border-line rounded-full bg-ok/[0.07] text-[11.5px] text-fg-dim whitespace-nowrap">
         <span class="w-[7px] h-[7px] rounded-full" :class="error ? 'bg-err' : 'bg-ok'"></span>
         {{ error ? '本体服务不可达' : '本体服务 · 实时' }}

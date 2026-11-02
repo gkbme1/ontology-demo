@@ -1049,6 +1049,33 @@ class ProfileNotFound(LookupError):
 
 def profile(store: Any, object_id: str) -> dict[str, Any]:
     """对象的本体档案。tag- 返回所属设备的档案并标出焦点位号。"""
+    result = _profile(store, object_id)
+    result["procedures"] = _procedures_for(store, result)
+    return result
+
+
+def _procedures_for(store: Any, result: dict[str, Any]) -> list[dict[str, Any]]:
+    """与本对象相关的报警处置卡：触发位号落在本对象上（触发），或卡片提到了本对象（相关）。"""
+    from backend.services.procedure_model import cards_for
+
+    ps = getattr(store, "procedures", None)
+    if not ps or not ps.cards:
+        return []
+    oid, kind, dcs = result["objectId"], result["kind"], store.dcs
+    objects = {oid} | ({result["graphEntityId"]} if result.get("graphEntityId") else set())
+    if kind == "equipment":
+        return cards_for(ps, object_ids=objects, tag_ids=set(dcs.equipment[oid]["tagIds"]))
+    if kind == "group":
+        return cards_for(ps, object_ids=objects, tag_ids=set(dcs.equipment_groups[oid]["tagIds"]))
+    if kind == "entity":
+        tags = {l["tagId"] for a in result["attributes"] for l in a.get("dataLinks") or []}
+        return cards_for(ps, object_ids=objects, tag_ids=tags)
+    if kind == "area":
+        return cards_for(ps, object_ids=objects, area_id=oid)
+    return []
+
+
+def _profile(store: Any, object_id: str) -> dict[str, Any]:
     index = asset_index(store)
     oid = ids.normalize(object_id) or ""
     if oid.startswith(":"):
