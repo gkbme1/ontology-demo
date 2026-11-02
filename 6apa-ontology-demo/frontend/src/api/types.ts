@@ -373,6 +373,8 @@ export interface AssetNode {
   objectId?: string
   badge?: string
   hint?: string
+  /** 类（标准设备组）/ 实例 / 组公共点位 / 合集·未拆分 / 兜底归类 */
+  nature?: string
 }
 
 export interface AssetSearchHit {
@@ -497,8 +499,10 @@ export interface AssetProfile {
     badges: string[]
     source?: Provenance | null
     aliases?: EquipmentAlias[]
+    nature?: string
   }
-  instances?: { id: string; name: string; tagCount: number; station?: string }[]
+  instances?: { id: string; name: string; tagCount: number; station?: string; nature?: string }[]
+  splitFrom?: { id: string; name: string; owlSubject: string; groupId: string; instanceIds: string[] }
   attributes: ProfileAttribute[]
   relations: { classRelations: ProfileRelation[]; attributeRelations: AttributeRelation[] }
   capabilities: ProfileCapability[]

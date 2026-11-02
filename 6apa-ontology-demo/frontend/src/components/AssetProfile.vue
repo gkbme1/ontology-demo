@@ -81,7 +81,8 @@ const KIND_TITLE: Record<string, string> = {
         <div class="flex flex-wrap items-baseline gap-x-6 gap-y-1">
           <div class="text-[11px] text-fg-mute">类名</div>
           <h2 class="m-0 text-[19px] font-semibold tracking-tight">{{ profile.name }}</h2>
-          <span class="pill pill-info">{{ KIND_TITLE[profile.kind] }}</span>
+          <span class="pill" :class="profile.header.nature && profile.header.nature !== '实例' ? 'pill-warn' : 'pill-info'">{{
+            profile.kind === 'equipment' && profile.header.nature && profile.header.nature !== '实例' ? profile.header.nature : KIND_TITLE[profile.kind] }}</span>
           <span v-for="b in profile.header.badges" :key="b" class="pill pill-plain">{{ b }}</span>
         </div>
         <dl class="mt-3 grid gap-x-8 gap-y-1.5 text-[12.5px]" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr))">
@@ -97,12 +98,20 @@ const KIND_TITLE: Record<string, string> = {
             </dd></div>
         </dl>
         <div v-if="profile.header.aliases?.length" class="mt-2 flex flex-wrap items-center gap-1.5 text-[12px]">
-          <span class="text-fg-mute">已归并点表写法</span>
+          <span class="text-fg-mute">点表来源写法</span>
           <span
             v-for="al in profile.header.aliases" :key="al.id" class="pill pill-plain"
             :title="`${al.mergeKind} · ${al.rule ?? ''}\n${al.basis ?? ''}\n${al.owlSubject}`"
           >{{ al.name }}<span class="text-fg-mute">{{ al.station }}站 · {{ al.mergeKind }} · {{ al.tagCount }}点</span></span>
           <span class="text-fg-mute text-[11px]">依据 6APA_设备归并.xlsx</span>
+        </div>
+        <div v-if="profile.kind === 'equipment' && profile.header.nature && profile.header.nature !== '实例'" class="mt-2 text-[12px] text-warn">
+          这不是一台设备：{{ profile.header.nature === '组公共点位' ? '设备组拆回实例后，剩下没有台号、整组共用的点挂在这里。'
+            : profile.header.nature === '合集·未拆分' ? '点表把同组几台设备的点写在一个名字下，按台号拆不开，暂作合集。'
+            : '点表中按位置兜底归类的点（公用测量管线 / 其他工艺单元 / 管网阀门系统）。' }}
+        </div>
+        <div v-if="profile.splitFrom" class="mt-2 text-[12px] text-warn">
+          点表中的「{{ profile.splitFrom.name }}」是本组 {{ profile.splitFrom.instanceIds.length }} 台设备的合集，已按台号拆回下面的实例。
         </div>
         <div v-if="profile.focusTag" class="mt-2 text-[12px] text-warn">由位号 {{ profile.focusTag }} 定位到本设备，属性表中已高亮。</div>
       </div>
@@ -285,10 +294,10 @@ const KIND_TITLE: Record<string, string> = {
         </section>
 
         <section v-if="profile.instances?.length" class="panel">
-          <div class="panel-head"><h3>类的实例</h3><span class="ml-auto font-mono text-fg-mute text-[11px]">{{ profile.instances.length }} 台</span></div>
+          <div class="panel-head"><h3>类的实例</h3><span class="ml-auto font-mono text-fg-mute text-[11px]">{{ profile.instances.filter((i) => !i.nature || i.nature === '实例').length }} 台实例<template v-if="profile.instances.some((i) => i.nature && i.nature !== '实例')"> + 公共点位/合集</template></span></div>
           <div class="panel-body flex flex-wrap gap-1.5">
-            <button v-for="i in profile.instances" :key="i.id" class="ctl" @click="emit('open', i.id)">
-              {{ i.name }}<span class="text-fg-mute font-mono text-[10.5px]">{{ i.tagCount }}点</span>
+            <button v-for="i in profile.instances" :key="i.id" class="ctl" :class="i.nature && i.nature !== '实例' ? 'italic border-dashed' : ''" @click="emit('open', i.id)">
+              {{ i.name }}<span class="text-fg-mute font-mono text-[10.5px]">{{ i.tagCount }}点<template v-if="i.nature && i.nature !== '实例'"> · {{ i.nature }}</template></span>
             </button>
           </div>
         </section>

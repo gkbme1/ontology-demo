@@ -181,13 +181,16 @@ def propose(ds: Any) -> list[dict[str, Any]]:
 # --------------------------------------------------------------------- 读表
 
 
-def load_table(path: Path) -> list[dict[str, Any]]:
-    """读取归并表；文件不存在时返回空表（即不做归并）。"""
+def load_table(path: Path, sheet: str = SHEET) -> list[dict[str, Any]]:
+    """读取归并表的一个工作表；文件或工作表不存在时返回空表（即不做处理）。"""
     if not path.exists():
         return []
     import pandas as pd
 
-    df = pd.read_excel(path, sheet_name=SHEET, dtype=str).fillna("")
+    try:
+        df = pd.read_excel(path, sheet_name=sheet, dtype=str).fillna("")
+    except ValueError:
+        return []
     rows = []
     for i, rec in enumerate(df.to_dict("records")):
         row = {k: str(v).strip() for k, v in rec.items()}
@@ -229,8 +232,10 @@ def apply(ds: Any, rows: list[dict[str, Any]], file_name: str = MERGE_FILE_NAME)
     """按归并表合并设备，返回统计。"""
     from backend.ontology.models import Provenance
 
-    ds.equipment = AliasDict(ds.equipment)
-    ds.parameters = AliasDict(ds.parameters)
+    if not isinstance(ds.equipment, AliasDict):
+        ds.equipment = AliasDict(ds.equipment)
+    if not isinstance(ds.parameters, AliasDict):
+        ds.parameters = AliasDict(ds.parameters)
     stats = {"file": file_name, "rows": len(rows), "applied": 0, "renamed": 0, "skipped": 0, "invalid": 0}
 
     for row in rows:

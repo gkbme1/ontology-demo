@@ -16,6 +16,7 @@ from backend.ontology import identifiers as ids
 from backend.ontology.indexes import DCS_FILE, MERGE_FILE, OntologyStore
 from backend.services import asset_model as am
 from backend.services import equipment_merge as em
+from backend.services import equipment_split as es
 from backend.services.dcs_loader import load_dcs
 
 results: list[bool] = []
@@ -28,6 +29,9 @@ def check(ok, label: str) -> None:
 
 def main() -> int:
     raw = load_dcs(DCS_FILE)
+    raw_count = len(raw.equipment)
+    raw_tag_links = sum(len(e["tagIds"]) for e in raw.equipment.values())
+    split_stats = es.apply_split(raw, em.load_table(MERGE_FILE, es.SPLIT_SHEET), MERGE_FILE.name)  # 与加载顺序一致：先拆后并
     rows = em.propose(raw)
     table = em.load_table(MERGE_FILE)
 
@@ -46,9 +50,11 @@ def main() -> int:
     store = OntologyStore()
     dcs = store.dcs
     merged = sum(1 for r in table if r["归并方式"] != em.KIND_RENAME)
-    check(len(dcs.equipment) == len(raw.equipment) - merged, f"设备 {len(raw.equipment)} → {len(dcs.equipment)}")
-    check(len(dcs.tags) == len(raw.tags) and sum(len(e["tagIds"]) for e in dcs.equipment.values())
-          == sum(len(e["tagIds"]) for e in raw.equipment.values()), f"DCS 点一个不丢（{len(dcs.tags)}）")
+    expected = raw_count + split_stats["instancesCreated"] - split_stats["sourcesRemoved"] - merged
+    check(len(dcs.equipment) == expected, f"设备 {raw_count} → {len(dcs.equipment)}（拆出 +{split_stats['instancesCreated']}，"
+          f"合集删除 -{split_stats['sourcesRemoved']}，归并 -{merged}）")
+    check(len(dcs.tags) == len(raw.tags) and sum(len(e["tagIds"]) for e in dcs.equipment.values()) == raw_tag_links,
+          f"DCS 点一个不丢（{len(dcs.tags)}）")
     check(all(t["equipmentId"] is None or t["equipmentId"] in dict.keys(dcs.equipment) for t in dcs.tags.values())
           and all(t["parameterId"] is None or t["parameterId"] in dict.keys(dcs.parameters) for t in dcs.tags.values()),
           "点位都指向合并后的设备与参数，没有悬空引用")

@@ -22,6 +22,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from backend.services import equipment_merge as em  # noqa: E402
+from backend.services import equipment_split as es  # noqa: E402
 from backend.services.dcs_loader import load_dcs  # noqa: E402
 
 SOURCE_DIR = ROOT / "data" / "source"
@@ -34,6 +35,7 @@ NOTES = [
     ("归并方式", "同一设备：同一台设备的另一种写法；附属点位：设备上的测量元件或信号（如两支 pH 电极、RB 进料阀、故障信号）；统一名称：只改名不合并。"),
     ("参数前缀", "附属点位的参数名前加的前缀，避免与本体参数重名，例如 A罐RB 的「进料阀指令」→「RB进料阀指令」。同名参数会合并成一个参数、保留全部位号。"),
     ("启用", "是 / 否。改成 否 即不归并该行；也可以照格式手工追加行。"),
+    ("设备拆分", "「设备拆分」工作表：点表把几台设备写成一个名字（如「滤液泵」挂着滤液泵A～F 的 30 个点），按位号描述里的台号逐个位号拆回实例。同一描述的台号正好覆盖全部实例才拆，否则留作「…·公共点位」。加载时先拆后并。"),
     ("重新生成", "python3 -m backend.tools.build_equipment_merge --force 会按规则覆盖本表，人工修改会丢失。"),
     ("规则", "本名 / 同名异写 / 简称 / 冗余后缀 / 省略设备位号 / 附属点位 / 同名跨站，均限定在同一标准设备组内，详见 backend/services/equipment_merge.py。"),
 ]
@@ -45,10 +47,23 @@ def main() -> int:
         print(f"{OUT_FILE.name} 已存在，未覆盖（按规则重建请加 --force）")
         return 0
     ds = load_dcs(SOURCE_DIR / "6APA_DCS.xlsx")  # 不带归并表，拿原始写法
+    raw_count = len(ds.equipment)
+    # 先拆后并，与加载顺序一致：归并规则看到的是拆分后的设备
+    split_rows = es.propose_split(ds)
+    split_stats = es.apply_split(ds, [dict(r, _row=i + 2) for i, r in enumerate(split_rows)], OUT_FILE.name)
     rows = em.propose(ds)
     df = pd.DataFrame(rows, columns=em.COLUMNS)
     with pd.ExcelWriter(OUT_FILE, engine="openpyxl") as writer:
         df.to_excel(writer, sheet_name=em.SHEET, index=False)
+        pd.DataFrame(split_rows, columns=es.SPLIT_COLUMNS).to_excel(writer, sheet_name=es.SPLIT_SHEET, index=False)
+        sws = writer.sheets[es.SPLIT_SHEET]
+        for i, w in enumerate([6, 7, 22, 14, 8, 26, 16, 34, 16, 26, 22, 10, 70, 6], 1):
+            sws.column_dimensions[get_column_letter(i)].width = w
+        for cell in sws[1]:
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill("solid", fgColor="1F3A5F")
+        sws.freeze_panes = "G2"
+        sws.auto_filter.ref = sws.dimensions
         pd.DataFrame(NOTES, columns=["项目", "说明"]).to_excel(writer, sheet_name="说明", index=False)
         ws = writer.sheets[em.SHEET]
         widths = [6, 7, 26, 20, 8, 28, 8, 20, 28, 10, 12, 60, 10, 6]
@@ -66,8 +81,12 @@ def main() -> int:
         notes.column_dimensions["B"].width = 110
     kinds = Counter(r["归并方式"] for r in rows)
     merged = sum(1 for r in rows if r["归并方式"] != em.KIND_RENAME)
-    print(f"已生成 {OUT_FILE.relative_to(ROOT)}：{len(rows)} 行（{dict(kinds)}），"
-          f"设备 {len(ds.equipment)} → {len(ds.equipment) - merged}")
+    split_into = Counter(r["拆分到"] for r in split_rows)
+    print(f"已生成 {OUT_FILE.relative_to(ROOT)}")
+    print(f"  设备拆分：{len(split_rows)} 个位号拆到 {len(split_into)} 台实例"
+          f"（新建 {split_stats['instancesCreated']} 台，原合集删除 {split_stats['sourcesRemoved']} 个）")
+    print(f"  设备归并：{len(rows)} 行（{dict(kinds)}）")
+    print(f"  设备 {raw_count} → {len(ds.equipment) - merged}")
     return 0
 
 

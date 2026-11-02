@@ -132,6 +132,10 @@ class DcsDataset:
         self.issues: list[dict[str, Any]] = []
         self.load_stats: dict[str, Any] = {}
         self.merge_stats: dict[str, Any] | None = None
+        self.split_stats: dict[str, Any] | None = None
+        # 整台拆回实例后删除的原设备：旧 ID → 所属设备组与拆出的实例
+        self.equipment_splits: dict[str, dict[str, Any]] = {}
+        self.nature_counts: dict[str, int] = {}
         # 工段编号 → areaId，供其它加载器按编号或名称回查
         self.area_by_code: dict[str, str] = {}
         self.area_by_name: dict[str, str] = {}
@@ -184,12 +188,21 @@ def load_dcs(path: str | Path, merge_path: str | Path | None = None) -> DcsDatas
     _load_stats(ds, path)
     _load_screen_sheets(ds, path)
     ds.merge_stats = None
+    ds.split_stats = None
+    ds.equipment_splits = {}
     if merge_path is not None:
-        from backend.services import equipment_merge
+        from backend.services import equipment_merge, equipment_split
 
         merge_path = Path(merge_path)
+        # 先拆（一个名字下的多台设备拆回实例），再并（一台设备的多种写法并成一台）
+        ds.split_stats = equipment_split.apply_split(
+            ds, equipment_merge.load_table(merge_path, equipment_split.SPLIT_SHEET), merge_path.name)
         ds.merge_stats = equipment_merge.apply(ds, equipment_merge.load_table(merge_path), merge_path.name)
         ds.merge_stats["available"] = merge_path.exists()
+        ds.merge_stats["split"] = ds.split_stats
+    from backend.services.equipment_split import classify
+
+    ds.nature_counts = classify(ds)
     _finalise(ds)
     return ds
 
@@ -763,4 +776,5 @@ def _finalise(ds: DcsDataset) -> None:
         "equipmentGroupCount": len(ds.equipment_groups),
         "multiAreaEquipmentCount": len([e for e in ds.equipment.values() if e["areaSpan"] > 1]),
         "equipmentMerge": ds.merge_stats,
+        "equipmentNature": ds.nature_counts,
     }

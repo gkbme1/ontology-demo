@@ -189,15 +189,24 @@ class AssetIndex:
 
     def _equip_node(self, eid: str, parent: str) -> dict[str, Any]:
         equip = self.equipment[eid]
-        return self._node(
+        nature = equip.get("nature") or "实例"
+        node = self._node(
             f"{parent}|{eid}", equip["name"], "equipment", children=False, object_id=eid,
-            badge=f"{equip['tagCount']} 点", hint=f"{equip.get('owlSubject')} · 站{equip.get('station')}",
+            badge=f"{equip['tagCount']} 点",
+            hint=f"{'设备实例' if nature == '实例' else nature} · {equip.get('owlSubject')} · 站{equip.get('station')}",
         )
+        node["nature"] = nature
+        return node
 
     def _group_node(self, gid: str, parent: str) -> dict[str, Any]:
         group = self.groups[gid]
-        return self._node(f"{parent}|{gid}", group["name"], "group", count=len(group["equipmentIds"]),
-                          object_id=gid, badge=group.get("areaCode"))
+        declared = len([i for i in group.get("instances") or [] if i])
+        node = self._node(f"{parent}|{gid}", group["name"], "group", count=len(group["equipmentIds"]),
+                          object_id=gid, badge=group.get("areaCode"),
+                          hint=f"类 · 标准设备组（{group.get('equipmentType')}）"
+                               + (f"，声明 {declared} 台实例" if declared else ""))
+        node["nature"] = "类"
+        return node
 
     def _entity_node(self, rid: str, parent: str) -> dict[str, Any]:
         entity = self.entities[rid]
@@ -293,6 +302,8 @@ class AssetIndex:
                     node["badge"] = "共用"
                     node["hint"] = f"共用设备，主组：{primary['name']}"
                 nodes.append(node)
+            # 先列实例，公共点位 / 合集放在后面
+            nodes.sort(key=lambda n: (n.get("nature") != "实例", n["label"]))
             return nodes
 
         # ---- 自动化与控制：多一层 DCS 控制站
@@ -631,6 +642,12 @@ def _safety_constraints(class_relations: list[dict[str, Any]]) -> list[dict[str,
     ]
 
 
+def _alias_badges(aliases: list[dict[str, Any]]) -> list[str]:
+    merged = [a for a in aliases if a.get("mergeKind") in ("同一设备", "附属点位")]
+    split = [a for a in aliases if a.get("mergeKind") == "拆分来源"]
+    return ([f"合并 {len(merged)} 种写法"] if merged else []) + [f"拆自「{a['name']}」" for a in split]
+
+
 def _entity_attribute(store: Any, entity: dict[str, Any], own_tags: set[str] | None = None) -> dict[str, Any]:
     """工艺属性（关系对象）作为一条属性：数据关联取它匹配到的测点。
 
@@ -720,10 +737,16 @@ def _equipment_profile(store: Any, index: AssetIndex, eid: str) -> dict[str, Any
         attrs.append({"kind": "固有", "name": "主要部件", "valueType": "列表", "value": "、".join(group["components"])})
     attrs.append({"kind": "固有", "name": "归属置信度", "valueType": "枚举", "value": equip.get("confidence")})
     aliases = equip.get("aliases") or []
-    if aliases:
+    merged = [a for a in aliases if a.get("mergeKind") in ("同一设备", "附属点位", "统一名称")]
+    split = [a for a in aliases if a.get("mergeKind") == "拆分来源"]
+    if merged:
         attrs.append({"kind": "固有", "name": "点表中的其他写法", "valueType": "列表",
-                      "value": "、".join(f"{a['name']}（{a['station']} 站）" for a in aliases),
-                      "note": "已按设备归并表合并为本设备"})
+                      "value": "、".join(f"{a['name']}（{a['station']} 站）" for a in merged),
+                      "note": "按设备归并表合并 / 改名为本设备"})
+    if split:
+        attrs.append({"kind": "固有", "name": "拆分来源", "valueType": "列表",
+                      "value": "、".join(f"{a['name']}（{a['station']} 站，{a['tagCount']} 点）" for a in split),
+                      "note": "点表把同组几台设备写在这个名字下，按台号拆出本台"})
 
     property_entities = []
     from_group: set[str] = set()
@@ -767,7 +790,8 @@ def _equipment_profile(store: Any, index: AssetIndex, eid: str) -> dict[str, Any
                                 "target": group["name"], "targetId": group["id"], "mechanism": "", "source": "DCS 点表 · 设备组"})
     for view in _class_relations(relations_list, anchor_ids):
         # 设备组"包含实例"的关系对单台设备而言是同组的兄弟实例
-        if view["role"] == "包含实例" and view["from"] in {a["name"] for i, a in anchors.items() if i in inherited}:
+        if view["role"] == "包含实例" and equip.get("nature", "实例") == "实例" \
+                and view["from"] in {a["name"] for i, a in anchors.items() if i in inherited}:
             if view["target"] == equip["name"]:
                 continue
             view["role"] = "同组实例"
@@ -783,6 +807,8 @@ def _equipment_profile(store: Any, index: AssetIndex, eid: str) -> dict[str, Any
     structure = _structure_checks([
         ("设备必须归属一个主工段", bool(equip.get("areaId")), f"{equip.get('areaCode')} {equip.get('areaName')}"),
         ("设备应归入标准设备组", bool(group), group["name"] if group else "未入组（点表有、设备组清单未声明）"),
+        ("设备节点应对应现场单台设备", equip.get("nature", "实例") == "实例",
+         "单台实例" if equip.get("nature", "实例") == "实例" else f"{equip.get('nature')}：点表中多台设备或整组共用的点"),
         ("过程测量点必须带单位", not no_unit, "全部带单位" if not no_unit else f"缺单位：{'、'.join(no_unit[:5])}"),
         ("设备应有 DCS 点", bool(tags), f"{len(tags)} 个点"),
     ])
@@ -800,9 +826,10 @@ def _equipment_profile(store: Any, index: AssetIndex, eid: str) -> dict[str, Any
             "overview": equip.get("overview"),
             "badges": [f"{equip['tagCount']} 个 DCS 点", f"{equip['parameterCount']} 个参数"]
                       + ([f"跨 {equip['areaSpan']} 个工段"] if equip.get("areaSpan", 1) > 1 else [])
-                      + ([f"合并 {len(equip['aliases'])} 种写法"] if equip.get("aliases") else []),
+                      + _alias_badges(equip.get("aliases") or []),
             "source": equip.get("source"),
             "aliases": equip.get("aliases") or [],
+            "nature": equip.get("nature") or "实例",
         },
         "attributes": _sort_attributes(attrs),
         "relations": {"classRelations": class_relations, "attributeRelations": attribute_relations},
@@ -870,7 +897,9 @@ def _group_profile(store: Any, index: AssetIndex, gid: str) -> dict[str, Any]:
             "badges": [f"{len(instances)} 台实例", f"{group['tagCount']} 个 DCS 点", "类（标准设备组）"],
             "source": group.get("source"),
         },
-        "instances": [{"id": e["id"], "name": e["name"], "tagCount": e["tagCount"], "station": e.get("station")} for e in instances],
+        "instances": [{"id": e["id"], "name": e["name"], "tagCount": e["tagCount"], "station": e.get("station"),
+                       "nature": e.get("nature") or "实例"}
+                      for e in sorted(instances, key=lambda e: (e.get("nature", "实例") != "实例", e["name"]))],
         "attributes": _sort_attributes(attrs),
         "relations": {
             "classRelations": class_relations,
@@ -1022,6 +1051,11 @@ def profile(store: Any, object_id: str) -> dict[str, Any]:
             result = _equipment_profile(store, index, tag["equipmentId"])
             result["focusTag"] = tag["name"]
             return result
+    if oid in store.dcs.equipment_splits:
+        # 整台拆回实例的原合集：转到所属设备组（类），由类列出拆出的实例
+        result = _group_profile(store, index, store.dcs.equipment_splits[oid]["groupId"])
+        result["splitFrom"] = {"id": oid, **store.dcs.equipment_splits[oid]}
+        return result
     if oid in store.dcs.equipment:
         # 已归并设备的旧 ID 转到合并后的设备
         return _equipment_profile(store, index, store.dcs.equipment[oid]["id"])
