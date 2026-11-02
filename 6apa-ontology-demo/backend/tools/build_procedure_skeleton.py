@@ -361,9 +361,17 @@ def main() -> int:
         return 0
     store = OntologyStore()
     cards, causes, steps = build_skeleton(store)
-    write_book(OUT_FILE, cards, causes, steps, [])
-    print(f"已生成 {OUT_FILE.relative_to(ROOT)}：{len(cards)} 张处置卡骨架，{len(causes)} 条可能原因，"
-          f"{len(steps)} 个确认判断步骤（真实处置步骤、禁止操作待工艺补充）")
+    # 已有规程的工段用规程卡替换推导骨架：S11 酶法水解（docs/SOP-S11-ALARM-001.md）
+    from backend.tools.sop_s11_cards import build as build_s11
+
+    s11_cards, s11_causes, s11_steps, s11_forbidden = build_s11(store)
+    keep = {c["卡片编号"] for c in cards if c["所属工段"] != "S11"}
+    cards = [c for c in cards if c["卡片编号"] in keep] + s11_cards
+    causes = [c for c in causes if c["卡片编号"] in keep] + s11_causes
+    steps = [s for s in steps if s["卡片编号"] in keep] + s11_steps
+    write_book(OUT_FILE, cards, causes, steps, s11_forbidden)
+    print(f"已生成 {OUT_FILE.relative_to(ROOT)}：{len(cards)} 张处置卡（S11 {len(s11_cards)} 张取自 SOP-S11-ALARM-001，"
+          f"其余为推导骨架），{len(causes)} 条可能原因，{len(steps)} 个步骤，{len(s11_forbidden)} 条禁止操作")
     return 0
 
 

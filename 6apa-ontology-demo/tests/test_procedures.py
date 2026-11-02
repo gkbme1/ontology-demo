@@ -32,16 +32,29 @@ def main() -> int:
     cards = list(ps.cards.values())
     check(ps.available and len(cards) >= 30 and not ps.issues, f"{pm.PROCEDURE_FILE_NAME} 加载 {len(cards)} 张处置卡，无引用错误")
     check(all(c["trigger"]["tags"] and c["causes"] for c in cards), "每张卡都有触发位号与可能原因")
-    check(all(c["status"].startswith("草案") for c in cards), "由本体推导的卡全部标草案，待工艺确认")
-    check(all(s["phase"] == "确认判断" for c in cards for s in c["steps"]) and not any(c["forbidden"] for c in cards),
-          "只生成确认判断步骤，真实处置步骤与禁止操作不编造")
-    card = ps.cards["ARP-S11-01"]
-    check(card["trigger"]["limits"][0]["id"] == "PL001" and "TI_1301A" in [t["text"] for t in card["trigger"]["tags"]],
-          f"{card['id']} {card['name']}：关联限值 PL001，触发位号含 TI_1301A")
-    check(any(c["category"] == "仪表" and "假报警" in c["description"] for c in card["causes"])
-          and any(c["category"] == "设备" for c in card["causes"]), "原因含测点本身（假报警）与控制回路执行机构")
-    check("R-S11-01" in card["consequence"]["text"] and "33.0～35.0" in card["clearCondition"],
-          "后果引用规则 R-S11-01，解除条件取限值正常区间")
+    skeleton = [c for c in cards if not c["id"].startswith("ARP-S11")]
+    check(all(c["status"].startswith("草案") for c in skeleton), f"由本体推导的 {len(skeleton)} 张骨架卡全部标草案，待工艺确认")
+    check(all(s["phase"] == "确认判断" for c in skeleton for s in c["steps"]) and not any(c["forbidden"] for c in skeleton),
+          "骨架只生成确认判断步骤，真实处置步骤与禁止操作不编造")
+    card = next(c for c in skeleton if c["trigger"]["limits"] and c["trigger"]["limits"][0]["id"] == "PL003")
+    check(any(c["category"] == "仪表" and "假报警" in c["description"] for c in card["causes"]),
+          f"{card['id']} {card['name']}：原因含测点本身（假报警）")
+    check("正常区间" in card["clearCondition"], "骨架的解除条件取限值正常区间")
+
+    print("\n[S11 规程卡（SOP-S11-ALARM-001）]")
+    s11 = [c for c in cards if c["id"].startswith("ARP-S11")]
+    check(len(s11) == 10 and all(c["status"].startswith("模拟规程") for c in s11), "S11 用规程卡替换骨架：10 张，标模拟规程")
+    check(all({s["phase"] for s in c["steps"]} - {"确认判断"} for c in s11) and sum(len(c["forbidden"]) for c in s11) >= 10,
+          "规程卡有真实处置 / 升级 / 恢复步骤与禁止操作")
+    temp = ps.cards["ARP-S11-01"]
+    check(temp["trigger"]["limits"][0]["id"] == "PL001" and "TI_1301A" in [t["text"] for t in temp["trigger"]["tags"]]
+          and any("HV_1301" in c["description"] or c["objects"] and c["objects"][0]["text"] == "热水阀HV_1301" for c in temp["causes"]),
+          "温度高：关联 PL001，触发 TI_1301A～K，原因含热水阀 HV_1301")
+    ph = ps.cards["ARP-S11-04"]
+    check(any("AT_1301A2" in [t["text"] for t in c["verifyTags"]] for c in ph["causes"])
+          and any("氨" in c["description"] for c in ph["causes"]), "pH 低：双电极对比、加氨无响应（氨水，不是碱液）")
+    refs = [r for c in s11 for r in pm._all_refs(c)]
+    check(all(r["status"] == pm.ANCHOR_OK for r in refs), f"规程卡里 {len(refs)} 处名称全部对应到本体")
 
     print("\n[方向]")
     texts = [c["description"] for c in cards for c in c["causes"]]
@@ -66,7 +79,7 @@ def main() -> int:
     tank = store.dcs.equipment_by_owl(":Dev_13_水解罐A")
     p = am.profile(store, tank["id"])
     trig = [c for c in p["procedures"] if c["relation"] == "触发"]
-    check(any(c["id"] == "ARP-S11-01" for c in trig), f"水解罐A 档案带出 {len(trig)} 张由它触发的处置卡")
+    check({"ARP-S11-01", "ARP-S11-04", "ARP-S11-07"} <= {c["id"] for c in trig}, f"水解罐A 档案带出 {len(trig)} 张由它触发的处置卡")
     area = am.profile(store, "area-S11")["procedures"]
     check(area and all(c["area"]["id"] == "area-S11" for c in area if c["relation"] == "本工段"), f"工段 S11 档案列出本工段 {len(area)} 张卡")
     try:
@@ -79,7 +92,7 @@ def main() -> int:
     app_module._store = store
     client = TestClient(app_module.app)
     check(client.get("/api/ontology/procedures").json()["total"] == len(cards), "/api/ontology/procedures 列出全部处置卡")
-    check(client.get("/api/ontology/procedures/ARP-S11-01").json()["name"] == card["name"]
+    check(client.get("/api/ontology/procedures/ARP-S11-01").json()["name"] == temp["name"]
           and client.get("/api/ontology/procedures/NOPE").status_code == 404, "单张卡接口可用，未知卡 404")
     check(client.get(f"/api/ontology/{tank['id']}/procedures").json()["total"] == len(p["procedures"]), "对象相关处置卡接口可用")
     sources = client.get("/api/ontology/data-sources").json()["sources"]
