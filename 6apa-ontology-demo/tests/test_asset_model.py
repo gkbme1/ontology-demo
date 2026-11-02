@@ -111,6 +111,12 @@ def main() -> int:
     measured = [a for a in p["attributes"] if a.get("dataLinks")]
     check(p["kind"] == "entity" and measured and measured[0]["dataLinkTotal"] == entity["match"]["tagCount"], f"工艺对象的数据关联 = 匹配到的测点（{entity['name']}）")
 
+    group_entity = next(e for e in store.relations.entities.values() if e["name"] == "水解反应釜组(水解罐A–K)")
+    ar = am.profile(store, group_entity["id"])["relations"]["attributeRelations"]
+    cats = {r["category"] for r in ar}
+    check({"影响关系", "控制关系", "质量关系", "报警联锁关系"} <= cats and all(r.get("via") for r in ar),
+          f"属性间关系顺着对象的工艺属性取影响 / 质量 / 控制 / 报警联锁（水解反应釜组 {len(ar)} 条）")
+
     p = am.profile(store, tag["id"])
     check(p["objectId"] == equip["id"] and p.get("focusTag") == tag["name"], "按位号打开所属设备档案并标出焦点位号")
     p = am.profile(store, equip["owlSubject"])

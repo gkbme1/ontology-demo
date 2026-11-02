@@ -532,33 +532,63 @@ def _class_relations(relations: list[dict[str, Any]], anchor_ids: set[str]) -> l
     return out
 
 
-def _attribute_relations(relations: list[dict[str, Any]], names: set[str]) -> list[dict[str, Any]]:
-    """属性间关系：涉及本对象属性的影响 / 质量关系，按"计算 / 传递 / 关联"归类。"""
+# 属性间关系取这几类：工艺参数之间的影响、质量、控制回路、报警联锁
+PARAM_RELATION_CATEGORIES = CAUSAL_CATEGORIES | {"控制关系", "报警联锁关系"}
+
+
+def _property_ids(store: Any, anchor_ids: set[str]) -> set[str]:
+    """对象（锚点）在工业关系里「具有属性」的工艺对象。"""
+    out = set()
+    for rel in store.relations.relations:
+        if rel.get("predicate") == "具有属性" and (rel.get("subject") or {}).get("id") in anchor_ids:
+            oid = (rel.get("object") or {}).get("id")
+            if oid:
+                out.add(oid)
+    return out
+
+
+def _attribute_relations(store: Any, property_ids: set[str], anchor_ids: set[str] = frozenset()) -> list[dict[str, Any]]:
+    """属性间关系：本对象的属性（工艺参数）参与的影响 / 质量 / 控制 / 报警联锁关系，按"计算 / 传递 / 关联"归类。
+
+    property_ids 是本对象的属性（工艺对象 ID）；对象自身作端点的控制、报警联锁关系已在类间关系里，不重复列出。
+    """
     out = []
-    for rel in relations:
-        if rel.get("category") not in CAUSAL_CATEGORIES:
+    for rel in store.relations.relations:
+        cat = rel.get("category")
+        if cat not in PARAM_RELATION_CATEGORIES:
             continue
-        if rel.get("subjectEntity") not in names and rel.get("objectEntity") not in names:
+        sid, oid = (rel.get("subject") or {}).get("id"), (rel.get("object") or {}).get("id")
+        if sid not in property_ids and oid not in property_ids:
+            if cat in CAUSAL_CATEGORIES and (sid in anchor_ids or oid in anchor_ids):
+                pass  # 对象自身参与的因果关系也算（类间关系里不列因果）
+            else:
+                continue
+        if cat in ("控制关系", "报警联锁关系") and (sid in anchor_ids or oid in anchor_ids):
             continue
         mechanism = rel.get("domainDescription") or ""
         pred = rel.get("predicate") or ""
         if "计算" in mechanism or "即" in mechanism:
             kind = "计算"
-        elif pred in ("正向影响", "负向影响"):
+        elif pred in ("正向影响", "负向影响") or cat == "控制关系":
             kind = "传递"
         else:
             kind = "关联"
+        via = rel.get("subjectEntity") if sid in property_ids else rel.get("objectEntity") if oid in property_ids else None
         out.append({
             "kind": kind,
             "from": rel.get("subjectEntity"),
             "to": rel.get("objectEntity"),
+            "fromId": sid,
+            "toId": oid,
+            "via": via,
             "predicate": pred,
-            "category": rel.get("category"),
+            "category": cat,
             "mechanism": mechanism,
+            "tagCount": rel.get("tagCount") or 0,
             "source": _source_text(rel),
         })
     order = {"计算": 0, "传递": 1, "关联": 2}
-    out.sort(key=lambda r: order.get(r["kind"], 9))
+    out.sort(key=lambda r: (order.get(r["kind"], 9), r["category"] or "", r["via"] or ""))
     return out
 
 
@@ -765,8 +795,8 @@ def _equipment_profile(store: Any, index: AssetIndex, eid: str) -> dict[str, Any
                 continue
             view["role"] = "同组实例"
         class_relations.append(view)
-    names = {e["name"] for e in property_entities} | {a["name"] for a in anchors.values()}
-    attribute_relations = _attribute_relations(store.relations.relations, names)
+    attribute_relations = _attribute_relations(store, {e["id"] for e in property_entities} | _property_ids(store, anchor_ids),
+                                               anchor_ids)
 
     # ---- 能力 / 约束 / 规则
     limits = _limits_by_name(store, eid)
@@ -811,6 +841,8 @@ def _equipment_profile(store: Any, index: AssetIndex, eid: str) -> dict[str, Any
         },
         "rules": _rules_view(rules),
         "treePath": index.path_of(eid),
+        # 关系图谱入口：优先本设备自己的工艺对象，其次继承的设备组对象
+        "graphEntityId": next((i for i in anchors if i not in inherited), next(iter(anchors), None)),
     }
 
 
@@ -873,7 +905,8 @@ def _group_profile(store: Any, index: AssetIndex, gid: str) -> dict[str, Any]:
         "attributes": _sort_attributes(attrs),
         "relations": {
             "classRelations": class_relations,
-            "attributeRelations": _attribute_relations(store.relations.relations, names | {group["name"]}),
+            "attributeRelations": _attribute_relations(store, _property_ids(store, {entity["id"]}) if entity else set(),
+                                                       {entity["id"]} if entity else set()),
         },
         "capabilities": _capabilities(store, "group", entity["id"] if entity else gid, tags, rules, group.get("equipmentType")),
         "constraints": {
@@ -884,6 +917,7 @@ def _group_profile(store: Any, index: AssetIndex, gid: str) -> dict[str, Any]:
         },
         "rules": _rules_view(rules),
         "treePath": index.path_of(gid),
+        "graphEntityId": entity["id"] if entity else None,
     }
 
 
@@ -923,7 +957,8 @@ def _entity_profile(store: Any, index: AssetIndex, rid: str) -> dict[str, Any]:
         "attributes": attrs,
         "relations": {
             "classRelations": class_relations,
-            "attributeRelations": _attribute_relations(relations, {entity["name"]}),
+            "attributeRelations": _attribute_relations(store, _property_ids(store, {rid}) | ({rid} if entity["type"] == "工艺属性" else set()),
+                                                       {rid}),
         },
         "capabilities": _capabilities(store, "entity", rid, tags, rules),
         "constraints": {
@@ -936,6 +971,7 @@ def _entity_profile(store: Any, index: AssetIndex, rid: str) -> dict[str, Any]:
         },
         "rules": _rules_view(rules),
         "treePath": index.path_of(rid),
+        "graphEntityId": rid,
     }
 
 
@@ -983,7 +1019,7 @@ def _area_profile(store: Any, index: AssetIndex, aid: str) -> dict[str, Any]:
         "attributes": attrs,
         "relations": {
             "classRelations": class_relations,
-            "attributeRelations": _attribute_relations(store.relations.relations, {e["name"] for e in entities}),
+            "attributeRelations": _attribute_relations(store, {e["id"] for e in entities}),
         },
         "capabilities": _capabilities(store, "area", aid, [store.dcs.tags[t] for t in area.get("tagIds", []) if t in store.dcs.tags],
                                       rules),

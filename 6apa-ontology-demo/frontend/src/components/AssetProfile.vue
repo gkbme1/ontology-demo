@@ -39,6 +39,86 @@ const activeTab = computed(() => tabs.value.find((t) => t.key === tab.value)!)
 function setTab(key: TabKey) {
   router.replace({ query: { ...route.query, tab: key === '属性' ? undefined : key } })
 }
+// 头部默认只显示一行要点，来源与点表写法收进「来源与说明」
+const headerOpen = ref(false)
+const hasHeaderMore = computed(() => !!props.profile.header.source || !!props.profile.header.aliases?.length)
+const notice = computed(() => {
+  const p = props.profile
+  if (p.kind === 'equipment' && p.header.nature && p.header.nature !== '实例') {
+    return '这不是一台设备：' + (p.header.nature === '组公共点位' ? '设备组拆回实例后，剩下没有台号、整组共用的点挂在这里。'
+      : p.header.nature === '合集·未拆分' ? '点表把同组几台设备的点写在一个名字下，按台号拆不开，暂作合集。'
+        : '点表中按位置兜底归类的点（公用测量管线 / 其他工艺单元 / 管网阀门系统）。')
+  }
+  if (p.splitFrom) return `点表中的「${p.splitFrom.name}」是本组 ${p.splitFrom.instanceIds.length} 台设备的合集，已按台号拆回实例（见「实例」页签）。`
+  if (p.focusTag) return `由位号 ${p.focusTag} 定位到本设备，属性表中已高亮。`
+  return ''
+})
+
+// ---------------------------------------------------------------- 关系页：类间 + 属性间统一成一张表，可多选筛选
+interface RelRow {
+  key: string; layer: '类间' | '属性间'; cat: string; label: string
+  from: string; fromId?: string | null; predicate: string; to: string; toId?: string | null
+  mechanism: string; via?: string | null; kind?: string
+}
+const CAT_OF: Record<string, string> = {
+  空间层级: '结构', 设备分类: '结构', 结构关系: '结构', 物理拓扑关系: '物理拓扑', 工段衔接: '物理拓扑',
+  控制关系: '控制', 报警联锁关系: '报警联锁', 影响关系: '影响', 因果关系: '影响', 质量关系: '质量'
+}
+const CAT_ORDER = ['结构', '物理拓扑', '控制', '影响', '质量', '报警联锁']
+const CAT_STYLE: Record<string, string> = {
+  结构: 'text-info', 物理拓扑: 'text-ok', 控制: 'text-equip', 影响: 'text-prop', 质量: 'text-tagc', 报警联锁: 'text-err'
+}
+const relRows = computed<RelRow[]>(() => {
+  const p = props.profile
+  const rows: RelRow[] = p.relations.classRelations.map((r, i) => {
+    const out = r.direction !== 'in'
+    return {
+      key: `c${i}`, layer: '类间', cat: CAT_OF[r.category ?? ''] ?? '结构', label: r.role,
+      from: r.from ?? (out ? p.name : r.target), fromId: out ? null : r.targetId,
+      predicate: r.predicate ?? r.role, to: r.to ?? (out ? r.target : p.name), toId: out ? r.targetId : null,
+      mechanism: r.mechanism
+    }
+  })
+  p.relations.attributeRelations.forEach((r, i) => rows.push({
+    key: `a${i}`, layer: '属性间', cat: CAT_OF[r.category ?? ''] ?? '影响', label: r.kind,
+    from: r.from, fromId: r.fromId, predicate: r.predicate, to: r.to, toId: r.toId, mechanism: r.mechanism, via: r.via, kind: r.kind
+  }))
+  return rows
+})
+const relLayers = ref<Set<string>>(new Set(['类间', '属性间']))
+const relCats = ref<Set<string>>(new Set(CAT_ORDER))
+const relKeyword = ref('')
+function toggled(set: Set<string>, key: string) {
+  const next = new Set(set)
+  if (next.has(key)) next.delete(key)
+  else next.add(key)
+  return next
+}
+function toggleLayer(key: string) { relLayers.value = toggled(relLayers.value, key) }
+function toggleCat(key: string) { relCats.value = toggled(relCats.value, key) }
+function onlyCat(key: string) { relCats.value = new Set([key]) }
+function allCats() { relCats.value = new Set(CAT_ORDER) }
+const catCounts = computed(() => {
+  const c: Record<string, number> = {}
+  for (const r of relRows.value) if (relLayers.value.has(r.layer)) c[r.cat] = (c[r.cat] ?? 0) + 1
+  return c
+})
+const layerCounts = computed(() => {
+  const c: Record<string, number> = {}
+  for (const r of relRows.value) c[r.layer] = (c[r.layer] ?? 0) + 1
+  return c
+})
+const filteredRel = computed(() => {
+  const kw = relKeyword.value.trim()
+  return relRows.value.filter((r) => relLayers.value.has(r.layer) && relCats.value.has(r.cat)
+    && (!kw || [r.from, r.to, r.predicate, r.mechanism, r.via ?? ''].some((t) => t?.includes(kw))))
+})
+const hubRelations = computed(() => props.profile.relations.classRelations.filter(
+  (r) => relLayers.value.has('类间') && relCats.value.has(CAT_OF[r.category ?? ''] ?? '结构')))
+function openGraph() {
+  if (props.profile.graphEntityId) router.push(`/graph/${props.profile.graphEntityId}`)
+}
+
 const structureIssues = computed(() => props.profile.constraints.structure.filter((c) => !c.satisfied).length)
 
 const RULE_FILTERS = ['全部', '专属 / 同工段', '通用层'] as const
@@ -133,45 +213,34 @@ const KIND_TITLE: Record<string, string> = {
 
 <template>
   <div class="space-y-4">
-    <!-- 类与层级 -->
+    <!-- 类与层级（紧凑） -->
     <section class="panel">
-      <div class="px-5 py-4 bg-gradient-to-r from-brand/[0.10] to-transparent">
-        <div class="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-          <div class="text-[11px] text-fg-mute">类名</div>
-          <h2 class="m-0 text-[19px] font-semibold tracking-tight">{{ profile.name }}</h2>
+      <div class="px-4 py-2.5 bg-gradient-to-r from-brand/[0.10] to-transparent">
+        <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+          <h2 class="m-0 text-[17px] font-semibold tracking-tight">{{ profile.name }}</h2>
           <span class="pill" :class="profile.header.nature && profile.header.nature !== '实例' ? 'pill-warn' : 'pill-info'">{{
             profile.kind === 'equipment' && profile.header.nature && profile.header.nature !== '实例' ? profile.header.nature : KIND_TITLE[profile.kind] }}</span>
           <span v-for="b in profile.header.badges" :key="b" class="pill pill-plain">{{ b }}</span>
+          <button v-if="hasHeaderMore" class="ml-auto text-[11.5px] text-fg-mute hover:text-fg" @click="headerOpen = !headerOpen">
+            {{ headerOpen ? '收起' : '来源与说明' }} {{ headerOpen ? '▴' : '▾' }}</button>
         </div>
-        <dl class="mt-3 grid gap-x-8 gap-y-1.5 text-[12.5px]" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr))">
-          <div class="flex gap-2"><dt class="text-fg-mute w-12 shrink-0">父类</dt>
-            <dd class="m-0 text-fg-dim">{{ profile.header.classPath.join(' → ') }}</dd></div>
-          <div class="flex gap-2"><dt class="text-fg-mute w-12 shrink-0">编码</dt>
-            <dd class="m-0 font-mono text-[12px] break-all">{{ profile.header.code || '—' }}</dd></div>
-          <div class="flex gap-2"><dt class="text-fg-mute w-12 shrink-0">工段</dt>
-            <dd class="m-0">{{ profile.header.area || '—' }}<span v-if="profile.header.station" class="text-fg-mute"> · 控制站 {{ profile.header.station }}</span></dd></div>
-          <div class="flex gap-2"><dt class="text-fg-mute w-12 shrink-0">来源</dt>
-            <dd class="m-0 text-fg-dim">
-              {{ profile.header.source?.file ?? '—' }}<span v-if="profile.header.source?.sheet"> · {{ profile.header.source.sheet }}</span><span v-if="profile.header.source?.row"> · 第 {{ profile.header.source.row }} 行</span>
-            </dd></div>
-        </dl>
-        <div v-if="profile.header.aliases?.length" class="mt-2 flex flex-wrap items-center gap-1.5 text-[12px]">
-          <span class="text-fg-mute">点表来源写法</span>
-          <span
-            v-for="al in profile.header.aliases" :key="al.id" class="pill pill-plain"
-            :title="`${al.mergeKind} · ${al.rule ?? ''}\n${al.basis ?? ''}\n${al.owlSubject}`"
-          >{{ al.name }}<span class="text-fg-mute">{{ al.station }}站 · {{ al.mergeKind }} · {{ al.tagCount }}点</span></span>
-          <span class="text-fg-mute text-[11px]">依据 6APA_设备归并.xlsx</span>
+        <div class="mt-1 flex flex-wrap gap-x-5 gap-y-0.5 text-[12px] text-fg-dim">
+          <span><span class="text-fg-mute">父类 </span>{{ profile.header.classPath.join(' → ') }}</span>
+          <span v-if="profile.header.code"><span class="text-fg-mute">编码 </span><span class="font-mono text-[11.5px] text-fg">{{ profile.header.code }}</span></span>
+          <span><span class="text-fg-mute">工段 </span><span class="text-fg">{{ profile.header.area || '—' }}</span><template v-if="profile.header.station"> · 站 {{ profile.header.station }}</template></span>
         </div>
-        <div v-if="profile.kind === 'equipment' && profile.header.nature && profile.header.nature !== '实例'" class="mt-2 text-[12px] text-warn">
-          这不是一台设备：{{ profile.header.nature === '组公共点位' ? '设备组拆回实例后，剩下没有台号、整组共用的点挂在这里。'
-            : profile.header.nature === '合集·未拆分' ? '点表把同组几台设备的点写在一个名字下，按台号拆不开，暂作合集。'
-            : '点表中按位置兜底归类的点（公用测量管线 / 其他工艺单元 / 管网阀门系统）。' }}
+        <div v-if="notice" class="mt-1 text-[12px] text-warn">{{ notice }}</div>
+        <div v-if="headerOpen" class="mt-1.5 pt-1.5 border-t border-line-soft space-y-1 text-[12px]">
+          <div class="text-fg-dim"><span class="text-fg-mute">来源 </span>{{ profile.header.source?.file ?? '—' }}<span v-if="profile.header.source?.sheet"> · {{ profile.header.source.sheet }}</span><span v-if="profile.header.source?.row"> · 第 {{ profile.header.source.row }} 行</span></div>
+          <div v-if="profile.header.aliases?.length" class="flex flex-wrap items-center gap-1.5">
+            <span class="text-fg-mute">点表来源写法</span>
+            <span
+              v-for="al in profile.header.aliases" :key="al.id" class="pill pill-plain"
+              :title="`${al.mergeKind} · ${al.rule ?? ''}\n${al.basis ?? ''}\n${al.owlSubject}`"
+            >{{ al.name }}<span class="text-fg-mute">{{ al.station }}站 · {{ al.mergeKind }} · {{ al.tagCount }}点</span></span>
+            <span class="text-fg-mute text-[11px]">依据 6APA_设备归并.xlsx</span>
+          </div>
         </div>
-        <div v-if="profile.splitFrom" class="mt-2 text-[12px] text-warn">
-          点表中的「{{ profile.splitFrom.name }}」是本组 {{ profile.splitFrom.instanceIds.length }} 台设备的合集，已按台号拆回下面的实例。
-        </div>
-        <div v-if="profile.focusTag" class="mt-2 text-[12px] text-warn">由位号 {{ profile.focusTag }} 定位到本设备，属性表中已高亮。</div>
       </div>
     </section>
 
@@ -238,44 +307,58 @@ const KIND_TITLE: Record<string, string> = {
       </div>
 
       <!-- 关系 -->
-      <div v-else-if="tab === '关系'" class="p-4 space-y-4">
-        <div v-if="!profile.relations.classRelations.length" class="empty">本体中没有登记该对象的类间关系</div>
-        <div v-else class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          <div>
-            <div class="text-fg-mute text-[11px] mb-1">类间关系 · {{ profile.relations.classRelations.length }} 条</div>
+      <div v-else-if="tab === '关系'" class="p-4 space-y-3">
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-2 text-[12px]">
+          <span class="text-fg-mute">层面</span>
+          <div class="flex gap-1">
+            <button v-for="l in ['类间', '属性间']" :key="l" class="ctl !py-0.5 !px-2" :class="{ 'ctl-on': relLayers.has(l) }" @click="toggleLayer(l)">
+              {{ l === '类间' ? '类间关系' : '属性间关系' }}<span class="font-mono text-fg-mute">{{ layerCounts[l] ?? 0 }}</span></button>
+          </div>
+          <span class="text-fg-mute ml-2">类别</span>
+          <div class="flex flex-wrap gap-1">
+            <button
+              v-for="c in CAT_ORDER" :key="c" class="ctl !py-0.5 !px-2" :class="{ 'ctl-on': relCats.has(c) }"
+              :disabled="!catCounts[c]" :title="'单击切换，双击只看这一类'"
+              @click="toggleCat(c)" @dblclick="onlyCat(c)"
+            ><span :class="CAT_STYLE[c]">●</span>{{ c }}<span class="font-mono text-fg-mute">{{ catCounts[c] ?? 0 }}</span></button>
+            <button class="ctl !py-0.5 !px-2" @click="allCats">全选</button>
+          </div>
+          <input v-model="relKeyword" type="search" placeholder="筛选对象 / 关系 / 机理…"
+                 class="ml-auto w-[200px] px-2 py-1 rounded-md border border-line bg-ink-panel2 text-[12px] text-fg placeholder:text-fg-mute focus:outline-none focus:border-brand" />
+          <button v-if="profile.graphEntityId" class="ctl !py-0.5 !px-2" @click="openGraph">在关系图谱中展开 ↗</button>
+        </div>
+
+        <div class="grid gap-4" :class="hubRelations.length ? 'xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]' : ''">
+          <div v-if="hubRelations.length">
+            <div class="text-fg-mute text-[11px] mb-1">类间关系示意 · {{ hubRelations.length }} 条</div>
             <ClassRelationHub
               :name="profile.name" :class-name="profile.header.className"
-              :relations="profile.relations.classRelations"
+              :relations="hubRelations"
               @open="emit('open', $event)"
             />
           </div>
           <div class="min-w-0">
-            <table class="tbl">
-              <thead><tr><th class="w-[72px]">关系</th><th>对象</th><th>说明</th></tr></thead>
-              <tbody>
-                <tr v-for="r in relationRows" :key="r.role + r.target + r.predicate" @click="r.targetId && emit('open', r.targetId)">
-                  <td class="text-fg-dim whitespace-nowrap">{{ r.role }}</td>
-                  <td :class="r.targetId ? 'text-fg hover:text-brand' : 'text-fg-dim'">{{ r.target }}
-                    <div class="text-fg-mute text-[11px]">{{ r.predicate }}<span v-if="r.targetType"> · {{ r.targetType }}</span></div></td>
-                  <td class="text-fg-dim text-[12px]">{{ r.mechanism || '—' }}</td>
-                </tr>
-              </tbody>
-            </table>
-            <button v-if="profile.relations.classRelations.length > 20" class="ctl mt-2" @click="showAllRelations = !showAllRelations">
-              {{ showAllRelations ? '收起' : `展开全部 ${profile.relations.classRelations.length} 条` }}
-            </button>
-          </div>
-        </div>
-        <div>
-          <div class="text-fg-mute text-[11px] mb-1">属性间关系 · {{ profile.relations.attributeRelations.length }} 条</div>
-          <div v-if="!profile.relations.attributeRelations.length" class="text-fg-mute text-[12.5px]">本体中没有登记涉及该对象属性的因果关系</div>
-          <div class="grid gap-3 lg:grid-cols-3 text-[12.5px]">
-            <div v-for="(list, kind) in attrRelGroups" :key="kind" class="rounded border border-line-soft bg-ink-panel2/40 px-3 py-2">
-              <div class="font-semibold mb-1" :class="ATTR_REL_STYLE[kind] ?? 'text-fg'">{{ kind }} <span class="font-mono text-fg-mute text-[11px]">{{ list.length }}</span></div>
-              <div v-for="r in list" :key="r.from + r.to + r.predicate" class="py-0.5">
-                {{ r.from }} <span class="text-fg-mute">→{{ r.predicate }}→</span> {{ r.to }}
-                <div v-if="r.mechanism" class="text-fg-mute text-[11.5px]">{{ r.mechanism }}</div>
-              </div>
+            <div class="text-fg-mute text-[11px] mb-1">关系明细 · {{ filteredRel.length }} 条（点击对象可跳转）</div>
+            <div class="max-h-[560px] overflow-y-auto border border-line-soft rounded">
+              <table class="tbl">
+                <thead class="sticky top-0 z-10"><tr><th class="w-[78px]">类别</th><th>关系</th><th>说明</th></tr></thead>
+                <tbody>
+                  <tr v-for="r in filteredRel" :key="r.key" class="!cursor-default">
+                    <td class="whitespace-nowrap">
+                      <span :class="CAT_STYLE[r.cat]">●</span> {{ r.cat }}
+                      <div class="text-fg-mute text-[11px]">{{ r.layer }} · {{ r.label }}</div>
+                    </td>
+                    <td>
+                      <span :class="r.fromId ? 'cursor-pointer text-fg hover:text-brand' : 'text-fg'" @click="r.fromId && emit('open', r.fromId)">{{ r.from }}</span>
+                      <span class="text-fg-mute mx-1">—{{ r.predicate }}→</span>
+                      <span :class="r.toId ? 'cursor-pointer text-fg hover:text-brand' : 'text-fg'" @click="r.toId && emit('open', r.toId)">{{ r.to }}</span>
+                      <div v-if="r.via" class="text-fg-mute text-[11px]">经本对象属性「{{ r.via }}」</div>
+                    </td>
+                    <td class="text-fg-dim text-[12px]">{{ r.mechanism || '—' }}</td>
+                  </tr>
+                  <tr v-if="!filteredRel.length"><td colspan="3" class="text-fg-mute text-center py-4">当前筛选下没有关系</td></tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

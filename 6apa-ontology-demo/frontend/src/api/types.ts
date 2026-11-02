@@ -432,6 +432,11 @@ export interface AttributeRelation {
   kind: '计算' | '传递' | '关联' | string
   from: string
   to: string
+  fromId?: string | null
+  toId?: string | null
+  /** 本对象的哪个属性参与了这条关系 */
+  via?: string | null
+  tagCount?: number
   predicate: string
   category?: string
   mechanism: string
@@ -556,5 +561,7 @@ export interface AssetProfile {
   }
   rules: ProfileRule[]
   treePath: string[]
+  /** 在关系图谱中展开时用的工艺对象 ID */
+  graphEntityId?: string | null
   focusTag?: string
 }
