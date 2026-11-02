@@ -5,7 +5,7 @@
  * 关系或规则数据（需求文档第二十一、二十四章）。
  */
 import type {
-  AssetNode, AssetProfile, LimitCheckResult, AssetSearchHit,
+  AgentTool, AssetNode, AssetProfile, LimitCheckResult, AssetSearchHit,
   CategoriesPayload, DataSourcesPayload, DcsTag, EmptySet, Equipment,
   GraphPayload, MeasurementAnchor, Overview, Paged, Parameter, ProcessArea,
   QualityReport, Relation, RelationDetail, RelationEntity, RelationEntityDetail, Rule
@@ -41,6 +41,15 @@ async function get<T>(path: string, query?: Query): Promise<T> {
 }
 
 const P = '/api/ontology'
+
+// Agent 服务：「固定工具」页读取它的工具清单
+const AGENT_BASE = (import.meta.env.VITE_AGENT_BASE || '/agent-api').replace(/\/$/, '')
+
+export async function agentTools(): Promise<{ items: AgentTool[]; total: number }> {
+  const res = await fetch(`${AGENT_BASE}/api/tools`, { headers: { Accept: 'application/json' } })
+  if (!res.ok) throw new ApiError(res.status, '/api/tools', `Agent 服务返回 ${res.status}`)
+  return (await res.json()) as { items: AgentTool[]; total: number }
+}
 
 export const api = {
   health: () => get<{ service: string; status: string }>('/api/health'),

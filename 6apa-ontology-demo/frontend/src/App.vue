@@ -13,7 +13,8 @@ const fullWidth = computed(() => route.meta.fullWidth === true)
 
 const topTabs = [
   { to: '/', label: '资产本体', match: (p: string) => p === '/' },
-  { to: '/overview', label: '本体总览', match: (p: string) => p !== '/' }
+  { to: '/overview', label: '本体总览', match: (p: string) => p !== '/' && p !== '/tools' },
+  { to: '/tools', label: '固定工具', match: (p: string) => p === '/tools' }
 ]
 
 const navItems = [

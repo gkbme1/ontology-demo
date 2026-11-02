@@ -616,3 +616,29 @@ export interface AssetProfile {
   procedures?: ProcedureCard[]
   focusTag?: string
 }
+
+/** Agent 工具清单（Agent 服务 GET /api/tools） */
+export interface AgentToolParameter {
+  name: string
+  type: string
+  required: boolean
+  description: string
+  enum?: string[]
+  example?: unknown
+}
+
+export interface AgentTool {
+  name: string
+  description: string
+  method: string
+  endpoint: string
+  returns: string
+  group?: string
+  summary?: string
+  /** 固定程序：Agent 本地按固定算法执行；本体接口：转调本体服务 */
+  kind?: '固定程序' | '本体接口' | string
+  defaults?: Record<string, unknown>
+  parameters: AgentToolParameter[]
+  /** 计算模块下的计算方法 */
+  methods?: { key: string; title: string; summary: string }[]
+}

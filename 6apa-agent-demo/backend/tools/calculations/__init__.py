@@ -158,6 +158,7 @@ CALCULATION_TOOLS: list[ToolSpec] = [
         summary="派生量计算：按本体写明的方法算速度、消耗量、累计量",
         returns="target、source（取数对象）、basis（本体依据）、window、unit、total、byTag[]、conclusion、method；算不了时 status=no_method。",
         handler=calculate_quantity,
+        catalog_extra=lambda: {"methods": [{"key": m.key, "title": m.title, "summary": m.summary} for m in CALC_METHODS.values()]},
     )
 ]
 

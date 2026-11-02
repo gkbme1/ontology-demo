@@ -85,6 +85,8 @@ class ToolSpec:
     # 可以是 async；api 是 ToolExecutor，通过 api.get_json 访问本体服务。
     # Runtime 只看这个字段是否为空，仍然不认识任何具体工具名。
     handler: Any = None
+    # 工具清单（/api/tools）里额外展示的内容，如计算模块下的计算方法；返回 dict，合并进该工具的清单条目
+    catalog_extra: Any = None
 
     def apply_defaults(self, arguments: dict[str, Any]) -> dict[str, Any]:
         """为未显式给出的参数补默认值（只补本工具声明过的参数）。"""
@@ -293,26 +295,38 @@ class ToolRegistry:
         ]
 
     def catalog(self) -> list[dict[str, Any]]:
-        """给前端 / 文档用的可读清单。"""
-        return [
-            {
+        """给前端 / 文档用的可读清单。
+
+        kind：固定程序（handler 在 Agent 本地执行，按固定算法完成）/ 本体接口（转调本体服务的一个接口）。
+        """
+        items = []
+        for spec in self._specs.values():
+            item = {
                 "name": spec.name,
                 "description": spec.description,
                 "method": spec.method,
                 "endpoint": spec.path,
                 "returns": spec.returns,
+                "group": spec.group,
+                "summary": spec.summary,
+                "kind": "固定程序" if spec.handler else "本体接口",
+                "defaults": dict(spec.defaults),
                 "parameters": [
                     {
                         "name": param.name,
                         "type": param.type,
                         "required": param.required,
                         "description": param.description,
+                        **({"enum": list(param.enum)} if param.enum else {}),
+                        **({"example": param.example} if param.example is not None else {}),
                     }
                     for param in spec.parameters
                 ],
             }
-            for spec in self._specs.values()
-        ]
+            if spec.catalog_extra:
+                item.update(spec.catalog_extra())
+            items.append(item)
+        return items
 
     def __len__(self) -> int:
         return len(self._specs)
