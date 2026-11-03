@@ -149,6 +149,7 @@ DCS 点表使用现场位号命名（水解罐A、离心机B1、温度）。两�
 │   │   ├── graph_builder.py         局部语义图构建
 │   │   ├── asset_model.py           资产本体视图：本体域分类树 + 对象本体档案（属性/关系/能力/约束/规则）
 │   │   ├── equipment_merge.py       设备名称统一：归并规则 + 加载时按设备归并表合并
+│   │   ├── process_context.py       工序与工艺阶段定义；罐批次 / 运行上下文 / 排班（代调 EBR、MOM）
 │   │   └── data_quality.py          数据一致性检查
 │   ├── tools/                   映射表 / 规则模板 / 离线演示构建脚本
 │   ├── export_static.py         导出静态 API 快照
@@ -281,6 +282,35 @@ Agent 目录下的 `run_demo.bat` / `run_demo.sh` 一键启动时也会拉起本
 - 接口：`/api/ontology/procedures`、`/api/ontology/procedures/{卡片编号}`、`/api/ontology/{对象ID}/procedures`；
   资产档案 `/api/ontology/asset-profile/{id}` 带 `procedures`。
 
+### 工序、工艺阶段与运行上下文（6APA_工序与阶段.xlsx）
+
+现场调查说的是「A 罐这一批」「反应期间」「夜班」：同一个温度在进料、反应、出料时的正常范围不同，
+所以本体要知道**工序、工艺阶段，以及某台设备某个时刻处于哪一批、哪个阶段、哪个班**。
+`python3 -m backend.tools.build_process_steps` 生成预填版（已存在时不覆盖，全部标「草案·待工艺确认」）：
+
+- 「工序」：八道工序（提取、水洗、脱色、抽取、水解、萃取、薄膜、结晶）与主 / 辅助工段的对应；
+- 「工艺阶段」：目前只定义了水解（S11 水解罐 A～K）：进料 / 反应 / 终点判定 / 出料 / 空闲。
+  每个阶段写明 EBR 阶段名、**DCS 识别条件**（如 反应 = `P_1303{x}_RUN=1；XV_1304{x}_VAL2=1`，`{x}` 为罐号）
+  和**对应的限值操作模式**（反应、终点判定 → 水解反应期）；
+- 「运行上下文」：罐批次、换酶后批次计数从 EBR 取（能力 CAP-007），班次从 MOM worktrans 取（CAP-008）。
+
+本体只登记定义，批次与排班数据在外部系统，经本体代调：
+
+| 接口 | 说明 |
+| --- | --- |
+| `GET /api/ontology/process-steps` | 工序、工艺阶段、运行上下文定义 |
+| `GET /api/ontology/{id}/stage-rules` | 设备的阶段识别规则，`{x}` 已换成本台罐号（供 EBR 取不到时由 Agent 按 DCS 推断） |
+| `GET /api/ontology/{id}/batches?startTime=&endTime=` | 设备的罐批次（EBR）：批号、换酶后批次数、酶批号、各阶段起止（标注本体阶段编号与限值模式） |
+| `GET /api/ontology/batches/{batchNo}` | 按批号查一批，并落到设备实例 |
+| `GET /api/ontology/{id}/context?at=` | 某时刻的运行上下文：所在批次、阶段、换酶后批次数、班次 |
+| `GET /api/ontology/shifts?startTime=&endTime=` | 班次（MOM 排班，四班三运转） |
+
+实时值 / 历史值接口新增 `unit` 参数（如 `unit=水解罐A`）：只返回本台及同工段按台号一一对应设备（氨水计量罐A）的测点，
+用于「只看 A 罐这一批」。上游地址 `EBR_BASE_URL` / `MOM_BASE_URL` 默认与 `RTDB_BASE_URL` 相同（模拟 DCS 服务同时模拟 EBR、MOM）。
+档案里定义了阶段的设备实例多一个「批次」页签：当前批次 / 阶段 / 换酶后批次数 / 班次、近期批次的阶段时间轴、阶段定义。
+
+自测：`ONTOLOGY_URL=http://localhost:8700 python3 -m tests.test_process_context`。
+
 ### 能力登记表（6APA_能力.xlsx）
 
 能力由外部系统实现（实时库、历史库、OPAS 动作程序、推理引擎、模型平台……），**本体不实现能力**，
@@ -289,9 +319,9 @@ Agent 目录下的 `run_demo.bat` / `run_demo.sh` 一键启动时也会拉起本
 - 「能力」工作表：能力、类型、描述、适用对象（设备 / 设备组 / 工段 / 工艺对象）、提供方、调用方式、端点、
   本体代调入口、输出、前置条件、登记状态（已登记 / 待登记）；「能力参数」工作表：参数名、类型、必填、绑定。
 - 绑定写法：`本对象位号`、`本对象位号[过程测量|状态|启停|调节]`、后缀 `→nodeId`（按 `RTDB_NODE_ID_TEMPLATE` 拼接）或
-  `→位号`、`本对象ID`、`本对象适用规则`、`调用方提供`、`常量:xxx`。必填参数在对象上绑不到值时，该能力不适用于这个对象。
-- 预填版由 `python3 -m backend.tools.build_capability_table` 生成（已存在时不覆盖）：实时值、历史值查询是真实接口，
-  标「已登记」；启停、调节、规则诊断、模型预测只登记描述与参数，提供方接口未知，标「待登记」，不虚构端点。
+  `→位号`、`本对象ID`、`本对象名称`、`本对象适用规则`、`调用方提供`、`常量:xxx`。必填参数在对象上绑不到值时，该能力不适用于这个对象。
+- 预填版由 `python3 -m backend.tools.build_capability_table` 生成（已存在时不覆盖）：实时值、历史值查询、
+  罐批次查询（EBR）、班次查询（MOM）有接口，标「已登记」；启停、调节、规则诊断、模型预测只登记描述与参数，提供方接口未知，标「待登记」，不虚构端点。
 - Agent 的分析工具与计算模块是本体的**使用方**，不是能力提供方，不登记在这里。越限判断属于运行约束校验，
   在档案「约束」里按需调用 `/api/ontology/{id}/limit-check`。
 - `/api/ontology/capabilities` 返回登记表（原来恒为空），对象上的参数绑定见 `/api/ontology/asset-profile/{id}`。
@@ -421,6 +451,7 @@ curl 'http://localhost:8700/api/ontology/equip-8170434d/history?startTime=2026-0
 | 参数 | 说明 |
 | --- | --- |
 | `type` / `blockType` / `keyword` | 在对象下再筛点（如 `type=过程测量(PV)`） |
+| `unit` | 只留某一台设备（及按台号对应设备）的点，如 `unit=水解罐A` |
 | `limit` / `offset` | 点的分页，默认 50，上限 `RTDB_MAX_TAGS`（200）；备用点排在最后 |
 | `startTime` / `endTime` | 毫秒时间戳或 `yyyy-MM-dd HH:mm:ss`（东八区）；`endTime` 默认当前 |
 | `interval` | 采样间隔（毫秒）；不填由历史库自动选 |

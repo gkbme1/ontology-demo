@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /**
- * 对象本体档案：头部是类与层级，下面按页签分为 属性 / 关系 / 能力 / 约束 / 规则（设备组另有 实例）。
+ * 对象本体档案：头部是类与层级，下面按页签分为 属性 / 关系 / 能力 / 约束 / 规则 / 处置
+ *（定义了工艺阶段的设备实例另有 批次，设备组 / 类另有 实例）。
  * 全部数据来自 /api/ontology/asset-profile/{id}，组件不内置任何设备、点位或关系。
  * 当前页签记在地址栏 ?tab=，切换对象时保持不变。
  */
@@ -10,12 +11,13 @@ import { api } from '@/api/client'
 import type { AssetProfile, LimitCheckResult, ProfileAttribute } from '@/api/types'
 import ClassRelationHub from './ClassRelationHub.vue'
 import ProcedureCardView from './ProcedureCardView.vue'
+import BatchPanel from './BatchPanel.vue'
 
 const props = defineProps<{ profile: AssetProfile }>()
 const emit = defineEmits<{ open: [objectId: string] }>()
 
 // ---------------------------------------------------------------- 页签
-type TabKey = '属性' | '关系' | '能力' | '约束' | '规则' | '处置' | '实例'
+type TabKey = '属性' | '关系' | '能力' | '约束' | '规则' | '处置' | '批次' | '实例'
 const route = useRoute()
 const router = useRouter()
 const tabs = computed(() => {
@@ -34,6 +36,10 @@ const tabs = computed(() => {
     { key: '处置', count: p.procedures?.length ?? 0,
       hint: '报警处置卡：触发、可能原因与验证方法、处置步骤、禁止操作；规程里的位号与对象已对应到本体（6APA_处置规程.xlsx）' },
   ]
+  if (p.process?.batchSupported) {
+    list.push({ key: '批次', count: p.process.stages.length,
+      hint: '运行上下文：罐批次、工艺阶段、换酶后批次数、班次（经本体代调 EBR / MOM）；阶段定义见 6APA_工序与阶段.xlsx，计数为阶段数' })
+  }
   if (p.instances?.length) {
     list.push({ key: '实例', count: p.instances.length, hint: p.kind === 'class'
       ? '属于本类的设备组与设备实例（实例取各设备组的主体实例）'
@@ -545,6 +551,9 @@ const KIND_TITLE: Record<string, string> = {
           </div>
         </div>
       </div>
+
+      <!-- 批次（运行上下文） -->
+      <BatchPanel v-else-if="tab === '批次' && profile.process" :object-id="profile.objectId" :process="profile.process" />
 
       <!-- 实例（设备组） -->
       <div v-else-if="tab === '实例' && profile.instances" class="p-4">

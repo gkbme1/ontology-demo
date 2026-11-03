@@ -19,6 +19,7 @@ from ..analysis_tools import (
     _resolve_entity,
     _target_view,
 )
+from ..context_tools import BATCH_WINDOW_PARAMS, with_batch_window
 from ..registry import ToolParameter, ToolSpec
 from .base import CALC_METHODS, CalcContext, CalcMethod, CalcSource, register
 
@@ -152,12 +153,13 @@ CALCULATION_TOOLS: list[ToolSpec] = [
             ToolParameter("method", "string", "指定计算方法；不填由程序按本体自动判断。", enum=tuple(CALC_METHODS)),
             ToolParameter("startTime", "string", "时间段开始，yyyy-MM-dd HH:mm:ss（东八区），按【当前时间】换算；用户说'当前一段时间'且没给范围时不填，由程序取默认时间窗。"),
             ToolParameter("endTime", "string", "时间段结束，格式同上，默认当前时刻。"),
+            *BATCH_WINDOW_PARAMS,
             ToolParameter("focus", "string", "只算某一支表，如 LT_1302A。"),
         ),
         group="analysis",
         summary="派生量计算：按本体写明的方法算速度、消耗量、累计量",
         returns="target、source（取数对象）、basis（本体依据）、window、unit、total、byTag[]、conclusion、method；算不了时 status=no_method。",
-        handler=calculate_quantity,
+        handler=with_batch_window(calculate_quantity),
         catalog_extra=lambda: {"methods": [{"key": m.key, "title": m.title, "summary": m.summary} for m in CALC_METHODS.values()]},
     )
 ]

@@ -13,7 +13,7 @@
 - 本对象位号            对象解析出的全部 DCS 位号
 - 本对象位号[过程测量]  只取某类位号，可选 过程测量 / 状态 / 启停 / 调节
 - …→nodeId              按实时库 nodeId 规则拼接（RTDB_NODE_ID_TEMPLATE，默认 {station}:{name}.PV）
-- 本对象ID / 本对象适用规则
+- 本对象ID / 本对象名称 / 本对象适用规则
 - 调用方提供            调用时由使用方给出（时间窗、指令值等）
 - 常量:xxx              固定取值
 必填参数的绑定在某个对象上取不到值时，该能力不适用于这个对象，不在档案里显示。
@@ -137,7 +137,7 @@ def load_capabilities(path: Path) -> CapabilitySet:
 
 
 def _valid_binding(binding: str) -> bool:
-    if binding in ("本对象ID", "本对象适用规则", "调用方提供") or binding.startswith("常量:"):
+    if binding in ("本对象ID", "本对象名称", "本对象适用规则", "调用方提供") or binding.startswith("常量:"):
         return True
     m = _TAG_BINDING.match(binding)
     return bool(m) and (not m.group("filter") or m.group("filter") in TAG_FILTERS)
@@ -145,12 +145,15 @@ def _valid_binding(binding: str) -> bool:
 
 def expand_endpoint(text: str) -> str:
     """端点里的 {RTDB_BASE_URL} / {HISTORIAN_BASE_URL} 按本体服务的实际配置展开。"""
+    from backend.services import process_context as pc
     from backend.services import timeseries as ts
 
-    return text.replace("{RTDB_BASE_URL}", ts.RTDB_BASE_URL).replace("{HISTORIAN_BASE_URL}", ts.HISTORIAN_BASE_URL)
+    return (text.replace("{RTDB_BASE_URL}", ts.RTDB_BASE_URL).replace("{HISTORIAN_BASE_URL}", ts.HISTORIAN_BASE_URL)
+            .replace("{EBR_BASE_URL}", pc.ebr_base()).replace("{MOM_BASE_URL}", pc.mom_base()))
 
 
-def bind(binding: str, *, object_id: str, tags: list[dict[str, Any]], rules: list[dict[str, Any]]) -> dict[str, Any]:
+def bind(binding: str, *, object_id: str, tags: list[dict[str, Any]], rules: list[dict[str, Any]],
+         object_name: str = "") -> dict[str, Any]:
     """在对象上解析一个参数绑定：返回 {bound, values（预览）, total, text}。"""
     if binding == "调用方提供":
         return {"bound": None, "values": [], "total": 0, "text": "调用时由使用方给出"}
@@ -159,6 +162,9 @@ def bind(binding: str, *, object_id: str, tags: list[dict[str, Any]], rules: lis
         return {"bound": True, "values": [value], "total": 1, "text": f"固定为 {value}"}
     if binding == "本对象ID":
         return {"bound": True, "values": [object_id], "total": 1, "text": "本对象 ID"}
+    if binding == "本对象名称":
+        return {"bound": bool(object_name), "values": [object_name] if object_name else [], "total": 1 if object_name else 0,
+                "text": f"本对象名称「{object_name}」"}
     if binding == "本对象适用规则":
         ids = [r.get("ruleId") or r.get("id") for r in rules]
         return {"bound": bool(ids), "values": ids[:PREVIEW], "total": len(ids), "text": f"本对象适用的 {len(ids)} 条规则"}
@@ -179,7 +185,7 @@ def bind(binding: str, *, object_id: str, tags: list[dict[str, Any]], rules: lis
 
 
 def capabilities_for(caps: CapabilitySet, kind: str, object_id: str, *, tags: list[dict[str, Any]],
-                     rules: list[dict[str, Any]], equipment_type: str | None = None) -> list[dict[str, Any]]:
+                     rules: list[dict[str, Any]], equipment_type: str | None = None, object_name: str = "") -> list[dict[str, Any]]:
     """对象的能力挂载：适用的能力 + 本对象上的参数绑定。必填参数绑定不上的能力不适用。"""
     out = []
     for cap in caps.items:
@@ -189,7 +195,7 @@ def capabilities_for(caps: CapabilitySet, kind: str, object_id: str, *, tags: li
             continue
         params, applicable = [], True
         for p in cap["parameters"]:
-            b = bind(p["binding"], object_id=object_id, tags=tags, rules=rules)
+            b = bind(p["binding"], object_id=object_id, tags=tags, rules=rules, object_name=object_name)
             if p["required"] and b["bound"] is False:
                 applicable = False
                 break

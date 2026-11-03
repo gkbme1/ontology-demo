@@ -874,11 +874,30 @@
           },
           "startTime": {
             "type": "string",
-            "description": "分析时间窗开始，yyyy-MM-dd HH:mm:ss（东八区）；按【当前时间】换算'昨天''夜班'等。不填默认最近 24 小时。"
+            "description": "分析时间窗开始，yyyy-MM-dd HH:mm:ss（东八区）；按【当前时间】换算'昨天''夜班'等。不填默认最近 24 小时；问的是某罐某批时改用 unit / batchNo / phase。"
           },
           "endTime": {
             "type": "string",
             "description": "分析时间窗结束，格式同上，默认当前时刻。"
+          },
+          "unit": {
+            "type": "string",
+            "description": "只看某一台设备（如 水解罐A）。给了 unit 没给时间时，时间窗取该罐最近一个已结束批次的 phase 阶段。"
+          },
+          "batchNo": {
+            "type": "string",
+            "description": "按罐批次取时间窗（如 SJ-A-0830）；时间窗为该批次的 phase 阶段，不用再给 startTime/endTime。"
+          },
+          "phase": {
+            "type": "string",
+            "description": "配合 unit / batchNo：取批次的哪个阶段，默认 反应；全批 = 整批起止。",
+            "enum": [
+              "反应",
+              "进料",
+              "终点判定",
+              "出料",
+              "全批"
+            ]
           },
           "focus": {
             "type": "string",
@@ -924,11 +943,30 @@
           },
           "startTime": {
             "type": "string",
-            "description": "分析时间窗开始，yyyy-MM-dd HH:mm:ss（东八区）；按【当前时间】换算'昨天''夜班'等。不填默认最近 24 小时。"
+            "description": "分析时间窗开始，yyyy-MM-dd HH:mm:ss（东八区）；按【当前时间】换算'昨天''夜班'等。不填默认最近 24 小时；问的是某罐某批时改用 unit / batchNo / phase。"
           },
           "endTime": {
             "type": "string",
             "description": "分析时间窗结束，格式同上，默认当前时刻。"
+          },
+          "unit": {
+            "type": "string",
+            "description": "只看某一台设备（如 水解罐A）。给了 unit 没给时间时，时间窗取该罐最近一个已结束批次的 phase 阶段。"
+          },
+          "batchNo": {
+            "type": "string",
+            "description": "按罐批次取时间窗（如 SJ-A-0830）；时间窗为该批次的 phase 阶段，不用再给 startTime/endTime。"
+          },
+          "phase": {
+            "type": "string",
+            "description": "配合 unit / batchNo：取批次的哪个阶段，默认 反应；全批 = 整批起止。",
+            "enum": [
+              "反应",
+              "进料",
+              "终点判定",
+              "出料",
+              "全批"
+            ]
           },
           "focus": {
             "type": "string",
@@ -986,6 +1024,25 @@
           "endTime": {
             "type": "string",
             "description": "时间窗结束，格式同上；只给 startTime 时默认到当前时刻。"
+          },
+          "unit": {
+            "type": "string",
+            "description": "只看某一台设备（如 水解罐A）。给了 unit 没给时间时，时间窗取该罐最近一个已结束批次的 phase 阶段。"
+          },
+          "batchNo": {
+            "type": "string",
+            "description": "按罐批次取时间窗（如 SJ-A-0830）；时间窗为该批次的 phase 阶段，不用再给 startTime/endTime。"
+          },
+          "phase": {
+            "type": "string",
+            "description": "配合 unit / batchNo：取批次的哪个阶段，默认 反应；全批 = 整批起止。",
+            "enum": [
+              "反应",
+              "进料",
+              "终点判定",
+              "出料",
+              "全批"
+            ]
           },
           "focus": {
             "type": "string",
@@ -1102,7 +1159,7 @@
           },
           "startTime": {
             "type": "string",
-            "description": "分析时间窗开始，yyyy-MM-dd HH:mm:ss（东八区）；按【当前时间】换算'昨天''夜班'等。不填默认最近 24 小时。"
+            "description": "分析时间窗开始，yyyy-MM-dd HH:mm:ss（东八区）；按【当前时间】换算'昨天''夜班'等。不填默认最近 24 小时；问的是某罐某批时改用 unit / batchNo / phase。"
           },
           "endTime": {
             "type": "string",
@@ -1116,6 +1173,40 @@
         "required": [
           "equipment"
         ],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_batch_context",
+      "description": "罐批次与运行上下文（固定程序）。问'A 罐最近几批''这一批什么时候开始反应、反应了多久''现在是第几批/换酶后第几批''某时刻处于哪个阶段、哪个班'时调用；也用于在分析前先确定要看哪一批。程序先查 EBR（经本体代调），EBR 取不到时按本体登记的 DCS 阶段识别条件推断，并标明来源。\n返回：batches[]（批号、状态、起止、反应起止、换酶后批次数、酶批号）、current（当前或 at 时刻的批次 / 阶段 / 对应限值操作模式 / 班次）、source（EBR 或 DCS推断）、conclusion；按批号查时返回 batch 与 phases[]。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "unit": {
+            "type": "string",
+            "description": "设备实例名称，如 水解罐A（目前定义了阶段的是水解罐 A～K）。"
+          },
+          "batchNo": {
+            "type": "string",
+            "description": "批号，如 SJ-A-0830；给了批号就不用给 unit。"
+          },
+          "startTime": {
+            "type": "string",
+            "description": "查批次的范围开始，yyyy-MM-dd HH:mm:ss，默认 endTime 往前 3 天。"
+          },
+          "endTime": {
+            "type": "string",
+            "description": "范围结束，默认当前时刻。"
+          },
+          "at": {
+            "type": "string",
+            "description": "看某一时刻处于哪个批次 / 阶段 / 班次，默认当前时刻。"
+          }
+        },
+        "required": [],
         "additionalProperties": false
       }
     }
@@ -1146,6 +1237,25 @@
           "endTime": {
             "type": "string",
             "description": "时间段结束，格式同上，默认当前时刻。"
+          },
+          "unit": {
+            "type": "string",
+            "description": "只看某一台设备（如 水解罐A）。给了 unit 没给时间时，时间窗取该罐最近一个已结束批次的 phase 阶段。"
+          },
+          "batchNo": {
+            "type": "string",
+            "description": "按罐批次取时间窗（如 SJ-A-0830）；时间窗为该批次的 phase 阶段，不用再给 startTime/endTime。"
+          },
+          "phase": {
+            "type": "string",
+            "description": "配合 unit / batchNo：取批次的哪个阶段，默认 反应；全批 = 整批起止。",
+            "enum": [
+              "反应",
+              "进料",
+              "终点判定",
+              "出料",
+              "全批"
+            ]
           },
           "focus": {
             "type": "string",

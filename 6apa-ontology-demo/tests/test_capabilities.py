@@ -31,7 +31,8 @@ def main() -> int:
     print("[能力表]")
     check(caps.available and len(caps.items) >= 6 and not caps.issues, f"{cl.CAPABILITY_FILE_NAME} 加载 {len(caps.items)} 项能力，无绑定错误")
     registered = [c for c in caps.items if c["registration"] == cl.STATUS_REGISTERED]
-    check({c["name"] for c in registered} == {"实时值查询", "历史值查询"}, "已登记的只有实时库 / 历史库两个真实接口")
+    check({c["name"] for c in registered} == {"实时值查询", "历史值查询", "罐批次查询", "班次查询"},
+          "已登记的是实时库 / 历史库 / EBR / MOM 四个接口")
     check(all(c["endpoint"] for c in registered) and not any(c["endpoint"] for c in caps.items if c not in registered),
           "已登记的有端点，待登记的不虚构端点")
     names = {c["name"] for c in caps.items}
@@ -66,7 +67,7 @@ def main() -> int:
     pump_caps = {c["name"] for c in am.profile(store, pump["id"])["capabilities"]}
     check("机理 / 时序模型预测" not in pump_caps, "滤液泵A 没有过程测量点，模型预测能力不适用")
     area = am.profile(store, "area-S11")
-    check({c["name"] for c in area["capabilities"]} == {"实时值查询", "历史值查询", "规则诊断"}, "工段只挂适用于工段的能力")
+    check({c["name"] for c in area["capabilities"]} == {"实时值查询", "历史值查询", "班次查询", "规则诊断"}, "工段只挂适用于工段的能力（含班次）")
 
     print("\n[HTTP]")
     try:
@@ -79,7 +80,7 @@ def main() -> int:
     app_module._store = store
     client = TestClient(app_module.app)
     r = client.get("/api/ontology/capabilities").json()
-    check(r["total"] == len(caps.items) and r["registeredCount"] == 2, "/api/ontology/capabilities 返回能力登记表")
+    check(r["total"] == len(caps.items) and r["registeredCount"] == 4, "/api/ontology/capabilities 返回能力登记表")
     sources = client.get("/api/ontology/data-sources").json()["sources"]
     check(any(s["file"] == cl.CAPABILITY_FILE_NAME and s["available"] for s in sources), "数据源清单里有能力登记表")
     check(client.get("/api/ontology/overview").json()["capabilityCount"] == len(caps.items), "概览的能力数取自登记表")

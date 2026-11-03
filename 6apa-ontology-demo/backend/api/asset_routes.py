@@ -13,6 +13,12 @@
     GET /api/ontology/procedures?keyword=&areaId=   报警处置卡列表
     GET /api/ontology/procedures/{card_id}          单张处置卡（触发、可能原因、处置步骤、禁止操作，含本体锚定）
     GET /api/ontology/{object_id}/procedures        与某对象相关的处置卡
+    GET /api/ontology/process-steps                 工序与工艺阶段定义
+    GET /api/ontology/batches/{batch_no}            按批号查罐批次（EBR），落到设备实例
+    GET /api/ontology/{object_id}/stage-rules       设备的阶段识别规则（{x} 换成罐号后的 DCS 位号）
+    GET /api/ontology/{object_id}/batches           设备的罐批次（EBR）?startTime=&endTime=
+    GET /api/ontology/{object_id}/context?at=       设备在某时刻的运行上下文（批次 / 阶段 / 换酶后批次数 / 班次）
+    GET /api/ontology/shifts                        班次（MOM 排班）
                                                     object_id 支持 equip- / egrp- / robj- / area- / tag- 与 :Dev_ 形式
 
 注意：本文件刻意不使用 `from __future__ import annotations`，
@@ -25,7 +31,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from backend.services import asset_model, procedure_model
+from backend.services import asset_model, procedure_model, process_context
 
 
 def _procedure(store: Any, card_id: str) -> dict:
@@ -59,6 +65,33 @@ _SPECS: List[Tuple[str, Callable[..., Any], str, Optional[str]]] = [
         "/api/ontology/asset-profile/{object_id}",
         lambda store, q, object_id: asset_model.profile(store, object_id),
         "对象本体档案",
+        "object_id",
+    ),
+    # 工序与阶段定义；罐批次 / 运行上下文 / 排班（经本体代调 EBR、MOM）
+    ("/api/ontology/process-steps", lambda store, q: store.process.view(), "工序与工艺阶段", None),
+    ("/api/ontology/shifts", lambda store, q: process_context.shifts(store, q), "班次（MOM 排班）", None),
+    (
+        "/api/ontology/batches/{batch_no}",
+        lambda store, q, batch_no: process_context.batch_detail(store, batch_no),
+        "按批号查罐批次（EBR）",
+        "batch_no",
+    ),
+    (
+        "/api/ontology/{object_id}/stage-rules",
+        lambda store, q, object_id: process_context.stage_rules(store, object_id),
+        "设备的阶段识别规则（DCS 位号）",
+        "object_id",
+    ),
+    (
+        "/api/ontology/{object_id}/batches",
+        lambda store, q, object_id: process_context.batches(store, object_id, q),
+        "设备的罐批次（EBR）",
+        "object_id",
+    ),
+    (
+        "/api/ontology/{object_id}/context",
+        lambda store, q, object_id: process_context.context(store, object_id, q),
+        "设备在某时刻的运行上下文",
         "object_id",
     ),
     # 报警处置规程（6APA_处置规程.xlsx）：处置卡列表、单张卡、某对象相关的卡

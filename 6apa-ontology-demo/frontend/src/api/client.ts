@@ -5,7 +5,7 @@
  * 关系或规则数据（需求文档第二十一、二十四章）。
  */
 import type {
-  AgentTool, AssetNode, AssetProfile, LimitCheckResult, AssetSearchHit,
+  AgentTool, AssetNode, AssetProfile, BatchesPayload, LimitCheckResult, AssetSearchHit, RunContextPayload,
   CategoriesPayload, DataSourcesPayload, DcsTag, EmptySet, Equipment,
   GraphPayload, MeasurementAnchor, Overview, Paged, Parameter, ProcessArea,
   QualityReport, Relation, RelationDetail, RelationEntity, RelationEntityDetail, Rule
@@ -121,6 +121,10 @@ export const api = {
     get<{ items: AssetSearchHit[]; total: number }>(`${P}/asset-tree/search`, { keyword, limit }),
   assetProfile: (objectId: string) => get<AssetProfile>(`${P}/asset-profile/${encodeURIComponent(objectId)}`),
   limitCheck: (objectId: string) => get<LimitCheckResult>(`${P}/${encodeURIComponent(objectId)}/limit-check`),
+  // 运行上下文（经本体代调 EBR / MOM）
+  batches: (objectId: string, q?: Query) => get<BatchesPayload>(`${P}/${encodeURIComponent(objectId)}/batches`, q),
+  runContext: (objectId: string, at?: string) =>
+    get<RunContextPayload>(`${P}/${encodeURIComponent(objectId)}/context`, at ? { at } : undefined),
 
   // 数据治理
   dataSources: () => get<DataSourcesPayload>(`${P}/data-sources`),
@@ -136,5 +140,6 @@ export const API_ENDPOINTS = [
   `${P}/capabilities`, `${P}/constraints`, `${P}/model-registry`, `${P}/semantics`,
   `${P}/measurement-anchors`, `${P}/causal-relations`, `${P}/{id}/relations`,
   `${P}/data-sources`, `${P}/data-quality`,
-  `${P}/asset-tree`, `${P}/asset-tree/search`, `${P}/asset-profile/{id}`
+  `${P}/asset-tree`, `${P}/asset-tree/search`, `${P}/asset-profile/{id}`,
+  `${P}/process-steps`, `${P}/shifts`, `${P}/batches/{batchNo}`, `${P}/{id}/stage-rules`, `${P}/{id}/batches`, `${P}/{id}/context`
 ]

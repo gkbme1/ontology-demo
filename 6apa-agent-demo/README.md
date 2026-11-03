@@ -114,6 +114,9 @@ backend/
 ├── tools/
 │   ├── registry.py        ToolSpec / ToolRegistry / 参数校验（声明式）
 │   ├── ontology_tools.py  30 个本体 API 的 Tool 定义——全项目唯一知道接口长什么样的地方
+│   ├── analysis_tools.py  确定性分析工具（异常溯源、影响验证、越限统计……）
+│   ├── context_tools.py   罐批次与运行上下文；按批次 / 阶段换算分析时间窗（EBR 优先，DCS 推断兜底）
+│   ├── calculations/      计算模块（派生量计算）
 │   └── executor.py        HTTP 执行、异常分级、超大返回体裁剪
 ├── agent/
 │   ├── runtime.py         Agent Loop（自己写的，无任何 Agent Framework）
@@ -130,6 +133,7 @@ tests/verify_tools.py        30 个 Tool 逐个打真实本体 API
 tests/test_agent_loop.py     Agent Loop 自测（脚本化假 LLM，无需 Key）
 tests/stub_llm_server.py     假 LLM 模式起真实服务，用于无 Key 环境验证前端
 tests/test_mock_dcs.py       模拟 DCS 服务自测
+tests/test_context_tools.py  批次工具与按批次取时间窗自测
 ```
 
 ---
@@ -313,6 +317,9 @@ ONTOLOGY_BASE_URL=http://localhost:8700 python3 -m tests.test_examples
 # 确定性分析工具：算法单元测试 + 打真实本体（需本体服务与模拟 DCS 在跑）
 ONTOLOGY_BASE_URL=http://localhost:8700 python3 -m tests.test_analysis_tools
 
+# 罐批次 / 运行上下文与按批次取时间窗：伪本体单元测试 + 打真实本体（需本体服务与模拟 DCS 在跑）
+ONTOLOGY_BASE_URL=http://localhost:8700 python3 -m tests.test_context_tools
+
 # 无 Key 环境下验证前端与 SSE（用假 LLM 起真实服务）
 ONTOLOGY_BASE_URL=http://localhost:8700 python3 -m tests.stub_llm_server
 ```
@@ -365,6 +372,20 @@ Agent 收到的和手敲进去完全一样。案例里的 `referenceToolChain` �
 每条案例的考察点、本体里实际能查到什么、什么样的回答算合格，见 `docs/工艺调查案例.md`。
 
 ---
+
+### 按罐批次 / 工艺阶段取时间窗（`backend/tools/context_tools.py`）
+
+现场说的是「A 罐上一批反应期间」「SJ-A-0830 出料时」，不是「最近 24 小时」：跨批次取一整天会把几批的进料、
+反应、出料混在一起，越限统计和相关分析都不可信。
+
+- `get_batch_context`（固定程序）：某罐近期批次、阶段起止、换酶后批次数、当前所处批次 / 阶段 / 班次；
+- `investigate_process_anomaly`、`verify_process_influence`、`check_limit_exceedance`、`calculate_quantity`
+  多了 `unit` / `batchNo` / `phase` 三个参数：给了就由程序把时间窗换算成该批次该阶段（`phase` 默认反应，`全批` = 整批起止），
+  只给 `unit` 时取该罐最近一个该阶段已结束的批次；取数只取这一台（本体 `unit` 筛选：本台 + 按台号对应的计量罐等）；
+  结果带 `windowBasis` 写明时间窗依据，回答里照它说明。
+- 取批次的顺序是固定的：先查 EBR（经本体 `/api/ontology/{设备}/batches`、`/batches/{批号}`）；
+  EBR 取不到时按本体登记的阶段识别条件（`/api/ontology/{设备}/stage-rules`）用 DCS 开关量变位推断，
+  结果标明「DCS推断」，没有批号和换酶后批次数。**阶段定义在本体，取数与推断在 Agent。**
 
 ### 计算模块（`backend/tools/calculations/`）
 
@@ -514,11 +535,17 @@ python3 -m tests.eval_agent --compare deepseek qwen32b
 | --- | --- | --- |
 | POST | `/api/hsm-db-rtserver/v1/rtdata/node/read` | 实时值，格式与现场实时库接口示例一致 |
 | POST | `/api/timing-svc/v1/history/findAll` | 历史值，**暂定格式**，待拿到真实时序库示例后对齐 |
+| GET | `/api/ebr/v1/batches?unit=&startTime=&endTime=` | 模拟 EBR：S11 水解罐 A～K 的罐批次（批号、换酶后批次数、酶批号、各阶段起止），默认近 3 天、最多 31 天 |
+| GET | `/api/ebr/v1/batches/{batchNo}` | 模拟 EBR：按批号查一批（批号 `SJ-<罐号>-<序号>`） |
+| GET | `/api/mom/v1/worktrans?startTime=&endTime=` | 模拟 MOM 排班：四班三运转（夜 0–8、白 8–16、中 16–24，甲乙丙丁轮转） |
 
 nodeId 约定 `{控制站号}:{位号}.PV`（如 `10:PT_1003.PV`），与本体点表一一对应。
 数值按单位 / 描述 / 位号推断量纲与合理范围（如水解 pH 7.7~8.1、结晶温度 2~12 ℃），
 同一设备的相关测点互相一致（开关反馈互补、停机时电流归零、阀位反馈跟随给定），
 实时与历史出自同一条确定性曲线，查多少次都对得上。
+S11 水解罐 A～K 按批次排程运行（进料 30–45 分、反应 5–6.5 小时、终点判定、出料、空闲，换酶后批次越多反应越慢），
+罐温、pH、液位、氨水计量罐液位和进料阀 / 氨水阀 / 搅拌 / 出料流量开关量都跟着批次阶段走，与模拟 EBR 一一对应
+（见 `mock_dcs/process.py`）。
 
 本体服务已通过 `/api/ontology/{对象ID}/realtime`、`/history` 把它对外暴露（本体做语义网关，本服务充当实时库 / 历史库）。
 Agent 通过 `query_realtime_values` / `query_history_values` 两个工具经本体查值（不直连本服务）；每轮对话会注入【当前时间】，供模型换算“过去一小时”等相对时间；数据源为模拟服务时，System Prompt 要求回答中明确说明。完整说明见 `docs/模拟DCS接口.md`，自测：

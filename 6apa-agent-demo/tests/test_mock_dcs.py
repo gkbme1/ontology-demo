@@ -100,7 +100,7 @@ def main() -> int:
                 out_of_range.append((node["nodeId"], v, lo, hi))
         by_category[f"{profile['category']}({profile['unit']})"].append(v)
 
-    check(not out_of_range, f"模拟量全部落在画像范围内（越界 {len(out_of_range)}）")
+    check(not out_of_range, f"模拟量全部落在画像范围内（越界 {len(out_of_range)}）{out_of_range[:25] if out_of_range else ''}")
     check(not bad_discrete, f"开关量只取 0/1（异常 {len(bad_discrete)}）")
     check(non_spare_bad_q == 0, "非备用点质量全部为 1")
     check(spare_bad_q > 0, f"备用模拟量返回坏质量 q=0（{spare_bad_q} 个）")

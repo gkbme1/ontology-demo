@@ -32,6 +32,7 @@ from collections import Counter, deque
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from .context_tools import BATCH_WINDOW_PARAMS, UNIT_SCOPE, with_batch_window
 from .registry import ToolParameter, ToolSpec
 
 # ---------------------------------------------------------------- 判定口径
@@ -322,7 +323,15 @@ async def _history(
     }
     if keyword:
         params["keyword"] = keyword
-    data = await api.get_json(f"/api/ontology/{entity_id}/history", params)
+    unit = UNIT_SCOPE.get()
+    data = None
+    if unit:
+        # 限定到某一台；该对象在这台上没有测点（如几台共用的储罐）时退回不限定
+        data = await api.get_json(f"/api/ontology/{entity_id}/history", {**params, "unit": unit})
+        if not data.get("items"):
+            data = None
+    if data is None:
+        data = await api.get_json(f"/api/ontology/{entity_id}/history", params)
     tags = []
     for item in data.get("items") or []:
         series = {
@@ -1763,7 +1772,7 @@ def _clarify(exc: AnalysisInputError) -> dict[str, Any]:
 
 
 _WINDOW_PARAMS = (
-    ToolParameter("startTime", "string", "分析时间窗开始，yyyy-MM-dd HH:mm:ss（东八区）；按【当前时间】换算'昨天''夜班'等。不填默认最近 24 小时。"),
+    ToolParameter("startTime", "string", "分析时间窗开始，yyyy-MM-dd HH:mm:ss（东八区）；按【当前时间】换算'昨天''夜班'等。不填默认最近 24 小时；问的是某罐某批时改用 unit / batchNo / phase。"),
     ToolParameter("endTime", "string", "分析时间窗结束，格式同上，默认当前时刻。"),
 )
 
@@ -1783,6 +1792,7 @@ ANALYSIS_TOOLS: list[ToolSpec] = [
             ToolParameter("target", "string", "出现异常的工艺量 / 位号 / 测点描述。", required=True),
             ToolParameter("symptom", "string", "异常表现；用户没说具体方向时用 异常。", enum=_SYMPTOMS),
             *_WINDOW_PARAMS,
+            *BATCH_WINDOW_PARAMS,
             ToolParameter("focus", "string", "只看该工艺量下的某个测点，如 TI_1301A 或 水解罐A；不填则自动选越限最多的测点。"),
             ToolParameter("depth", "integer", f"沿因果关系往上游推几层，默认 {DEFAULT_DEPTH}，最多 {MAX_DEPTH}。"),
         ),
@@ -1794,7 +1804,7 @@ ANALYSIS_TOOLS: list[ToolSpec] = [
             "dataGaps、conclusion（程序给出的分层结论）、method（判定口径与模拟数据声明）。"
             "status=needs_clarification 时返回 candidates 供选择。"
         ),
-        handler=investigate_process_anomaly,
+        handler=with_batch_window(investigate_process_anomaly),
     ),
     ToolSpec(
         name="verify_process_influence",
@@ -1811,12 +1821,13 @@ ANALYSIS_TOOLS: list[ToolSpec] = [
             ToolParameter("effect", "string", "被影响的工艺量 / 位号 / 测点描述。", required=True),
             ToolParameter("symptom", "string", "结果一侧的异常表现，默认 异常。", enum=_SYMPTOMS),
             *_WINDOW_PARAMS,
+            *BATCH_WINDOW_PARAMS,
             ToolParameter("focus", "string", "结果一侧只看某个测点，如 AT_1301A1。"),
         ),
         group="analysis",
         summary="影响验证：本体路径与方向 + 两端同期数据对比",
         returns="ontology（是否记载、路径、方向、机理、来源）、limit、effectAnomaly、evidence（预期方向、测点、相关系数、领先分钟、判断）、conclusion、method。",
-        handler=verify_process_influence,
+        handler=with_batch_window(verify_process_influence),
     ),
     ToolSpec(
         name="summarize_area_relations",
@@ -1847,6 +1858,7 @@ ANALYSIS_TOOLS: list[ToolSpec] = [
             ToolParameter("quantity", "string", "target 是设备名时补充物理量，如 温度、pH、液位。"),
             ToolParameter("startTime", "string", "时间窗开始，yyyy-MM-dd HH:mm:ss（东八区），按【当前时间】换算。问'现在'时不要填。"),
             ToolParameter("endTime", "string", "时间窗结束，格式同上；只给 startTime 时默认到当前时刻。"),
+            *BATCH_WINDOW_PARAMS,
             ToolParameter("focus", "string", "只看该工艺量下的某个测点，如 TI_1301A。"),
         ),
         group="analysis",
@@ -1856,7 +1868,7 @@ ANALYSIS_TOOLS: list[ToolSpec] = [
             "越限分钟（按档位）、longestRuns 最长连续越限时段、runCount；当前值模式为 value 与 status）、"
             "normalTags、conclusion、method。"
         ),
-        handler=check_limit_exceedance,
+        handler=with_batch_window(check_limit_exceedance),
     ),
     ToolSpec(
         name="map_causal_neighborhood",

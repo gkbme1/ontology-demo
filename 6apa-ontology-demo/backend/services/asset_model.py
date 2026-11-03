@@ -624,7 +624,15 @@ def _capabilities(store: Any, kind: str, object_id: str, tags: list[dict[str, An
     """
     from backend.services.capability_loader import capabilities_for
 
-    return capabilities_for(store.capability_set, kind, object_id, tags=tags, rules=rules, equipment_type=equipment_type)
+    obj_name = ""
+    if kind == "equipment" and object_id in store.dcs.equipment:
+        obj_name = store.dcs.equipment[object_id]["name"]
+    elif kind == "group" and object_id in store.dcs.equipment_groups:
+        obj_name = store.dcs.equipment_groups[object_id]["name"]
+    elif kind == "area" and object_id in store.dcs.areas:
+        obj_name = store.dcs.areas[object_id]["name"]
+    return capabilities_for(store.capability_set, kind, object_id, tags=tags, rules=rules, equipment_type=equipment_type,
+                            object_name=obj_name)
 
 
 def _limit_check(object_id: str, limits: list[dict[str, Any]]) -> dict[str, Any]:
@@ -1102,7 +1110,34 @@ def profile(store: Any, object_id: str) -> dict[str, Any]:
     """对象的本体档案。tag- 返回所属设备的档案并标出焦点位号。"""
     result = _profile(store, object_id)
     result["procedures"] = _procedures_for(store, result)
+    result["process"] = _process_for(store, result)
     return result
+
+
+def _process_for(store: Any, result: dict[str, Any]) -> dict[str, Any] | None:
+    """对象所属工序、所在设备组定义的工艺阶段，以及能否查询罐批次（运行上下文）。"""
+    pm = getattr(store, "process", None)
+    if not pm or not pm.available:
+        return None
+    dcs, oid, kind = store.dcs, result["objectId"], result["kind"]
+    code, group_name = None, None
+    if kind == "equipment":
+        equip = dcs.equipment[oid]
+        code = equip.get("areaCode")
+        group_name = (dcs.equipment_groups.get(equip.get("equipmentGroupId") or "") or {}).get("name")
+    elif kind == "group":
+        code, group_name = dcs.equipment_groups[oid].get("areaCode"), dcs.equipment_groups[oid]["name"]
+    elif kind == "area":
+        code = dcs.areas[oid]["code"]
+    elif kind == "entity":
+        code = (store.relations.entities.get(oid) or {}).get("areaCode")
+    step = pm.step_of_area(code)
+    stages = pm.stages_for_group(group_name) if group_name else []
+    batch_supported = kind == "equipment" and bool(stages) and dcs.equipment[oid].get("nature", "实例") == "实例"
+    if not step and not stages:
+        return None
+    return {"step": step, "stages": stages, "batchSupported": batch_supported,
+            "contexts": [c for c in pm.contexts if c["group"] in ("", group_name)] if group_name or step else []}
 
 
 def _instance_link_views(store: Any, eid: str) -> list[dict[str, Any]]:

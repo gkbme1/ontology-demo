@@ -26,6 +26,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
+from . import process
 from .catalog import Catalog, node_id_of, parse_node_id
 from .config import settings
 from .profiles import classify
@@ -264,6 +265,94 @@ async def history_find_all(request: Request) -> JSONResponse:
     return envelope(data)
 
 
+# --------------------------------------------------------------------- 模拟 EBR / MOM
+# 罐批次与排班从 process.py 的同一份排程算出，与上面的 DCS 测点值对得上。
+
+MAX_CONTEXT_DAYS = 31
+
+
+def _fmt(ms: int | None) -> str | None:
+    if ms is None:
+        return None
+    return datetime.fromtimestamp(ms / 1000, timezone(timedelta(hours=settings.tz_offset_hours))).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _batch_view(batch: process.Batch, now: int) -> dict:
+    """EBR 只知道已经发生的阶段：进行中的批次只返回到当前阶段，当前阶段没有结束时间。"""
+    phases = []
+    for name, start, end in batch.phases:
+        if start > now:
+            break
+        done = end <= now
+        phases.append({"phase": name, "startTime": start, "endTime": end if done else None,
+                       "startText": _fmt(start), "endText": _fmt(end) if done else None})
+    reaction = next((p for p in phases if p["phase"] == "反应"), None)
+    status = "已完成" if batch.end <= now else "进行中"
+    return {
+        "batchNo": batch.batch_no, "unit": f"水解罐{batch.tank}", "unitCode": batch.tank, "area": "S11",
+        "enzymeLot": batch.enzyme_lot, "enzymeBatchCount": batch.count, "status": status,
+        "startTime": batch.start, "endTime": batch.end if status == "已完成" else None,
+        "startText": _fmt(batch.start), "endText": _fmt(batch.end) if status == "已完成" else None,
+        "reactionStart": reaction["startTime"] if reaction else None,
+        "reactionEnd": reaction["endTime"] if reaction else None,
+        "phases": phases,
+    }
+
+
+def _time_range(query) -> tuple[int, int]:
+    now = now_ms()
+    end = parse_time(query.get("endTime"), "endTime") if query.get("endTime") else now
+    start = parse_time(query.get("startTime"), "startTime") if query.get("startTime") else end - 3 * 86_400_000
+    if start >= end:
+        raise ValueError("startTime 必须早于 endTime")
+    if end - start > MAX_CONTEXT_DAYS * 86_400_000:
+        raise ValueError(f"时间范围不能超过 {MAX_CONTEXT_DAYS} 天")
+    return start, min(end, now)
+
+
+async def ebr_batches(request: Request) -> JSONResponse:
+    query = request.query_params
+    unit = (query.get("unit") or "").strip()
+    tanks = [process.tank_of(unit)] if unit else list(process.TANKS)
+    if unit and tanks[0] is None:
+        return fail(E_BAD_PARAM, f"未知设备：{unit}（模拟 EBR 只有 S11 水解罐 A～K）")
+    try:
+        start, end = _time_range(query)
+    except ValueError as exc:
+        return fail(E_BAD_TIME_RANGE, str(exc))
+    now = now_ms()
+    items = []
+    for tank in tanks:
+        for batch in process.schedule(settings.seed, tank).between(start, end):
+            if batch.start <= now:
+                items.append(_batch_view(batch, now))
+    items.sort(key=lambda b: (b["unitCode"], b["startTime"]))
+    return envelope({"total": len(items), "items": items, "simulated": True})
+
+
+async def ebr_batch(request: Request) -> JSONResponse:
+    batch_no = request.path_params["batch_no"]
+    parts = batch_no.split("-")
+    if len(parts) != 3 or parts[0] != "SJ" or process.tank_of(parts[1]) is None or not parts[2].isdigit():
+        return fail(E_BAD_PARAM, f"批号格式应为 SJ-<罐号>-<序号>：{batch_no}")
+    sched = process.schedule(settings.seed, parts[1])
+    now = now_ms()
+    sched.at(now)
+    seq = int(parts[2])
+    if not 1 <= seq <= len(sched.batches) or sched.batches[seq - 1].start > now:
+        return fail(E_BAD_PARAM, f"批次不存在：{batch_no}")
+    return envelope(_batch_view(sched.batches[seq - 1], now))
+
+
+async def mom_worktrans(request: Request) -> JSONResponse:
+    try:
+        start, end = _time_range(request.query_params)
+    except ValueError as exc:
+        return fail(E_BAD_TIME_RANGE, str(exc))
+    items = [{**s, "startText": _fmt(s["startTime"]), "endText": _fmt(s["endTime"])} for s in process.shifts_between(start, end)]
+    return envelope({"total": len(items), "items": items, "rule": "四班三运转：夜班 0–8、白班 8–16、中班 16–24", "simulated": True})
+
+
 # --------------------------------------------------------------------- 调试接口
 
 
@@ -284,6 +373,8 @@ async def health(request: Request) -> JSONResponse:
                 "maxPointsPerNode": settings.max_points_per_node,
             },
             "stats": _stats,
+            "ebr": {"units": [f"水解罐{t}" for t in process.TANKS], "simulated": True},
+            "mom": {"worktrans": True, "simulated": True},
             "serverTime": now_ms(),
         }
     )
@@ -300,7 +391,7 @@ async def mock_nodes(request: Request) -> JSONResponse:
     total, metas = catalog.search(query.get("keyword") or "", query.get("station") or "", limit, offset)
     items = []
     for meta in metas:
-        profile = classify(meta)
+        profile = process.adjust_profile(meta.name, classify(meta))
         items.append(
             {
                 "nodeId": node_id_of(meta),
@@ -348,6 +439,9 @@ async def mock_profile(request: Request) -> JSONResponse:
 ROUTES = [
     ("/api/hsm-db-rtserver/v1/rtdata/node/read", ["POST"], rtdata_read, "实时值读取"),
     ("/api/timing-svc/v1/history/findAll", ["POST"], history_find_all, "历史值查询"),
+    ("/api/ebr/v1/batches", ["GET"], ebr_batches, "模拟EBR·罐批次"),
+    ("/api/ebr/v1/batches/{batch_no}", ["GET"], ebr_batch, "模拟EBR·批次详情"),
+    ("/api/mom/v1/worktrans", ["GET"], mom_worktrans, "模拟MOM·排班"),
     ("/api/health", ["GET"], health, "健康检查"),
     ("/api/mock/nodes", ["GET"], mock_nodes, "查找测点"),
     ("/api/mock/profile", ["GET"], mock_profile, "测点模拟规则"),

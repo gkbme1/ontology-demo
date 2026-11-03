@@ -18,6 +18,7 @@ import struct
 from dataclasses import dataclass
 from typing import Iterable
 
+from . import process
 from .profiles import Profile, TagMeta, device_key
 
 SCAN_MS = 1_000  # 模拟量扫描周期
@@ -45,7 +46,7 @@ class Signal:
 
     def __init__(self, meta: TagMeta, profile: Profile, seed: str) -> None:
         self.meta = meta
-        self.profile = profile
+        self.profile = process.adjust_profile(meta.name, profile)
         self.seed = seed
         self.dev_key = device_key(meta)
 
@@ -67,6 +68,9 @@ class Signal:
         self.slot_offset = int(d("offset") * self.slot_ms) // 1000 * 1000
         self.const_since_min = int(d("since") * 360)
 
+        # S11 水解罐的阀门、搅拌、温度、pH、液位、氨水计量罐跟着批次阶段取值（见 process.py）
+        self.overlay = process.overlay_for(meta.name, meta.station, profile.kind == "discrete", seed)
+
     # ------------------------------------------------------------------ 公共
 
     @property
@@ -74,12 +78,19 @@ class Signal:
         return self.profile.kind == "discrete"
 
     def value_at(self, t_ms: int) -> Sample:
+        if self.overlay:
+            return Sample(t_ms, 1, self.overlay.value(t_ms))
         if self.is_discrete:
             return Sample(t_ms, 1, self._discrete_value(t_ms))
         return self._analog_sample(t_ms)
 
     def realtime(self, now_ms: int) -> Sample:
         """实时值：t 是该值的时间戳。模拟量取最近一次扫描；开关量取最近一次变位时刻。"""
+        if self.overlay and self.is_discrete:
+            return Sample(self.overlay.last_change(now_ms), 1, self.overlay.value(now_ms))
+        if self.overlay:
+            scan_t = now_ms - now_ms % SCAN_MS
+            return Sample(scan_t, 1, self.overlay.value(scan_t))
         if self.is_discrete:
             value = self._discrete_value(now_ms)
             return Sample(self._last_change(now_ms), 1, value)
@@ -89,6 +100,11 @@ class Signal:
 
     def raw(self, start_ms: int, end_ms: int, cap: int) -> list[Sample]:
         """原始存储值：开关量只存变位点，模拟量按存储步长存。"""
+        if self.overlay and self.is_discrete:
+            return [Sample(t, 1, v) for t, v in self.overlay.changes(start_ms, end_ms, cap)]
+        if self.overlay:
+            first = start_ms + (-start_ms) % RAW_ANALOG_STEP_MS
+            return [self.value_at(t) for t in range(first, end_ms + 1, RAW_ANALOG_STEP_MS)][:cap]
         if self.is_discrete:
             return self._discrete_changes(start_ms, end_ms, cap)
         first = start_ms + (-start_ms) % RAW_ANALOG_STEP_MS

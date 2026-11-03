@@ -281,6 +281,13 @@ def _select(store, q: dict, object_id: str | None):
         tags = _filter(tags, q)
     else:
         scope, tags, notes = resolve_query(store, q)
+    if q.get("unit"):
+        from backend.services.process_context import unit_scope
+
+        equip, ids = unit_scope(store, q["unit"])
+        before = len(tags)
+        tags = [t for t in tags if t.get("equipmentId") in ids]
+        notes.append(f"按设备「{equip['name']}」筛选：本台及同工段同台号设备的测点，{before} 个中保留 {len(tags)} 个。")
     # 备用点（未接线）排到最后，默认返回的前 N 个点才有看头；其余顺序保持点表原样
     tags = sorted(tags, key=lambda t: (t.get("rawDescription") or "").strip().startswith("备用"))
     total = len(tags)

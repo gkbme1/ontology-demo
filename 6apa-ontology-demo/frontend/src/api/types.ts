@@ -614,7 +614,102 @@ export interface AssetProfile {
   graphEntityId?: string | null
   /** 与本对象相关的报警处置卡 */
   procedures?: ProcedureCard[]
+  /** 所属工序、设备组定义的工艺阶段，能否查罐批次 */
+  process?: ProcessInfo | null
   focusTag?: string
+}
+
+/** 工序与工艺阶段（6APA_工序与阶段.xlsx） */
+export interface ProcessStage {
+  stepId: string
+  stepName: string
+  id: string
+  name: string
+  order: number
+  group: string
+  ebrPhase: string
+  dcsCondition: string
+  dcsRules: { tag: string; value: number }[]
+  limitMode: string
+  description: string
+  status: string
+  source?: Provenance
+}
+
+export interface ProcessContextDef {
+  type: string
+  step: string
+  group: string
+  system: string
+  capabilityId: string
+  fields: string
+  description: string
+  status: string
+}
+
+export interface ProcessInfo {
+  step: { id: string; name: string; role: string } | null
+  stages: ProcessStage[]
+  batchSupported: boolean
+  contexts: ProcessContextDef[]
+}
+
+export interface BatchPhase {
+  phase: string
+  startTime: number
+  endTime: number | null
+  startText: string
+  endText: string | null
+  stageId?: string
+  limitMode?: string
+}
+
+export interface BatchRecord {
+  batchNo: string
+  unit: string
+  status: string
+  enzymeLot?: string | null
+  enzymeBatchCount?: number | null
+  startTime: number
+  endTime: number | null
+  startText: string
+  endText: string | null
+  reactionStart: number | null
+  reactionEnd: number | null
+  phases: BatchPhase[]
+}
+
+export interface ContextDataSource {
+  sourceType: string
+  sourceTypeLabel: string
+  endpoint: string
+  simulated?: boolean | null
+  notice?: string
+}
+
+export interface BatchesPayload {
+  scope: { objectId: string; objectName: string; group: string; step?: string | null }
+  total: number
+  items: BatchRecord[]
+  dataSource: ContextDataSource
+}
+
+export interface ShiftRecord {
+  date: string
+  shift: string
+  team: string
+  startTime: number
+  endTime: number
+}
+
+export interface RunContextPayload {
+  scope: BatchesPayload['scope']
+  at: number
+  batch: Pick<BatchRecord, 'batchNo' | 'status' | 'enzymeLot' | 'enzymeBatchCount' | 'startTime' | 'reactionStart' | 'reactionEnd' | 'startText'> | null
+  phase: BatchPhase | null
+  shift: ShiftRecord | null
+  notice: string | null
+  dataSource: ContextDataSource
 }
 
 /** Agent 工具清单（Agent 服务 GET /api/tools） */
