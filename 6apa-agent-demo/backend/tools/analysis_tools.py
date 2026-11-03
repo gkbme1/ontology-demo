@@ -30,9 +30,11 @@ import math
 import re
 from collections import Counter, deque
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Callable
 
 from .context_tools import BATCH_WINDOW_PARAMS, UNIT_SCOPE, with_batch_window
+from .investigation_tools import CONFIDENCE_THRESHOLD, SCORING_NOTE, converge_directions
+from .limit_context import build_timeline
 from .registry import ToolParameter, ToolSpec
 
 # ---------------------------------------------------------------- 判定口径
@@ -100,6 +102,25 @@ def _window(arguments: dict[str, Any]) -> tuple[str, str, int]:
     span_ms = int((end - start).total_seconds() * 1000)
     interval = max(60_000, math.ceil(span_ms / TARGET_SAMPLES / 60_000) * 60_000)
     return start.strftime(TIME_FMT), end.strftime(TIME_FMT), interval
+
+
+def _ms(text: str) -> int:
+    return int(_parse_time(text, _now()).timestamp() * 1000)
+
+
+async def _timeline_for(api: Any, limit: dict[str, Any] | None, hist: dict[str, Any], start: str, end: str) -> Any:
+    """限值在各测点上的逐时刻生效取值（阶段 × 版本 × 换酶后批次数），见 limit_context。"""
+    return await build_timeline(api, limit, [t.get("equipment") for t in hist["tags"]], _ms(start), _ms(end))
+
+
+def _applicable_series(focus: dict[str, Any], timeline: Any) -> dict[int, float]:
+    """做同期对比时只用限值适用阶段内的样本：进料 / 出料 / 空闲的周期性起落会和阀门开关同步，造成假相关。"""
+    series = focus["_series"]
+    if not timeline or not timeline.phase_aware_units:
+        return series
+    unit = focus.get("_equipment") or ""
+    kept = {t: v for t, v in series.items() if timeline.applicable(unit, t)}
+    return kept if len(kept) >= MIN_SAMPLES else series
 
 
 def _fmt_t(t_ms: int) -> str:
@@ -345,6 +366,7 @@ async def _history(
                     "tag": item.get("tagName"),
                     "desc": item.get("description"),
                     "unit": item.get("unit"),
+                    "equipment": item.get("equipmentName"),
                     "series": series,
                 }
             )
@@ -453,13 +475,23 @@ _VERDICT_RANK = {
 }
 
 
-def assess_tag(series: dict[int, float], limit: dict[str, Any] | None) -> dict[str, Any]:
-    """单个测点在时间窗内的表现；有限值时逐档统计越限样本数。"""
+LimitAt = Callable[[int], "dict[str, Any] | None"]
+
+
+def _limit_fn(limit: dict[str, Any] | None, limit_at: LimitAt | None) -> LimitAt:
+    """逐时刻取限值：有 limit_at（按阶段 / 版本）用它，否则整窗用同一条限值。返回 None 表示该时刻不判断。"""
+    return limit_at if limit_at is not None else (lambda t: limit)
+
+
+def assess_tag(series: dict[int, float], limit: dict[str, Any] | None, limit_at: LimitAt | None = None) -> dict[str, Any]:
+    """单个测点在时间窗内的表现；有限值时逐档统计越限样本数（每个样本按当时生效的限值判断）。"""
     times = sorted(series)
     values = [series[t] for t in times]
     out: dict[str, Any] = {"max": _r(max(values)), "min": _r(min(values)), "avg": _r(_mean(values))}
     if not limit:
         return out
+    lim_of = _limit_fn(limit, limit_at)
+    lims = [lim_of(t) for t in times]
     bands = (
         ("aboveHighHigh", "highHigh", lambda v, b: v > b),
         ("aboveHigh", "high", lambda v, b: v > b),
@@ -469,29 +501,37 @@ def assess_tag(series: dict[int, float], limit: dict[str, Any] | None) -> dict[s
         ("belowLowLow", "lowLow", lambda v, b: v < b),
     )
     for key, field, test in bands:
-        bound = limit.get(field)
-        count = sum(1 for v in values if bound is not None and test(v, bound))
+        count = sum(1 for v, lim in zip(values, lims) if lim and lim.get(field) is not None and test(v, lim[field]))
         if count:
             out[key] = count
-    lo, hi = limit.get("normalLow"), limit.get("normalHigh")
-    abnormal = [t for t, v in zip(times, values) if (hi is not None and v > hi) or (lo is not None and v < lo)]
+    abnormal = [t for t, v, lim in zip(times, values, lims) if lim and _outside_normal(v, lim)]
     if abnormal:
         out["firstOut"] = _fmt_t(abnormal[0])
         out["lastOut"] = _fmt_t(abnormal[-1])
     return out
 
 
-def anomaly_mask(series: dict[int, float], limit: dict[str, Any] | None, direction: int) -> set[int]:
-    """异常期：有限值时取越出正常区间（按方向）的时刻；没有限值时取最偏的 20%。"""
+def _outside_normal(v: float, lim: dict[str, Any]) -> bool:
+    hi, lo = lim.get("normalHigh"), lim.get("normalLow")
+    return (hi is not None and v > hi) or (lo is not None and v < lo)
+
+
+def anomaly_mask(series: dict[int, float], limit: dict[str, Any] | None, direction: int, limit_at: LimitAt | None = None) -> set[int]:
+    """异常期：有限值时取越出正常区间（按方向，按当时生效的限值）的时刻；没有限值时取最偏的 20%。"""
     if direction == 0:
         return set()
     if limit and (limit.get("normalHigh") is not None or limit.get("normalLow") is not None):
-        hi, lo = limit.get("normalHigh"), limit.get("normalLow")
-        if direction > 0 and hi is not None:
-            return {t for t, v in series.items() if v > hi}
-        if direction < 0 and lo is not None:
-            return {t for t, v in series.items() if v < lo}
-        return set()
+        lim_of = _limit_fn(limit, limit_at)
+        out = set()
+        for t, v in series.items():
+            lim = lim_of(t)
+            if not lim:
+                continue
+            if direction > 0 and lim.get("normalHigh") is not None and v > lim["normalHigh"]:
+                out.add(t)
+            if direction < 0 and lim.get("normalLow") is not None and v < lim["normalLow"]:
+                out.add(t)
+        return out
     ordered = sorted(series.items(), key=lambda kv: kv[1], reverse=direction > 0)
     return {t for t, _ in ordered[: max(1, int(len(ordered) * ANOMALY_QUANTILE))]}
 
@@ -522,6 +562,7 @@ def _limit_brief(limit: dict[str, Any] | None) -> dict[str, Any] | None:
 
     brief = {
         "id": limit.get("id"),
+        "版本": limit.get("versionId"),
         "正常区间": f"{_range_text(limit.get('normalLow'), limit.get('normalHigh'))}{unit}",
         "低低限LL": with_unit(limit.get("lowLow")),
         "低限L": with_unit(limit.get("low")),
@@ -534,15 +575,19 @@ def _limit_brief(limit: dict[str, Any] | None) -> dict[str, Any] | None:
 
 
 def _judge_target(
-    hist: dict[str, Any], limit: dict[str, Any] | None, symptom: str, focus_tag: str | None, interval_ms: int
+    hist: dict[str, Any], limit: dict[str, Any] | None, symptom: str, focus_tag: str | None, interval_ms: int,
+    timeline: Any = None,
 ) -> dict[str, Any]:
-    """确认异常是否成立，并选出用于对比的"关注测点"。"""
+    """确认异常是否成立，并选出用于对比的"关注测点"。timeline 给定时按阶段与限值版本逐点判断。"""
     per_tag = []
     for tag in hist["tags"]:
-        stats = assess_tag(tag["series"], limit)
+        limit_at = timeline.for_unit(tag.get("equipment")) if timeline else None
+        stats = assess_tag(tag["series"], limit, limit_at)
+        stats["_limitAt"] = limit_at
         up = stats.get("aboveNormal", 0)
         down = stats.get("belowNormal", 0)
-        per_tag.append({"tag": tag["tag"], "desc": tag["desc"], "unit": tag["unit"], "up": up, "down": down, **stats, "_series": tag["series"]})
+        per_tag.append({"tag": tag["tag"], "desc": tag["desc"], "unit": tag["unit"], "up": up, "down": down, **stats,
+                        "_series": tag["series"], "_equipment": tag.get("equipment")})
 
     if symptom == "偏高":
         direction = 1
@@ -591,6 +636,7 @@ def _judge_target(
     public = []
     for t in shown:
         row = {k: v for k, v in t.items() if not k.startswith("_") and k not in ("up", "down") and k not in band_keys}
+        row.pop("_limitAt", None)
         minutes = {_BAND_LABEL[k]: int(round(t[k] * step_min)) for k in band_keys if t.get(k)}
         if minutes:
             row["越限分钟"] = minutes
@@ -695,15 +741,17 @@ async def investigate_process_anomaly(registry: Any, arguments: dict[str, Any], 
             ),
         }
 
-    judged = _judge_target(hist, limit, symptom, focus_kw if focus_kw and _TAG_RE.match(focus_kw) else None, window[2])
+    timeline = await _timeline_for(api, limit, hist, window[0], window[1])
+    judged = _judge_target(hist, limit, symptom, focus_kw if focus_kw and _TAG_RE.match(focus_kw) else None, window[2], timeline)
     focus = judged.pop("focus")
-    mask = anomaly_mask(focus["_series"], limit, judged["direction"])
+    mask = anomaly_mask(focus["_series"], limit, judged["direction"], focus.get("_limitAt"))
     causes, controllers = await _cause_tree(api, target, depth)
 
     candidates = []
     simulated = hist["simulated"]
+    effect_series = _applicable_series(focus, timeline)
     for cause in causes[:MAX_CANDIDATES]:
-        ev = await _evidence(api, cause, focus["_series"], mask, judged["direction"], window)
+        ev = await _evidence(api, cause, effect_series, mask, judged["direction"], window)
         simulated = ev.pop("simulated") or simulated
         candidates.append(
             {
@@ -728,6 +776,9 @@ async def investigate_process_anomaly(registry: Any, arguments: dict[str, Any], 
     if len(causes) > MAX_CANDIDATES:
         gaps.append(f"上推共找到 {len(causes)} 个因素，本次只验证了最近的 {MAX_CANDIDATES} 个")
 
+    converged = await converge_directions(api, target, judged, {"tag": focus["tag"], "equipment": focus.get("_equipment")},
+                                           candidates, window)
+
     supported = [c["factor"] for c in candidates if c["verdict"] in ("数据支持", "弱支持", "同期强相关（本体未标方向）")]
     unverifiable = [c["factor"] for c in candidates if not c["tags"]]
     conclusion = [f"异常{judged['established']}（关注测点 {focus['tag']}）。"]
@@ -743,17 +794,27 @@ async def investigate_process_anomaly(registry: Any, arguments: dict[str, Any], 
             f"分析对象「{target['name']}」本身处于闭环控制（{'、'.join(controllers)}），"
             "控制器会补偿扰动，各原因在数据上的信号可能被削弱。"
         )
+    if converged["directions"]:
+        conclusion.append(
+            "候选排查方向："
+            + "；".join(f"[{d['category']}]{d['factor']}{'（证据弱）' if d.get('weak') else ''}" for d in converged["directions"]) + "。"
+        )
+    if converged["confidence"]["needsHuman"]:
+        conclusion.append(f"最高得分 {converged['confidence']['topScore']} 低于阈值 {CONFIDENCE_THRESHOLD}，证据不足，建议转人工排查。")
 
     return {
         "analysisType": "异常溯源",
         "target": {**_target_view(target), "symptom": symptom},
         "window": {"start": window[0], "end": window[1], "intervalMinutes": window[2] // 60_000},
-        "limit": _limit_brief(limit),
+        "limit": _limit_brief(timeline.dominant() if timeline else limit),
         "anomaly": judged,
+        "limitContext": timeline.summary(window[2] / 60_000) if timeline else None,
+        "directions": converged["directions"],
+        "directionSummary": {k: converged[k] for k in ("uncovered", "confidence", "notes") if converged[k]},
         "candidates": candidates,
         "dataGaps": gaps,
         "conclusion": "".join(conclusion) + (_SIMULATED_TAIL if simulated else ""),
-        "method": _method_note(simulated),
+        "method": _method_note(simulated) + SCORING_NOTE,
         "next": _NEXT_HINT,
     }
 
@@ -800,11 +861,12 @@ async def verify_process_influence(registry: Any, arguments: dict[str, Any], api
     if not effect_hist["tags"]:
         return {**base, "verdict": "无测点，无法用数据验证", "conclusion": f"「{effect['name']}」没有可取历史值的现场测点。"}
 
-    judged = _judge_target(effect_hist, limit, arguments.get("symptom") or "异常", None, window[2])
+    timeline = await _timeline_for(api, limit, effect_hist, window[0], window[1])
+    judged = _judge_target(effect_hist, limit, arguments.get("symptom") or "异常", None, window[2], timeline)
     focus = judged.pop("focus")
-    mask = anomaly_mask(focus["_series"], limit, judged["direction"])
+    mask = anomaly_mask(focus["_series"], limit, judged["direction"], focus.get("_limitAt"))
     probe = {"id": cause["id"], "pathSign": sign}
-    ev = await _evidence(api, probe, focus["_series"], mask, judged["direction"], window)
+    ev = await _evidence(api, probe, _applicable_series(focus, timeline), mask, judged["direction"], window)
     simulated = ev.pop("simulated") or effect_hist["simulated"]
 
     if not path:
@@ -815,6 +877,7 @@ async def verify_process_influence(registry: Any, arguments: dict[str, Any], api
     return {
         **base,
         "effectAnomaly": judged,
+        "limitContext": timeline.summary(window[2] / 60_000) if timeline else None,
         "evidence": {"expected": _expectation(sign, judged["direction"]), **ev},
         "conclusion": conclusion,
         "method": _method_note(simulated),
@@ -931,38 +994,55 @@ def classify(value: float, limit: dict[str, Any]) -> str:
     return "正常"
 
 
-def exceedance_profile(series: dict[int, float], limit: dict[str, Any], interval_ms: int) -> dict[str, Any]:
+def exceedance_profile(
+    series: dict[int, float], limit: dict[str, Any], interval_ms: int, limit_at: LimitAt | None = None
+) -> dict[str, Any]:
     """一个测点在时间窗内：最值及时刻、各档越限累计时长、最长的连续越限时段。
 
-    时长 = 越限样本数 × 采样间隔，精度就是一个采样间隔。
+    时长 = 越限样本数 × 采样间隔，精度就是一个采样间隔。limit_at 给定时每个样本按当时生效的限值判断，
+    不在适用阶段的样本（返回 None）不参与判断，最值也只在参与判断的样本里取。
     """
-    times = sorted(series)
-    values = [series[t] for t in times]
+    lim_of = _limit_fn(limit, limit_at)
+    all_times = sorted(series)
+    lims_all = {t: lim_of(t) for t in all_times}
+    times = [t for t in all_times if lims_all[t]]
     step_min = interval_ms / 60_000
+    if not times:
+        return {"worst": "正常", "judgedMinutes": 0, "notJudgedMinutes": int(round(len(all_times) * step_min)),
+                "max": None, "min": None}
+    values = [series[t] for t in times]
+    lims = [lims_all[t] for t in times]
     t_max = max(times, key=lambda t: series[t])
     t_min = min(times, key=lambda t: series[t])
     out: dict[str, Any] = {
         "max": _r(series[t_max]),
         "maxAt": _fmt_t(t_max),
+        "maxStatus": classify(series[t_max], lims_all[t_max]),
         "min": _r(series[t_min]),
         "minAt": _fmt_t(t_min),
+        "minStatus": classify(series[t_min], lims_all[t_min]),
     }
+    if len(times) < len(all_times):
+        out["judgedMinutes"] = int(round(len(times) * step_min))
+        out["notJudgedMinutes"] = int(round((len(all_times) - len(times)) * step_min))
     minutes: dict[str, int] = {}
     for key, field, side, _ in _BANDS:
-        bound = limit.get(field)
-        if bound is None:
-            continue
-        count = sum(1 for v in values if (side > 0 and v > bound) or (side < 0 and v < bound))
+        count = sum(1 for v, lim in zip(values, lims) if lim.get(field) is not None
+                    and ((side > 0 and v > lim[field]) or (side < 0 and v < lim[field])))
         if count:
             minutes[key] = int(round(count * step_min))
     if minutes:
         out["越限分钟"] = {_BAND_LABEL[k]: v for k, v in minutes.items()}
 
-    lo, hi = limit.get("normalLow"), limit.get("normalHigh")
     runs: list[tuple[int, int]] = []
     run_start = None
     for index, value in enumerate(values):
-        outside = (hi is not None and value > hi) or (lo is not None and value < lo)
+        # 中间隔着不判断的时段（换了批次 / 阶段）也算断开
+        gap = index > 0 and times[index] - times[index - 1] > interval_ms * 1.5
+        if gap and run_start is not None:
+            runs.append((run_start, index - 1))
+            run_start = None
+        outside = _outside_normal(value, lims[index])
         if outside and run_start is None:
             run_start = index
         if not outside and run_start is not None:
@@ -1114,22 +1194,34 @@ async def _check_limit_one(api: Any, target: dict[str, Any], arguments: dict[str
     if not hist["tags"]:
         return {**base, "window": {"start": start, "end": end}, "conclusion": f"「{target['name']}」没有可取历史值的现场测点。"}
 
+    timeline = await _timeline_for(api, limit, hist, start, end)
     profiles = []
     for tag in hist["tags"]:
-        profile = exceedance_profile(tag["series"], limit, interval)
+        limit_at = timeline.for_unit(tag.get("equipment")) if timeline else None
+        profile = exceedance_profile(tag["series"], limit, interval, limit_at)
         profiles.append({"tag": tag["tag"], "desc": tag["desc"], **profile})
     # 排序：高高 / 低低最严重，其次高限 / 低限，最后正常区间外
     severity = {"高于高高限": 0, "低于低低限": 0, "高于高限": 1, "低于低限": 1, "高于正常上沿": 2, "低于正常下沿": 2}
     abnormal = [p for p in profiles if p["worst"] != "正常"]
     abnormal.sort(key=lambda p: (severity.get(p["worst"], 9), -_outside_minutes(p)))
-    peak = max(profiles, key=lambda p: p["max"])
-    trough = min(profiles, key=lambda p: p["min"])
-    conclusion = (
-        f"{len(profiles)} 个测点中 {len(abnormal)} 个在时间窗内越出正常区间。"
-        f"全窗最高 {peak['max']}{limit.get('unit') or ''}（{peak['tag']}，{peak['maxAt']}，{classify(peak['max'], limit)}），"
-        f"最低 {trough['min']}{limit.get('unit') or ''}（{trough['tag']}，{trough['minAt']}，{classify(trough['min'], limit)}）。"
-        + _limit_status_note(limit)
-    )
+    if timeline:
+        base["limit"] = _limit_brief(timeline.dominant())
+    judged_profiles = [p for p in profiles if p.get("max") is not None]
+    step_min = interval / 60_000
+    context_note = timeline.note(step_min) if timeline else ""
+    if not judged_profiles:
+        conclusion = (f"{len(profiles)} 个测点在时间窗内都不处于限值 {limit.get('id')} 的适用工况「{limit.get('operatingMode')}」，"
+                      "没有可判断的时段。" + context_note)
+    else:
+        peak = max(judged_profiles, key=lambda p: p["max"])
+        trough = min(judged_profiles, key=lambda p: p["min"])
+        scope_word = "适用阶段内" if timeline and timeline.phase_aware_units else "全窗"
+        conclusion = (
+            f"{len(profiles)} 个测点中 {len(abnormal)} 个在时间窗内越出正常区间。"
+            f"{scope_word}最高 {peak['max']}{limit.get('unit') or ''}（{peak['tag']}，{peak['maxAt']}，{peak['maxStatus']}），"
+            f"最低 {trough['min']}{limit.get('unit') or ''}（{trough['tag']}，{trough['minAt']}，{trough['minStatus']}）。"
+            + context_note + _limit_status_note(limit)
+        )
     if hist["simulated"]:
         conclusion += _SIMULATED_TAIL
     result = {
@@ -1141,6 +1233,7 @@ async def _check_limit_one(api: Any, target: dict[str, Any], arguments: dict[str
         "abnormalTagCount": len(abnormal),
         "abnormal": abnormal[:MAX_ABNORMAL_ROWS],
         "normalTags": [p["tag"] for p in profiles if p["worst"] == "正常"],
+        "limitContext": timeline.summary(step_min) if timeline else None,
         "conclusion": conclusion,
         "method": _exceedance_method(interval, hist["simulated"]),
         "next": "越限统计已完整，请直接作答；abnormal 已按严重程度排好序，列出全部越限测点，不要只挑几个。",
@@ -1801,6 +1894,9 @@ ANALYSIS_TOOLS: list[ToolSpec] = [
         returns=(
             "limit（限值及确认状态）、anomaly（异常是否成立、越限测点与次数、首末越限时刻）、"
             "candidates[]（因素、路径、本体方向、机理、来源行、预期方向、测点、相关系数、领先分钟、异常期偏移σ、判断）、"
+            "directions[]（Top 3～5 候选排查方向：人机料法环分类、得分 = 证据 × 权重、证据、依据）、"
+            "directionSummary（未覆盖的分类、置信度与是否需转人工）。候选方向计分：数据支持 1.0、同期强相关 0.75、弱支持 0.6、无测点 0.35、"
+            "未发现支持 0.15；人为改同一参数且方向一致 0.9；测量偏差扩大 0.9、恒定 0.75；乘本体原因权重。directions 里没有 basis 的来自本体因果，路径见 candidates；、limitContext（按阶段与限值版本判断的说明）、"
             "dataGaps、conclusion（程序给出的分层结论）、method（判定口径与模拟数据声明）。"
             "status=needs_clarification 时返回 candidates 供选择。"
         ),

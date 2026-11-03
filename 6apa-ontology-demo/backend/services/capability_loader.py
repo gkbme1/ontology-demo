@@ -149,7 +149,8 @@ def expand_endpoint(text: str) -> str:
     from backend.services import timeseries as ts
 
     return (text.replace("{RTDB_BASE_URL}", ts.RTDB_BASE_URL).replace("{HISTORIAN_BASE_URL}", ts.HISTORIAN_BASE_URL)
-            .replace("{EBR_BASE_URL}", pc.ebr_base()).replace("{MOM_BASE_URL}", pc.mom_base()))
+            .replace("{EBR_BASE_URL}", pc.ebr_base()).replace("{MOM_BASE_URL}", pc.mom_base())
+            .replace("{LIMS_BASE_URL}", pc.lims_base()).replace("{OPLOG_BASE_URL}", pc.oplog_base()))
 
 
 def bind(binding: str, *, object_id: str, tags: list[dict[str, Any]], rules: list[dict[str, Any]],

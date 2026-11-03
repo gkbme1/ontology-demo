@@ -12,6 +12,7 @@ import type { AssetProfile, LimitCheckResult, ProfileAttribute } from '@/api/typ
 import ClassRelationHub from './ClassRelationHub.vue'
 import ProcedureCardView from './ProcedureCardView.vue'
 import BatchPanel from './BatchPanel.vue'
+import LimitVersions from './LimitVersions.vue'
 
 const props = defineProps<{ profile: AssetProfile }>()
 const emit = defineEmits<{ open: [objectId: string] }>()
@@ -160,6 +161,8 @@ const KINDS = ['全部', '固有', '工艺属性', '测量', '状态', '控制']
 const kindFilter = ref<(typeof KINDS)[number]>('全部')
 // 运行约束按当前值校验（本体约束校验接口，按需调用）
 const checking = ref(false)
+// 展开限值版本（在线修改限值 = 追加版本）
+const openLimit = ref<string | null>(null)
 const checkResult = ref<LimitCheckResult | null>(null)
 const checkError = ref<string | null>(null)
 async function runCheck() {
@@ -183,6 +186,7 @@ watch(() => props.profile.objectId, () => {
   checkResult.value = null
   checkError.value = null
   procId.value = null
+  openLimit.value = null
   kindFilter.value = '全部'
   ruleFilter.value = '全部'
   showAllRelations.value = false
@@ -495,6 +499,9 @@ const KIND_TITLE: Record<string, string> = {
                     <template v-if="l.hasValues">正常 {{ l.normal ?? '—' }} {{ l.unit }} · {{ alarmText(l.alarm) }}</template>
                     <template v-else>数值待现场提供</template>
                     <span v-if="l.operatingMode" class="text-fg-mute"> · {{ l.operatingMode }}</span>
+                    <button class="ml-2 text-[11px] text-info hover:underline" @click="openLimit = openLimit === l.id ? null : l.id">
+                      版本 {{ l.versionCount ?? 1 }}<template v-if="l.conditional"> · 含条件版本</template> {{ openLimit === l.id ? '▴' : '▾' }}
+                    </button>
                   </div>
                 </div>
         </div>
@@ -502,6 +509,10 @@ const KIND_TITLE: Record<string, string> = {
           <div class="text-fg-mute text-[11px] mb-1">安全约束（报警联锁）</div>
           <div v-if="!profile.constraints.safety.length" class="text-fg-mute">本体中没有登记涉及本对象的报警联锁</div>
           <div v-for="s in profile.constraints.safety" :key="s.text" class="py-0.5">{{ s.text }}<span class="text-fg-mute"> · {{ s.mechanism }}</span></div>
+        </div>
+        <div v-if="openLimit" class="lg:col-span-3">
+          <div class="text-fg-mute text-[11px]">限值 <span class="font-mono text-brand">{{ openLimit }}</span> 的版本（在线修改 = 追加版本，判断历史数据按当时生效的版本）</div>
+          <LimitVersions :limit-id="openLimit" :unit-name="profile.kind === 'equipment' ? profile.name : null" />
         </div>
       </div>
 

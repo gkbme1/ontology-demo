@@ -116,6 +116,8 @@ backend/
 │   ├── ontology_tools.py  30 个本体 API 的 Tool 定义——全项目唯一知道接口长什么样的地方
 │   ├── analysis_tools.py  确定性分析工具（异常溯源、影响验证、越限统计……）
 │   ├── context_tools.py   罐批次与运行上下文；按批次 / 阶段换算分析时间窗（EBR 优先，DCS 推断兜底）
+│   ├── limit_context.py   按「当时生效」的限值逐点判断：工艺阶段 × 限值版本 × 换酶后批次数
+│   ├── investigation_tools.py  测量偏差判定、漂移检测、操作记录关联、候选方向收敛（Top 3～5、人机料法环）
 │   ├── calculations/      计算模块（派生量计算）
 │   └── executor.py        HTTP 执行、异常分级、超大返回体裁剪
 ├── agent/
@@ -134,6 +136,7 @@ tests/test_agent_loop.py     Agent Loop 自测（脚本化假 LLM，无需 Key�
 tests/stub_llm_server.py     假 LLM 模式起真实服务，用于无 Key 环境验证前端
 tests/test_mock_dcs.py       模拟 DCS 服务自测
 tests/test_context_tools.py  批次工具与按批次取时间窗自测
+tests/test_investigation_tools.py  第 2 步分析能力自测（偏差判定、漂移、操作记录、逐点限值、候选方向）
 ```
 
 ---
@@ -320,6 +323,9 @@ ONTOLOGY_BASE_URL=http://localhost:8700 python3 -m tests.test_analysis_tools
 # 罐批次 / 运行上下文与按批次取时间窗：伪本体单元测试 + 打真实本体（需本体服务与模拟 DCS 在跑）
 ONTOLOGY_BASE_URL=http://localhost:8700 python3 -m tests.test_context_tools
 
+# 分析能力：测量偏差、漂移、操作记录、按阶段与限值版本判断、候选方向收敛
+ONTOLOGY_BASE_URL=http://localhost:8700 python3 -m tests.test_investigation_tools
+
 # 无 Key 环境下验证前端与 SSE（用假 LLM 起真实服务）
 ONTOLOGY_BASE_URL=http://localhost:8700 python3 -m tests.stub_llm_server
 ```
@@ -386,6 +392,22 @@ Agent 收到的和手敲进去完全一样。案例里的 `referenceToolChain` �
 - 取批次的顺序是固定的：先查 EBR（经本体 `/api/ontology/{设备}/batches`、`/batches/{批号}`）；
   EBR 取不到时按本体登记的阶段识别条件（`/api/ontology/{设备}/stage-rules`）用 DCS 开关量变位推断，
   结果标明「DCS推断」，没有批号和换酶后批次数。**阶段定义在本体，取数与推断在 Agent。**
+
+### 分析能力：候选方向、测量偏差、漂移、人为改参数、动态限值（`investigation_tools.py`、`limit_context.py`）
+
+规则、阈值、权重、限值版本都定义在本体（`6APA_调查知识.xlsx`、`6APA_限值版本.xlsx`，草案待标定），这里按定义取数计算：
+
+| 工具 | 做什么 |
+| --- | --- |
+| `investigate_process_anomaly`（增强） | 输出 `directions`：固定 3～5 条候选排查方向，按人机料法环归类，得分 = 证据分 × 本体原因权重；除本体因果候选外，还自动查「人」（该批的设定值修改，方向是否一致）和「机」（该工艺量的测量偏差规则）；最高分 < 0.5 提示证据不足转人工 |
+| `check_measurement_deviation` | 按本体判定规则：在线与化验 pH 按取样时间 ±2 分钟对齐比对、双电极互比，判「恒定偏差 / 差值扩大 / 正常」（BF-05） |
+| `detect_drift` | 有批次的设备逐批取同阶段均值，用中位数斜率看批间趋势（不受个别批次人为改设定值影响）；无批次的用 CUSUM + 斜率；标出仍在正常区间内的漂移（温水煮青蛙） |
+| `analyze_operations` | DCS 操作日志：设定值修改 / 手自动切换、班次、操作站，并算改动前后对应位号的实测变化 |
+
+**按当时生效的限值判断**：`check_limit_exceedance`、`investigate_process_anomaly`、`verify_process_influence` 逐个样本取限值——
+样本所处阶段对应的限值操作模式与限值的适用工况不同就不判断（进料时罐温 28℃ 不再报成低于低低限），
+其余样本按本体登记的匹配规则选限值版本（换酶后批次区间、适用设备、生效时间）。结果里的 `limitContext` 写明用了哪些版本、哪些阶段没有判断；
+同期对比（相关性）也只用适用阶段的样本，避免阀门随批次周期开关造成假相关。
 
 ### 计算模块（`backend/tools/calculations/`）
 
@@ -538,6 +560,8 @@ python3 -m tests.eval_agent --compare deepseek qwen32b
 | GET | `/api/ebr/v1/batches?unit=&startTime=&endTime=` | 模拟 EBR：S11 水解罐 A～K 的罐批次（批号、换酶后批次数、酶批号、各阶段起止），默认近 3 天、最多 31 天 |
 | GET | `/api/ebr/v1/batches/{batchNo}` | 模拟 EBR：按批号查一批（批号 `SJ-<罐号>-<序号>`） |
 | GET | `/api/mom/v1/worktrans?startTime=&endTime=` | 模拟 MOM 排班：四班三运转（夜 0–8、白 8–16、中 16–24，甲乙丙丁轮转） |
+| GET / POST | `/api/lims/v1/results` | 模拟 LIMS：水解液 pH（反应中两次、终点一次）与酶解转化率；POST 人工录入（存 `mock_dcs/runtime/`，不入库） |
+| GET | `/api/dcs/v1/oplog?unit=&startTime=&endTime=` | 模拟 DCS 操作日志：温度 / pH 设定值修改（真实影响该批后续曲线）、氨水阀手自动切换 |
 
 nodeId 约定 `{控制站号}:{位号}.PV`（如 `10:PT_1003.PV`），与本体点表一一对应。
 数值按单位 / 描述 / 位号推断量纲与合理范围（如水解 pH 7.7~8.1、结晶温度 2~12 ℃），

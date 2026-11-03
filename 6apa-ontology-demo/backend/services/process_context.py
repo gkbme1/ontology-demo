@@ -287,44 +287,196 @@ def unit_scope(store: Any, unit: str) -> tuple[dict[str, Any], set[str]]:
     ids = {equip["id"]}
     letter = _letter(equip["name"])
     if letter:
-        def size(gid: str | None) -> int:
-            return sum(1 for e in dcs.equipment.values() if gid and e.get("equipmentGroupId") == gid)
+        def members(gid: str | None) -> list[dict[str, Any]]:
+            return [e for e in dcs.equipment.values() if gid and e.get("equipmentGroupId") == gid
+                    and e.get("nature", "实例") == "实例"]
 
-        own = size(equip.get("equipmentGroupId"))
-        for e in dcs.equipment.values():
-            gid = e.get("equipmentGroupId")
+        own_letters = {_letter(e["name"]) for e in members(equip.get("equipmentGroupId"))}
+        groups = {e.get("equipmentGroupId") for e in dcs.equipment.values()
+                  if e.get("areaCode") == equip.get("areaCode") and e.get("equipmentGroupId")}
+        for gid in groups - {equip.get("equipmentGroupId")}:
+            others = members(gid)
+            letters = {_letter(e["name"]) for e in others}
             # 只认台数与本组相当的组（按台号一一对应）；RB储罐A/B 这种两台供十一台的是汇管，不算「这一台」的
-            if (e.get("areaCode") == equip.get("areaCode") and e.get("nature", "实例") == "实例" and gid
-                    and _letter(e["name"]) == letter and size(gid) >= 0.6 * own):
-                ids.add(e["id"])
+            if len(others) < 0.6 * len(own_letters):
+                continue
+            want = letter
+            # 台号跳过 I 的组（A～H、J、K、L）：本组的 I/J/K 对应它的 J/K/L
+            if "I" in own_letters and "I" not in letters and "L" in letters and letter in "IJK":
+                want = SKIP_I_SHIFT[letter]
+            ids.update(e["id"] for e in others if _letter(e["name"]) == want)
     return equip, ids
 
 
+# 点表台号跳过 I 的写法（I 易与 1 混淆）：按顺序对应时 I→J、J→K、K→L
+SKIP_I_SHIFT = {"I": "J", "J": "K", "K": "L"}
+
+
+def unit_tag_names(store: Any, equip: dict[str, Any]) -> list[str]:
+    """「这一台」的全部位号：本台 + 按台号对应的设备（见 unit_scope）。"""
+    _, ids = unit_scope(store, equip["id"])
+    return [t["name"] for t in store.dcs.tags.values() if t.get("equipmentId") in ids]
+
+
+def resolve_template(names: list[str], tpl: str, code_hint: str = "") -> dict[str, Any]:
+    """位号模板（{x} 为台号）在这一台的位号里找对应的那个。
+
+    不直接把 {x} 换成设备名末尾的字母：点表的台号后缀并不总与设备名一致
+    （如水解罐K 的温度是 TI_1301L、搅拌是 P_1303K），按本台实际登记的位号匹配才可靠。
+    """
+    if "{x}" not in tpl:
+        return {"template": tpl, "tag": tpl, "resolved": tpl in names}
+    pattern = re.compile("^" + re.escape(tpl).replace(re.escape("{x}"), r"([A-Za-z0-9]{1,2})") + "$")
+    hits = [n for n in names if pattern.match(n)]
+    if len(hits) > 1:
+        hits = [n for n in hits if pattern.match(n).group(1) == code_hint] or hits[:1]
+    if hits:
+        return {"template": tpl, "tag": hits[0], "resolved": True}
+    return {"template": tpl, "tag": tpl.replace("{x}", code_hint), "resolved": False,
+            "note": "本台登记的位号里没有与模板对应的点"}
+
+
 def stage_rules(store: Any, object_id: str) -> dict[str, Any]:
-    """设备实例的阶段识别规则，模板里的 {x} 换成本设备的罐号、落到具体 DCS 位号。
+    """设备实例的阶段识别规则：模板里的 {x} 落到本台实际登记的 DCS 位号。
 
     供 EBR 取不到时由调用方（Agent）按 DCS 开关量推断阶段：本体只给定义，不做推断。
-    罐号取设备名称末尾的字母数字（水解罐A → A）；换出来的位号在点表里查不到的标 resolved=false。
+    本台没有登记对应位号的条件标 resolved=false（如水解罐I 点表里没有搅拌运行点）。
     """
     equip = _equipment(store, object_id)
     group = store.dcs.equipment_groups[equip["equipmentGroupId"]]
     m = _UNIT_CODE.search(equip["name"])
     code = m.group(1) if m else ""
-    names = {t.get("name") for t in store.dcs.tags.values()}
+    names = unit_tag_names(store, equip)
     stages = []
     for s in store.process.stages_for_group(group["name"]):
-        rules = []
-        for r in s["dcsRules"]:
-            tag = r["tag"].replace("{x}", code)
-            rules.append({"template": r["tag"], "tag": tag, "value": r["value"], "resolved": tag in names})
+        rules = [{**resolve_template(names, r["tag"], code), "value": r["value"]} for r in s["dcsRules"]]
         stages.append({k: s[k] for k in ("id", "name", "order", "ebrPhase", "limitMode", "dcsCondition", "status", "source")}
                       | {"rules": rules})
+    unresolved = sorted({r["template"] for st in stages for r in st["rules"] if not r["resolved"]})
     return {
         "scope": {"objectId": equip["id"], "objectName": equip["name"], "group": group["name"]},
         "unitCode": code,
         "stages": stages,
-        "note": "阶段按顺序判定：满足某阶段全部条件即为该阶段；都不满足（无条件的阶段）为其余状态。定义为草案，待工艺确认。",
+        "unresolved": unresolved,
+        "note": "阶段按顺序判定：满足某阶段全部条件即为该阶段；都不满足（无条件的阶段）为其余状态。"
+                "{x} 按本台实际登记的位号匹配。定义为草案，待工艺确认。"
+                + (f"本台缺少识别位号：{'、'.join(unresolved)}，DCS 推断不完整，应以 EBR 为准。" if unresolved else ""),
     }
+
+
+
+
+
+# ------------------------------------------------------------------ LIMS 化验 / DCS 操作日志 代调
+
+LIMS_RESULTS_PATH = os.environ.get("LIMS_RESULTS_PATH", "/api/lims/v1/results")
+OPLOG_PATH = os.environ.get("OPLOG_PATH", "/api/dcs/v1/oplog")
+
+
+def lims_base() -> str:
+    return _base("LIMS_BASE_URL")
+
+
+def oplog_base() -> str:
+    return _base("OPLOG_BASE_URL")
+
+
+def _post(url: str, body: dict[str, Any]) -> Any:
+    from backend.services.timeseries import ApiError
+
+    req = urllib.request.Request(url, data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+                                 headers={"Content-Type": "application/json"}, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.URLError as exc:
+        raise ApiError(502, f"无法连接上游接口 {url}：{getattr(exc, 'reason', exc)}") from exc
+    if payload.get("code", 0) != 0:
+        status = 400 if str(payload.get("code", "")).startswith("400") else 502
+        raise ApiError(status, f"上游接口返回错误 code={payload.get('code')}：{payload.get('message')}")
+    return payload.get("data")
+
+
+def _lab_defs(store: Any) -> dict[str, dict[str, Any]]:
+    kn = getattr(store, "investigation", None)
+    return {x["code"]: x for x in (kn.lab_items if kn else [])}
+
+
+def lab_results(store: Any, object_id: str, q: dict[str, Any]) -> dict[str, Any]:
+    """设备实例的化验结果（LIMS + 人工录入），附本体里登记的化验项目定义（对应工艺属性、对比位号、对齐方式）。"""
+    equip = _equipment(store, object_id)
+    data = _get(f"{lims_base()}{LIMS_RESULTS_PATH}", {
+        "unit": equip["name"], "startTime": _ms(q.get("startTime"), "startTime"), "endTime": _ms(q.get("endTime"), "endTime"),
+        "item": q.get("item") or None,
+    })
+    defs = _lab_defs(store)
+    items = data.get("items") or []
+    for r in items:
+        d = defs.get(r.get("itemCode"))
+        if d:
+            r["property"] = d["property"]
+            r["alignment"] = f"{d['alignment']}（±{d['alignMinutes']:g} 分钟）" if d.get("alignMinutes") else d["alignment"]
+    return {"scope": {"objectId": equip["id"], "objectName": equip["name"]}, "total": len(items), "items": items,
+            "labItems": list(defs.values()),
+            "dataSource": _data_source("LIMS", "LIMS 化验 / 人工录入", lims_base(), LIMS_RESULTS_PATH)}
+
+
+def submit_lab_result(store: Any, object_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    """人工录入化验结果：校验项目在本体里有定义，再写入 LIMS（化验员只录一遍，调查与台账共用）。"""
+    from backend.services.timeseries import ApiError
+
+    equip = _equipment(store, object_id)
+    if not isinstance(body, dict):
+        raise ApiError(400, "请求体必须是 JSON 对象")
+    defs = _lab_defs(store)
+    code = str(body.get("itemCode") or "")
+    if code not in defs:
+        raise ApiError(400, f"化验项目 {code or '（空）'} 未在本体登记，可选：{'、'.join(defs) or '无'}")
+    if body.get("value") in (None, ""):
+        raise ApiError(400, "value 必填")
+    if not str(body.get("enteredBy") or "").strip():
+        raise ApiError(400, "enteredBy（录入人）必填")
+    record = _post(f"{lims_base()}{LIMS_RESULTS_PATH}", {**body, "unit": equip["name"],
+                                                          "sampleTime": _ms(body.get("sampleTime"), "sampleTime")})
+    return {"created": record, "property": defs[code]["property"],
+            "note": "已写入 LIMS（演示环境为模拟服务），调查、台账按取样时间对齐使用。"}
+
+
+def _tag_entities(store: Any, tag_name: str) -> list[str]:
+    tag = next((t for t in store.dcs.tags.values() if t.get("name") == tag_name), None)
+    if not tag:
+        return []
+    out = []
+    for entity in store.relations.entities.values():
+        for m in (entity.get("match") or {}).get("matches", []):
+            if m["objectType"] == "parameter" and m["id"] == tag.get("parameterId"):
+                out.append(entity["name"])
+                break
+    return out
+
+
+def operations(store: Any, object_id: str, q: dict[str, Any]) -> dict[str, Any]:
+    """设备实例的操作记录（设定值修改、手自动切换），附所在班次与对应的本体工艺属性。"""
+    equip = _equipment(store, object_id)
+    start, end = _ms(q.get("startTime"), "startTime"), _ms(q.get("endTime"), "endTime")
+    data = _get(f"{oplog_base()}{OPLOG_PATH}", {"unit": equip["name"], "startTime": start, "endTime": end})
+    items = data.get("items") or []
+    shift_items: list[dict[str, Any]] = []
+    if items:
+        try:
+            shift_items = shifts(store, {"startTime": items[0]["time"] - 3_600_000, "endTime": items[-1]["time"]})["items"]
+        except Exception:  # 排班取不到不影响操作记录
+            shift_items = []
+    cache: dict[str, list[str]] = {}
+    for r in items:
+        s = next((x for x in shift_items if x["startTime"] <= r["time"] < x["endTime"]), None)
+        r["shift"] = f"{s['date']} {s['shift']} {s['team']}" if s else None
+        tag = r.get("tag") or ""
+        if tag not in cache:
+            cache[tag] = _tag_entities(store, tag)
+        r["properties"] = cache[tag]
+    return {"scope": {"objectId": equip["id"], "objectName": equip["name"]}, "total": len(items), "items": items,
+            "dataSource": _data_source("OPLOG", "DCS 操作日志", oplog_base(), OPLOG_PATH)}
 
 
 def shifts(store: Any, q: dict[str, Any]) -> dict[str, Any]:

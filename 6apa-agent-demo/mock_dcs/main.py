@@ -16,9 +16,13 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import math
+import os
+import threading
 import time
+from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -353,6 +357,100 @@ async def mom_worktrans(request: Request) -> JSONResponse:
     return envelope({"total": len(items), "items": items, "rule": "四班三运转：夜班 0–8、白班 8–16、中班 16–24", "simulated": True})
 
 
+# --------------------------------------------------------------------- 模拟 LIMS（化验）与 DCS 操作日志
+
+LIMS_STORE = Path(os.environ.get("MOCK_LIMS_STORE", Path(__file__).resolve().parent / "runtime" / "lims_manual.json"))
+_lims_lock = threading.Lock()
+
+
+def _manual_results() -> list[dict]:
+    try:
+        return json.loads(LIMS_STORE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+
+
+def _units(query) -> list[str] | None:
+    unit = (query.get("unit") or "").strip()
+    if not unit:
+        return list(process.TANKS)
+    tank = process.tank_of(unit)
+    return [tank] if tank else None
+
+
+async def lims_results(request: Request) -> JSONResponse:
+    query = request.query_params
+    tanks = _units(query)
+    if tanks is None:
+        return fail(E_BAD_PARAM, f"未知取样对象：{query.get('unit')}（模拟 LIMS 只有 S11 水解罐 A～K）")
+    try:
+        start, end = _time_range(query)
+    except ValueError as exc:
+        return fail(E_BAD_TIME_RANGE, str(exc))
+    item = (query.get("item") or "").strip()
+    items = []
+    for tank in tanks:
+        items.extend(process.lab_results(settings.seed, tank, start, end))
+    items.extend(r for r in _manual_results() if r.get("unitCode") in tanks and start <= r["sampleTime"] <= end)
+    if item:
+        items = [r for r in items if item in (r["itemCode"], r["itemName"])]
+    items.sort(key=lambda r: (r["unitCode"], r["sampleTime"]))
+    for r in items:
+        r["sampleText"], r["reportText"] = _fmt(r["sampleTime"]), _fmt(r.get("reportTime"))
+    return envelope({"total": len(items), "items": items, "itemCatalog": process.LAB_ITEMS, "simulated": True})
+
+
+async def lims_submit(request: Request) -> JSONResponse:
+    """人工录入化验结果（化验员只录一遍，存进 LIMS，调查 / 台账共用）。"""
+    body = await read_json(request)
+    if not isinstance(body, dict):
+        return fail(E_BAD_JSON, "请求体必须是 JSON 对象")
+    tank = process.tank_of(str(body.get("unit") or ""))
+    if not tank:
+        return fail(E_BAD_PARAM, "unit 必填，且只能是 S11 水解罐 A～K")
+    item = str(body.get("itemCode") or "")
+    if item not in process.LAB_ITEMS:
+        return fail(E_BAD_PARAM, f"itemCode 只能取 {', '.join(process.LAB_ITEMS)}")
+    try:
+        value = float(body.get("value"))
+        sample = parse_time(body.get("sampleTime"), "sampleTime") if body.get("sampleTime") else now_ms()
+    except (TypeError, ValueError) as exc:
+        return fail(E_BAD_PARAM, f"value / sampleTime 无效：{exc}")
+    batch = process.schedule(settings.seed, tank).at(sample)
+    with _lims_lock:
+        manual = _manual_results()
+        record = {
+            "sampleNo": f"MANUAL-{len(manual) + 1:04d}", "unit": f"水解罐{tank}", "unitCode": tank,
+            "batchNo": batch.batch_no if batch else None, "samplePoint": f"水解罐{tank}取样口",
+            "stage": str(body.get("stage") or "人工录入"), "itemCode": item, "itemName": process.LAB_ITEMS[item]["name"],
+            "value": value, "unitOfMeasure": process.LAB_ITEMS[item]["unit"], "sampleTime": sample, "reportTime": now_ms(),
+            "source": "人工录入", "enteredBy": str(body.get("enteredBy") or "")[:40], "note": str(body.get("note") or "")[:200],
+        }
+        manual.append(record)
+        LIMS_STORE.parent.mkdir(parents=True, exist_ok=True)
+        LIMS_STORE.write_text(json.dumps(manual, ensure_ascii=False, indent=1), encoding="utf-8")
+    return envelope(record)
+
+
+async def dcs_oplog(request: Request) -> JSONResponse:
+    query = request.query_params
+    tanks = _units(query)
+    if tanks is None:
+        return fail(E_BAD_PARAM, f"未知设备：{query.get('unit')}（模拟操作日志只有 S11 水解罐 A～K）")
+    try:
+        start, end = _time_range(query)
+    except ValueError as exc:
+        return fail(E_BAD_TIME_RANGE, str(exc))
+    items = []
+    for tank in tanks:
+        for e in process.ops_between(settings.seed, tank, start, end):
+            items.append({"time": e.t, "timeText": _fmt(e.t), "unit": f"水解罐{tank}", "unitCode": tank, "batchNo": e.batch_no,
+                          "kind": e.kind, "tag": e.tag, "param": e.param, "oldValue": e.old, "newValue": e.new,
+                          "station": e.station})
+    items.sort(key=lambda r: r["time"])
+    return envelope({"total": len(items), "items": items, "simulated": True})
+
+
 # --------------------------------------------------------------------- 调试接口
 
 
@@ -375,6 +473,8 @@ async def health(request: Request) -> JSONResponse:
             "stats": _stats,
             "ebr": {"units": [f"水解罐{t}" for t in process.TANKS], "simulated": True},
             "mom": {"worktrans": True, "simulated": True},
+            "lims": {"items": list(process.LAB_ITEMS), "manualEntry": True, "simulated": True},
+            "oplog": {"simulated": True},
             "serverTime": now_ms(),
         }
     )
@@ -442,6 +542,9 @@ ROUTES = [
     ("/api/ebr/v1/batches", ["GET"], ebr_batches, "模拟EBR·罐批次"),
     ("/api/ebr/v1/batches/{batch_no}", ["GET"], ebr_batch, "模拟EBR·批次详情"),
     ("/api/mom/v1/worktrans", ["GET"], mom_worktrans, "模拟MOM·排班"),
+    ("/api/lims/v1/results", ["GET"], lims_results, "模拟LIMS·化验结果"),
+    ("/api/lims/v1/results", ["POST"], lims_submit, "模拟LIMS·人工录入"),
+    ("/api/dcs/v1/oplog", ["GET"], dcs_oplog, "模拟DCS·操作日志"),
     ("/api/health", ["GET"], health, "健康检查"),
     ("/api/mock/nodes", ["GET"], mock_nodes, "查找测点"),
     ("/api/mock/profile", ["GET"], mock_profile, "测点模拟规则"),

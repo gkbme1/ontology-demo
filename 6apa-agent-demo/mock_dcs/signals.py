@@ -69,7 +69,7 @@ class Signal:
         self.const_since_min = int(d("since") * 360)
 
         # S11 水解罐的阀门、搅拌、温度、pH、液位、氨水计量罐跟着批次阶段取值（见 process.py）
-        self.overlay = process.overlay_for(meta.name, meta.station, profile.kind == "discrete", seed)
+        self.overlay = process.overlay_for(meta.name, meta.station, profile.kind == "discrete", seed, meta.equipment)
 
     # ------------------------------------------------------------------ 公共
 

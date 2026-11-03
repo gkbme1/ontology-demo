@@ -24,6 +24,8 @@ from backend.ontology.models import (
     SOURCE_MAPPING,
     SOURCE_PROCEDURE,
     SOURCE_PROCESS,
+    SOURCE_INVESTIGATION,
+    SOURCE_LIMIT_VERSION,
     SOURCE_RELATION,
     SOURCE_RULE,
     SOURCE_TYPE_LABELS,
@@ -33,6 +35,8 @@ from backend.services.capability_loader import CAPABILITY_FILE_NAME, load_capabi
 from backend.services.procedure_model import PROCEDURE_FILE_NAME, load_procedures
 from backend.services import instance_links as _instance_links
 from backend.services.process_context import PROCESS_FILE_NAME, load_process
+from backend.services.investigation import KNOWLEDGE_FILE_NAME, load_knowledge
+from backend.services import limit_versions as _limit_versions
 from backend.services.data_quality import build_quality_report
 from backend.services.dcs_loader import load_dcs
 from backend.services.mapping_loader import load_mapping
@@ -51,6 +55,7 @@ CAPABILITY_FILE = SOURCE_DIR / CAPABILITY_FILE_NAME
 PROCEDURE_FILE = SOURCE_DIR / PROCEDURE_FILE_NAME
 LINK_FILE = SOURCE_DIR / _instance_links.LINK_FILE_NAME
 PROCESS_FILE = SOURCE_DIR / PROCESS_FILE_NAME
+KNOWLEDGE_FILE = SOURCE_DIR / KNOWLEDGE_FILE_NAME
 
 
 class OntologyStore:
@@ -70,6 +75,8 @@ class OntologyStore:
         self.procedures = load_procedures(base / PROCEDURE_FILE.name, self)
         # 工序、工艺阶段与运行上下文定义（批次、班次的事实在 EBR / MOM，本体代为查询）
         self.process = load_process(base / PROCESS_FILE.name, self)
+        # 调查知识：原因分类（人机料法环）与权重、化验项目、判定规则、漂移口径
+        self.investigation = load_knowledge(base / KNOWLEDGE_FILE.name, self)
         # 组间拓扑按连接方式落到实例（类 / 设备组 / 实例 三层分开）
         self.instance_links = _instance_links.build(self, base / LINK_FILE.name)
 
@@ -1131,6 +1138,11 @@ class OntologyStore:
                       "实例连接：组间拓扑落到实例的连接方式（单台直连 / 按台号 / 汇管 / 指定 / 不展开）"),
                 block(SOURCE_PROCESS, PROCESS_FILE, self.process.load_stats, self.process.available,
                       "工序与工艺阶段：八道工序与工段对应、阶段识别依据、运行上下文（罐批次 / 批次计数 / 班次）来源"),
+                block(SOURCE_INVESTIGATION, KNOWLEDGE_FILE, self.investigation.load_stats, self.investigation.available,
+                      "调查知识：原因分类（人机料法环）与权重、化验项目与对齐方式、判定规则、漂移判定口径"),
+                block(SOURCE_LIMIT_VERSION, _limit_versions.VERSION_FILE, self._limit_version_stats(),
+                      _limit_versions.VERSION_FILE.is_file(),
+                      "限值版本：条件化（换酶后批次区间、设备）与在线修改的限值版本，带生效时间、修改人、原因"),
                 block(SOURCE_PROCEDURE, PROCEDURE_FILE, self.procedures.load_stats, self.procedures.available,
                       "报警处置规程：处置卡的触发、可能原因、处置步骤、禁止操作，锚定到本体对象"),
             ],
@@ -1143,8 +1155,17 @@ class OntologyStore:
                 "PROCEDURE_FILE": "报警后怎么判断、怎么处置、什么不能做",
                 "INSTANCE_LINK_FILE": "设备组之间的连接落到哪几台实例之间",
                 "PROCESS_FILE": "属于哪道工序、处在哪个阶段、批次与班次从哪来",
+                "INVESTIGATION_FILE": "原因怎么归类、权重多少、化验怎么对齐、按什么判据判异常",
+                "LIMIT_VERSION_FILE": "限值在什么条件下、从什么时候起取什么值，谁因为什么改的",
             },
         }
+
+    @staticmethod
+    def _limit_version_stats() -> dict[str, Any]:
+        items = _limit_versions._load()
+        return {"file": _limit_versions.VERSION_FILE.name,
+                "sheets": [{"sheet": _limit_versions.SHEET, "rows": len(items), "validRows": len(items)}],
+                "versionCount": len(items)}
 
     def turtle(self) -> dict[str, Any]:
         return {

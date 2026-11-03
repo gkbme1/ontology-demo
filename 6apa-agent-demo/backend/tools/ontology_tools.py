@@ -674,9 +674,10 @@ def build_ontology_registry(compact_relations: bool = False) -> ToolRegistry:
     from backend.tools.analysis_tools import ANALYSIS_TOOLS
     from backend.tools.calculations import CALCULATION_TOOLS
     from backend.tools.context_tools import CONTEXT_TOOLS
+    from backend.tools.investigation_tools import INVESTIGATION_TOOLS
     from backend.tools.discovery import DISCOVERY_TOOL
 
-    specs = list(ONTOLOGY_TOOLS) + list(ANALYSIS_TOOLS) + list(CONTEXT_TOOLS) + list(CALCULATION_TOOLS)
+    specs = list(ONTOLOGY_TOOLS) + list(ANALYSIS_TOOLS) + list(CONTEXT_TOOLS) + list(INVESTIGATION_TOOLS) + list(CALCULATION_TOOLS)
     if compact_relations:
         specs = [
             replace(spec, defaults={**spec.defaults, "view": "compact"})

@@ -222,8 +222,10 @@ async def live() -> None:
         check(names == ["TI_1301A"], f"越限统计：只取本台测点 {names}")
         check(d["windowBasis"]["source"] == "EBR" and last in d["windowBasis"]["text"], "结果写明时间窗依据")
 
+        ctx = await run("get_batch_context", {"unit": "水解罐A"})
+        react_done = [b["batchNo"] for b in ctx["batches"] if b.get("reaction") and "进行中" not in b["reaction"]]
         d = await run("investigate_process_anomaly", {"target": "釜内反应温度", "unit": "水解罐A"})
-        check(d["windowBasis"]["batchNo"] == last, "异常溯源：只给 unit 时取最近已完成批次的反应期")
+        check(d["windowBasis"]["batchNo"] == react_done[-1], "异常溯源：只给 unit 时取反应已结束的最近一批")
         check([t["tag"] for t in d["anomaly"]["tags"]] == ["TI_1301A"], "异常溯源：目标测点限定本台")
 
         d = await run("calculate_quantity", {"target": "氨水累计加量", "batchNo": last})

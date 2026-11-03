@@ -127,7 +127,7 @@ def _build_fastapi():
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
-        allow_methods=["GET"],
+        allow_methods=["GET", "POST"],
         allow_headers=["*"],
     )
 
@@ -198,7 +198,7 @@ def _build_starlette():
     return Starlette(
         routes=routes,
         lifespan=lifespan,
-        middleware=[Middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"], allow_headers=["*"])],
+        middleware=[Middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST"], allow_headers=["*"])],
     )
 
 

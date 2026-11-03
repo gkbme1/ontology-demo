@@ -506,7 +506,20 @@ def _limit_constraint(limit: dict[str, Any]) -> dict[str, Any]:
         "confidence": limit.get("confidence"),
         "basis": limit.get("basis"),
         "matchedTargets": [t.get("tagName") for t in limit.get("matchedTargets") or []],
+        **_version_summary(limit.get("id")),
     }
+
+
+def _version_summary(limit_id: str | None) -> dict[str, Any]:
+    """限值版本数与是否有条件化版本（6APA_限值版本.xlsx）；详情走 /process-limits/{id}/versions。"""
+    if not limit_id:
+        return {}
+    try:
+        from backend.services.limit_versions import summary_for
+
+        return summary_for(limit_id)
+    except Exception:
+        return {}
 
 
 def _relation_view(rel: dict[str, Any], anchor_ids: set[str]) -> dict[str, Any]:

@@ -854,7 +854,7 @@
     "type": "function",
     "function": {
       "name": "investigate_process_anomaly",
-      "description": "异常溯源（确定性分析，优先使用）。用户问'某参数异常/偏高/偏低/波动，帮我查原因''是什么引起的'时，直接调用本工具，不要自己逐步调限值、历史、关系工具。程序会按固定算法一次完成：查工艺限值 → 取时间窗历史确认异常是否成立 → 沿本体因果关系往上游推（正负向逐层传播）→ 逐个原因查测点 → 同期历史对比（领先滞后、方向、异常期偏移）→ 排序并列出数据缺口。target 可传本体工艺量名称（如 釜内反应温度）、robj- ID、DCS 位号（TI_1301A）或测点描述（水解罐A温度）；不确定时直接传用户的说法，没有唯一匹配时工具会返回候选让你选。\n返回：limit（限值及确认状态）、anomaly（异常是否成立、越限测点与次数、首末越限时刻）、candidates[]（因素、路径、本体方向、机理、来源行、预期方向、测点、相关系数、领先分钟、异常期偏移σ、判断）、dataGaps、conclusion（程序给出的分层结论）、method（判定口径与模拟数据声明）。status=needs_clarification 时返回 candidates 供选择。",
+      "description": "异常溯源（确定性分析，优先使用）。用户问'某参数异常/偏高/偏低/波动，帮我查原因''是什么引起的'时，直接调用本工具，不要自己逐步调限值、历史、关系工具。程序会按固定算法一次完成：查工艺限值 → 取时间窗历史确认异常是否成立 → 沿本体因果关系往上游推（正负向逐层传播）→ 逐个原因查测点 → 同期历史对比（领先滞后、方向、异常期偏移）→ 排序并列出数据缺口。target 可传本体工艺量名称（如 釜内反应温度）、robj- ID、DCS 位号（TI_1301A）或测点描述（水解罐A温度）；不确定时直接传用户的说法，没有唯一匹配时工具会返回候选让你选。\n返回：limit（限值及确认状态）、anomaly（异常是否成立、越限测点与次数、首末越限时刻）、candidates[]（因素、路径、本体方向、机理、来源行、预期方向、测点、相关系数、领先分钟、异常期偏移σ、判断）、directions[]（Top 3～5 候选排查方向：人机料法环分类、得分 = 证据 × 权重、证据、依据）、directionSummary（未覆盖的分类、置信度与是否需转人工）。候选方向计分：数据支持 1.0、同期强相关 0.75、弱支持 0.6、无测点 0.35、未发现支持 0.15；人为改同一参数且方向一致 0.9；测量偏差扩大 0.9、恒定 0.75；乘本体原因权重。directions 里没有 basis 的来自本体因果，路径见 candidates；、limitContext（按阶段与限值版本判断的说明）、dataGaps、conclusion（程序给出的分层结论）、method（判定口径与模拟数据声明）。status=needs_clarification 时返回 candidates 供选择。",
       "parameters": {
         "type": "object",
         "properties": {
@@ -1204,6 +1204,117 @@
           "at": {
             "type": "string",
             "description": "看某一时刻处于哪个批次 / 阶段 / 班次，默认当前时刻。"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "check_measurement_deviation",
+      "description": "测量偏差判定（固定程序）。问'pH 表准不准''在线 pH 和化验对得上吗''两支电极是不是有一支漂了'，或调查 pH 类异常要先排除仪表问题时调用。程序按本体判定规则逐条执行：在线与化验 pH 按取样时间对齐比对、双电极互比，判断差值是「恒定偏差」「差值扩大」还是正常（BF-05）。\n返回：results[]（规则、判定、理由、差值均值与趋势、对齐样本）、flagged、conclusion、method。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "unit": {
+            "type": "string",
+            "description": "设备实例，如 水解罐C。"
+          },
+          "batchNo": {
+            "type": "string",
+            "description": "批号，如 SJ-C-0830；给了就看整批，不用再给 unit 和时间。"
+          },
+          "startTime": {
+            "type": "string",
+            "description": "开始时间 yyyy-MM-dd HH:mm:ss，默认 endTime 往前 3 天。"
+          },
+          "endTime": {
+            "type": "string",
+            "description": "结束时间，默认当前。"
+          },
+          "ruleId": {
+            "type": "string",
+            "description": "只执行某条规则，如 J-S11-01；不填执行全部适用规则。"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "detect_drift",
+      "description": "漂移检测（固定程序）。问'某参数这两天是不是一直往上跑''有没有在限值内慢慢偏''温水煮青蛙'时调用。有批次的设备逐批取同一阶段均值看批间趋势，没有批次的按时间窗 CUSUM 与斜率判断；会标出仍在正常区间内的漂移。\n返回：drifting[]（测点、设备、方式、方向、总变化、阈值、是否仍在限值内、逐批均值）、noDrift、conclusion、method。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string",
+            "description": "工艺量 / 位号 / 测点描述，如 反应体系pH、AT_1301C2。"
+          },
+          "unit": {
+            "type": "string",
+            "description": "只看某一台，如 水解罐B；不填看该工艺量的全部测点。"
+          },
+          "phase": {
+            "type": "string",
+            "description": "批间比较用哪个阶段，默认 反应。",
+            "enum": [
+              "反应",
+              "进料",
+              "终点判定",
+              "出料",
+              "全批"
+            ]
+          },
+          "startTime": {
+            "type": "string",
+            "description": "开始时间，默认覆盖最近约 8 批。"
+          },
+          "endTime": {
+            "type": "string",
+            "description": "结束时间，默认当前。"
+          },
+          "focus": {
+            "type": "string",
+            "description": "只看某个测点。"
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "analyze_operations",
+      "description": "操作记录关联（固定程序）。问'有没有人改过参数''夜班动过设定值吗''这批谁改的温度'时调用。程序取 DCS 操作日志（设定值修改、手自动切换），附班次，并算出改设定值前后对应位号的实测变化。\n返回：operations[]（时间、批次、类型、位号、参数、旧值、新值、操作站、班次、实测变化）、byShift、conclusion。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "unit": {
+            "type": "string",
+            "description": "设备实例，如 水解罐C。"
+          },
+          "batchNo": {
+            "type": "string",
+            "description": "批号，如 SJ-C-0830；给了就看整批，不用再给 unit 和时间。"
+          },
+          "startTime": {
+            "type": "string",
+            "description": "开始时间 yyyy-MM-dd HH:mm:ss，默认 endTime 往前 3 天。"
+          },
+          "endTime": {
+            "type": "string",
+            "description": "结束时间，默认当前。"
           }
         },
         "required": [],

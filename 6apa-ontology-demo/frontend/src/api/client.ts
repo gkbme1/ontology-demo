@@ -6,6 +6,7 @@
  */
 import type {
   AgentTool, AssetNode, AssetProfile, BatchesPayload, LimitCheckResult, AssetSearchHit, RunContextPayload,
+  LabEntry, LabResult, LabResultsPayload, LimitVersion, LimitVersionInput, LimitVersionsPayload, OperationsPayload,
   CategoriesPayload, DataSourcesPayload, DcsTag, EmptySet, Equipment,
   GraphPayload, MeasurementAnchor, Overview, Paged, Parameter, ProcessArea,
   QualityReport, Relation, RelationDetail, RelationEntity, RelationEntityDetail, Rule
@@ -36,6 +37,24 @@ async function get<T>(path: string, query?: Query): Promise<T> {
   const res = await fetch(`${BASE}${path}${qs(query)}`, { headers: { Accept: 'application/json' } })
   if (!res.ok) {
     throw new ApiError(res.status, path, `本体服务返回 ${res.status}：${path}`)
+  }
+  return (await res.json()) as T
+}
+
+async function post<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  })
+  if (!res.ok) {
+    let detail = ''
+    try {
+      detail = ((await res.json()) as { detail?: string }).detail ?? ''
+    } catch {
+      detail = ''
+    }
+    throw new ApiError(res.status, path, detail || `本体服务返回 ${res.status}：${path}`)
   }
   return (await res.json()) as T
 }
@@ -123,6 +142,13 @@ export const api = {
   limitCheck: (objectId: string) => get<LimitCheckResult>(`${P}/${encodeURIComponent(objectId)}/limit-check`),
   // 运行上下文（经本体代调 EBR / MOM）
   batches: (objectId: string, q?: Query) => get<BatchesPayload>(`${P}/${encodeURIComponent(objectId)}/batches`, q),
+  labResults: (objectId: string, q?: Query) => get<LabResultsPayload>(`${P}/${encodeURIComponent(objectId)}/lab-results`, q),
+  submitLabResult: (objectId: string, body: LabEntry) =>
+    post<{ created: LabResult; note: string }>(`${P}/${encodeURIComponent(objectId)}/lab-results`, body),
+  operations: (objectId: string, q?: Query) => get<OperationsPayload>(`${P}/${encodeURIComponent(objectId)}/operations`, q),
+  limitVersions: (limitId: string) => get<LimitVersionsPayload>(`${P}/process-limits/${encodeURIComponent(limitId)}/versions`),
+  addLimitVersion: (limitId: string, body: LimitVersionInput) =>
+    post<{ created: LimitVersion; note: string }>(`${P}/process-limits/${encodeURIComponent(limitId)}/versions`, body),
   runContext: (objectId: string, at?: string) =>
     get<RunContextPayload>(`${P}/${encodeURIComponent(objectId)}/context`, at ? { at } : undefined),
 
@@ -141,5 +167,7 @@ export const API_ENDPOINTS = [
   `${P}/measurement-anchors`, `${P}/causal-relations`, `${P}/{id}/relations`,
   `${P}/data-sources`, `${P}/data-quality`,
   `${P}/asset-tree`, `${P}/asset-tree/search`, `${P}/asset-profile/{id}`,
-  `${P}/process-steps`, `${P}/shifts`, `${P}/batches/{batchNo}`, `${P}/{id}/stage-rules`, `${P}/{id}/batches`, `${P}/{id}/context`
+  `${P}/process-steps`, `${P}/shifts`, `${P}/batches/{batchNo}`, `${P}/{id}/stage-rules`, `${P}/{id}/batches`, `${P}/{id}/context`,
+  `${P}/investigation-knowledge`, `${P}/cause-profile`, `${P}/{id}/judgement-rules`, `${P}/{id}/lab-results`,
+  `${P}/{id}/operations`, `${P}/process-limits/{id}/versions`, `${P}/process-limits/{id}/effective`
 ]

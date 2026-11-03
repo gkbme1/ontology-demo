@@ -7,6 +7,8 @@ python3 -m backend.tools.build_capability_table  # 能力登记表，已存在�
 python3 -m backend.tools.build_procedure_skeleton  # 报警处置规程骨架与模板，已存在时不覆盖
 python3 -m backend.tools.build_instance_links  # 实例连接方式表，已存在时不覆盖
 python3 -m backend.tools.build_process_steps  # 工序与阶段定义表，已存在时不覆盖
+python3 -m backend.tools.build_investigation_knowledge  # 调查知识表（原因分类与权重、化验项目、判定规则、漂移口径），已存在时不覆盖
+python3 -m backend.tools.build_limit_versions  # 限值版本表（在线修改都追加在这里），已存在时不覆盖
 python3 -m backend.tools.build_mapping_template
 python3 backend/tools/build_rule_template.py
 python3 -m backend.tools.build_static_demo_data

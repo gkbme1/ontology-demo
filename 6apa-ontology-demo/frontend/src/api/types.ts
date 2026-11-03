@@ -514,6 +514,59 @@ export interface OperatingConstraint {
   confidence?: string
   basis?: string
   matchedTargets?: string[]
+  versionCount?: number
+  conditional?: boolean
+}
+
+/** 限值版本（6APA_限值版本.xlsx；V0 为 6APA_工艺限值.xlsx 中的基础版本） */
+export interface LimitVersion {
+  id: string
+  limitId: string
+  unit: string
+  enzymeMin: number | null
+  enzymeMax: number | null
+  lowLow: number | null
+  low: number | null
+  normalLow: number | null
+  normalHigh: number | null
+  high: number | null
+  highHigh: number | null
+  sourceType: string
+  optimum: number | null
+  delta: number | null
+  effectiveFromText: string | null
+  effectiveToText: string | null
+  status: string
+  editor: string
+  reason: string
+  recordedAt: string
+  conditionText: string
+  base: boolean
+}
+
+export interface LimitVersionsPayload {
+  limit: { id: string; appliesTo: string; operatingMode: string; unit: string; status: string }
+  items: LimitVersion[]
+  total: number
+  matchRule: string
+}
+
+export interface LimitVersionInput {
+  editor: string
+  reason: string
+  sourceType: string
+  unit?: string
+  enzymeMin?: number | null
+  enzymeMax?: number | null
+  lowLow?: number | null
+  low?: number | null
+  normalLow?: number | null
+  normalHigh?: number | null
+  high?: number | null
+  highHigh?: number | null
+  optimum?: number | null
+  delta?: number | null
+  effectiveFrom?: string
 }
 
 export interface ProfileRule {
@@ -700,6 +753,72 @@ export interface ShiftRecord {
   team: string
   startTime: number
   endTime: number
+}
+
+/** 化验（LIMS / 人工录入） */
+export interface LabResult {
+  sampleNo: string
+  unit: string
+  batchNo: string | null
+  stage: string
+  itemCode: string
+  itemName: string
+  value: number
+  unitOfMeasure: string
+  sampleTime: number
+  reportTime: number
+  sampleText?: string
+  reportText?: string
+  source: string
+  enteredBy?: string
+  property?: string
+}
+
+export interface LabItemDef {
+  code: string
+  name: string
+  property: string
+  unit: string
+  onlineTag: string
+  alignment: string
+  alignMinutes: number | null
+  system: string
+}
+
+export interface LabResultsPayload {
+  total: number
+  items: LabResult[]
+  labItems: LabItemDef[]
+  dataSource: ContextDataSource
+}
+
+export interface LabEntry {
+  itemCode: string
+  value: number
+  sampleTime?: string
+  enteredBy: string
+  note?: string
+}
+
+/** 操作记录（DCS 操作日志） */
+export interface OperationRecord {
+  time: number
+  timeText: string
+  batchNo: string | null
+  kind: string
+  tag: string
+  param: string
+  oldValue: number | string
+  newValue: number | string
+  station: string
+  shift: string | null
+  properties: string[]
+}
+
+export interface OperationsPayload {
+  total: number
+  items: OperationRecord[]
+  dataSource: ContextDataSource
 }
 
 export interface RunContextPayload {

@@ -31,8 +31,9 @@ def main() -> int:
     print("[能力表]")
     check(caps.available and len(caps.items) >= 6 and not caps.issues, f"{cl.CAPABILITY_FILE_NAME} 加载 {len(caps.items)} 项能力，无绑定错误")
     registered = [c for c in caps.items if c["registration"] == cl.STATUS_REGISTERED]
-    check({c["name"] for c in registered} == {"实时值查询", "历史值查询", "罐批次查询", "班次查询"},
-          "已登记的是实时库 / 历史库 / EBR / MOM 四个接口")
+    check({c["name"] for c in registered} == {"实时值查询", "历史值查询", "罐批次查询", "班次查询", "化验结果查询",
+                                              "化验结果录入", "操作记录查询"},
+          "已登记的是实时库 / 历史库 / EBR / MOM / LIMS（查询、录入）/ 操作日志 七个接口")
     check(all(c["endpoint"] for c in registered) and not any(c["endpoint"] for c in caps.items if c not in registered),
           "已登记的有端点，待登记的不虚构端点")
     names = {c["name"] for c in caps.items}
@@ -80,7 +81,7 @@ def main() -> int:
     app_module._store = store
     client = TestClient(app_module.app)
     r = client.get("/api/ontology/capabilities").json()
-    check(r["total"] == len(caps.items) and r["registeredCount"] == 4, "/api/ontology/capabilities 返回能力登记表")
+    check(r["total"] == len(caps.items) and r["registeredCount"] == 7, "/api/ontology/capabilities 返回能力登记表")
     sources = client.get("/api/ontology/data-sources").json()["sources"]
     check(any(s["file"] == cl.CAPABILITY_FILE_NAME and s["available"] for s in sources), "数据源清单里有能力登记表")
     check(client.get("/api/ontology/overview").json()["capabilityCount"] == len(caps.items), "概览的能力数取自登记表")

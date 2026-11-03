@@ -3,11 +3,13 @@
  * 「批次」页签：设备实例的运行上下文。
  * - 当前：所在罐批次、阶段（及对应的限值操作模式）、换酶后批次数、班次 —— /api/ontology/{id}/context
  * - 近期批次：每批各阶段的时间轴 —— /api/ontology/{id}/batches
+ * - 化验结果（含人工录入）与操作记录 —— /lab-results、/operations（见 LabAndOperations）
  * - 阶段定义：工序与阶段表里登记的 EBR 阶段名与 DCS 识别条件（来自档案 process.stages）
  * 批次与排班由本体代调 EBR / MOM，组件不内置任何批号或时间。
  */
 import { computed, ref, watch } from 'vue'
 import { api } from '@/api/client'
+import LabAndOperations from './LabAndOperations.vue'
 import type { BatchesPayload, BatchRecord, ProcessInfo, RunContextPayload } from '@/api/types'
 
 const props = defineProps<{ objectId: string; process: ProcessInfo }>()
@@ -183,6 +185,9 @@ const stats = computed(() => {
         </table>
       </template>
     </div>
+
+    <!-- 化验与操作记录 -->
+    <LabAndOperations :object-id="objectId" :days="days" />
 
     <!-- 阶段定义 -->
     <div>

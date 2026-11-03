@@ -60,6 +60,10 @@ EXTRA_ARGS: dict[str, dict] = {
     "map_causal_neighborhood": {"withValues": True},
     "audit_data_gaps": {"kind": "无测点"},
     "analyze_switch_signals": {"startTime": "__ONE_HOUR_AGO__"},
+    "get_batch_context": {"unit": "水解罐A"},
+    "check_measurement_deviation": {"unit": "水解罐C"},
+    "detect_drift": {"target": "反应体系pH"},
+    "analyze_operations": {"unit": "水解罐B"},
 }
 
 

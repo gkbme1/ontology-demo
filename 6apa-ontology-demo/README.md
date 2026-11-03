@@ -149,7 +149,9 @@ DCS 点表使用现场位号命名（水解罐A、离心机B1、温度）。两�
 │   │   ├── graph_builder.py         局部语义图构建
 │   │   ├── asset_model.py           资产本体视图：本体域分类树 + 对象本体档案（属性/关系/能力/约束/规则）
 │   │   ├── equipment_merge.py       设备名称统一：归并规则 + 加载时按设备归并表合并
-│   │   ├── process_context.py       工序与工艺阶段定义；罐批次 / 运行上下文 / 排班（代调 EBR、MOM）
+│   │   ├── process_context.py       工序与工艺阶段定义；罐批次 / 运行上下文 / 排班 / 化验 / 操作记录（代调 EBR、MOM、LIMS、操作日志）
+│   │   ├── investigation.py         调查知识：原因分类（人机料法环）与权重、化验项目、判定规则、漂移口径
+│   │   ├── limit_versions.py        限值版本：条件化限值、在线修改（追加版本）、某时刻生效限值
 │   │   └── data_quality.py          数据一致性检查
 │   ├── tools/                   映射表 / 规则模板 / 离线演示构建脚本
 │   ├── export_static.py         导出静态 API 快照
@@ -311,6 +313,46 @@ Agent 目录下的 `run_demo.bat` / `run_demo.sh` 一键启动时也会拉起本
 
 自测：`ONTOLOGY_URL=http://localhost:8700 python3 -m tests.test_process_context`。
 
+### 调查知识与动态限值（6APA_调查知识.xlsx、6APA_限值版本.xlsx）
+
+**定义在本体，执行在 Agent。** 本体登记「怎么归类、权重多少、按什么判据、限值当时是多少」，取数比对由 Agent 的固定程序完成。
+两张表都由生成脚本给出预填版（已存在时不覆盖），预填条目全部标「草案·待工艺确认」。
+
+`6APA_调查知识.xlsx`（`python3 -m backend.tools.build_investigation_knowledge`）：
+
+| 工作表 | 内容 |
+| --- | --- |
+| 原因分类 | 人 / 机 / 料 / 法 / 环：按对象类型、名称关键词归类，默认权重（BF-04） |
+| 原因权重 | 具体原因对象的分类与权重，如 双pH电极 1.3、热水阀HV_1301 1.2（车间主任提出原因可设权重） |
+| 化验项目 | 化验项目 → 工艺属性、适用设备组、对比在线位号、对齐方式（按取样时间 ±2 分钟） |
+| 判定规则 | J-S11-01 在线与化验 pH 差值恒定或扩大判异常（BF-05）；J-S11-02 双电极偏差。阈值、最少样本数、适用阶段 |
+| 漂移口径 | CUSUM、斜率、批间均值（Theil–Sen 中位数斜率，总变化 ≥ 正常区间宽度 15%）|
+
+`6APA_限值版本.xlsx`（`python3 -m backend.tools.build_limit_versions`）：`6APA_工艺限值.xlsx` 的每条限值是基础版本 V0，
+这张表登记后续版本——适用设备、换酶后批次区间、六档取值、来源（人工设定 / 模型最优值±差值 / 规程 / 推断）、生效 / 失效时间、修改人、原因。
+**在线修改限值 = 追加一个版本**，旧版本不动；判断历史数据时按当时生效的版本（条件都匹配的版本中取生效时间最晚的；留空档位沿用 V0）。
+限值只在其「适用工况」对应的工艺阶段内判断（见工序与阶段表的「对应限值操作模式」）。
+
+| 接口 | 说明 |
+| --- | --- |
+| `GET /api/ontology/investigation-knowledge` | 调查知识全集 |
+| `GET /api/ontology/cause-profile?ids=&names=` | 候选原因的人机料法环分类与权重 |
+| `GET /api/ontology/{id}/judgement-rules` | 设备适用的判定规则与化验项目，`{x}` 落到本台实际位号 |
+| `GET /api/ontology/{id}/lab-results`、`POST` 同路径 | 化验结果（LIMS 代调）；人工录入（校验化验项目后写入 LIMS，录入人必填） |
+| `GET /api/ontology/{id}/operations` | 操作记录（DCS 操作日志代调），附班次与对应工艺属性 |
+| `GET /api/ontology/process-limits/{id}/versions`、`POST` 同路径 | 限值版本；在线修改（修改人、原因必填，校验六档顺序） |
+| `GET /api/ontology/process-limits/{id}/effective?at=&unit=&enzymeBatchCount=` | 某时刻、某台、换酶后第几批的生效限值 |
+
+点表台号后缀跳过了 I（水解罐I/J/K 的温度、pH、进料阀写 J/K/L，搅拌、出料流量又各有例外），
+所以 `{x}` 不按设备名末尾字母替换，而是在本台实际登记的位号里按模板匹配；水解罐I 点表里没有搅拌运行与出料流量点，阶段识别规则标为未落位。
+「这一台」也按同样规则对应计量罐（水解罐K ↔ 氨水计量罐L）。
+
+档案「约束」页的每条限值可展开版本并在线修改；「批次」页增加化验结果（含人工录入）与操作记录。
+能力表新增 化验结果查询 / 化验结果录入（LIMS）、操作记录查询（DCS 操作日志），已登记 7 项。
+上游地址 `LIMS_BASE_URL` / `OPLOG_BASE_URL` 默认与 `RTDB_BASE_URL` 相同（模拟 DCS 服务一并模拟）。
+
+自测：`python3 -m tests.test_investigation`（需模拟 DCS 服务在跑；限值版本写入在临时副本上测，不改 data/source）。
+
 ### 能力登记表（6APA_能力.xlsx）
 
 能力由外部系统实现（实时库、历史库、OPAS 动作程序、推理引擎、模型平台……），**本体不实现能力**，
@@ -321,7 +363,7 @@ Agent 目录下的 `run_demo.bat` / `run_demo.sh` 一键启动时也会拉起本
 - 绑定写法：`本对象位号`、`本对象位号[过程测量|状态|启停|调节]`、后缀 `→nodeId`（按 `RTDB_NODE_ID_TEMPLATE` 拼接）或
   `→位号`、`本对象ID`、`本对象名称`、`本对象适用规则`、`调用方提供`、`常量:xxx`。必填参数在对象上绑不到值时，该能力不适用于这个对象。
 - 预填版由 `python3 -m backend.tools.build_capability_table` 生成（已存在时不覆盖）：实时值、历史值查询、
-  罐批次查询（EBR）、班次查询（MOM）有接口，标「已登记」；启停、调节、规则诊断、模型预测只登记描述与参数，提供方接口未知，标「待登记」，不虚构端点。
+  罐批次查询（EBR）、班次查询（MOM）、化验结果查询 / 录入（LIMS）、操作记录查询有接口，标「已登记」；启停、调节、规则诊断、模型预测只登记描述与参数，提供方接口未知，标「待登记」，不虚构端点。
 - Agent 的分析工具与计算模块是本体的**使用方**，不是能力提供方，不登记在这里。越限判断属于运行约束校验，
   在档案「约束」里按需调用 `/api/ontology/{id}/limit-check`。
 - `/api/ontology/capabilities` 返回登记表（原来恒为空），对象上的参数绑定见 `/api/ontology/asset-profile/{id}`。
