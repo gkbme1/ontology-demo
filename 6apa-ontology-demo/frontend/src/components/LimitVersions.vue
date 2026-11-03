@@ -4,11 +4,11 @@
  * 在线修改 = 追加一个版本（POST /process-limits/{id}/versions），必须写修改人与原因，旧版本保留；
  * Agent 判断历史数据时按当时生效的版本。
  */
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { api } from '@/api/client'
 import type { LimitVersion, LimitVersionInput, LimitVersionsPayload } from '@/api/types'
 
-const props = defineProps<{ limitId: string; unitName?: string | null }>()
+const props = defineProps<{ limitId: string; unitName?: string | null; startEditing?: boolean }>()
 const emit = defineEmits<{ changed: [] }>()
 
 const data = ref<LimitVersionsPayload | null>(null)
@@ -36,10 +36,21 @@ async function load() {
   try {
     data.value = await api.limitVersions(props.limitId)
   } catch (e) {
-    error.value = (e as Error).message
+    const status = (e as { status?: number }).status
+    error.value = status === 404 || status === 405
+      ? '本体服务没有提供限值版本接口：请用最新代码重启本体服务（8700），并确认 data/source/6APA_限值版本.xlsx 存在（python3 -m backend.tools.build_limit_versions）。'
+      : (e as Error).message
   }
 }
-watch(() => props.limitId, load, { immediate: true })
+const formEl = ref<HTMLElement | null>(null)
+watch(() => props.limitId, async () => {
+  await load()
+  if (props.startEditing && data.value) {
+    startEdit()
+    await nextTick()
+    formEl.value?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+}, { immediate: true })
 
 function startEdit() {
   const base = data.value?.items[data.value.items.length - 1]
@@ -120,7 +131,7 @@ const rows = computed(() => [...(data.value?.items ?? [])].reverse())
       <div v-if="saved" class="text-ok mt-1">{{ saved }}</div>
 
       <div v-if="!editing" class="mt-1.5"><button class="ctl !py-0.5 !px-2" @click="startEdit">修改限值（追加版本）</button></div>
-      <div v-else class="mt-2 grid gap-2 sm:grid-cols-2">
+      <div v-else ref="formEl" class="mt-2 grid gap-2 sm:grid-cols-2 rounded border border-brand/40 p-2">
         <label class="flex items-center gap-1.5">来源
           <select v-model="form.sourceType" class="ctl !py-0.5">
             <option>人工设定</option><option>模型最优值±差值</option><option>规程</option>

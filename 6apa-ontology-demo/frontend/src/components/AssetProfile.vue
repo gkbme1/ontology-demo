@@ -5,7 +5,7 @@
  * 全部数据来自 /api/ontology/asset-profile/{id}，组件不内置任何设备、点位或关系。
  * 当前页签记在地址栏 ?tab=，切换对象时保持不变。
  */
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/api/client'
 import type { AssetProfile, LimitCheckResult, ProfileAttribute } from '@/api/types'
@@ -163,6 +163,19 @@ const kindFilter = ref<(typeof KINDS)[number]>('全部')
 const checking = ref(false)
 // 展开限值版本（在线修改限值 = 追加版本）
 const openLimit = ref<string | null>(null)
+const editLimit = ref(false) // 打开时直接进入修改表单
+const limitPanel = ref<HTMLElement | null>(null)
+async function showLimit(id: string, edit: boolean) {
+  if (openLimit.value === id && editLimit.value === edit) {
+    openLimit.value = null
+    return
+  }
+  openLimit.value = id
+  editLimit.value = edit
+  await nextTick()
+  // 修改时由表单自己滚到可见处；只看版本时滚到版本表
+  if (!edit) limitPanel.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
 const checkResult = ref<LimitCheckResult | null>(null)
 const checkError = ref<string | null>(null)
 async function runCheck() {
@@ -499,9 +512,10 @@ const KIND_TITLE: Record<string, string> = {
                     <template v-if="l.hasValues">正常 {{ l.normal ?? '—' }} {{ l.unit }} · {{ alarmText(l.alarm) }}</template>
                     <template v-else>数值待现场提供</template>
                     <span v-if="l.operatingMode" class="text-fg-mute"> · {{ l.operatingMode }}</span>
-                    <button class="ml-2 text-[11px] text-info hover:underline" @click="openLimit = openLimit === l.id ? null : l.id">
+                    <button class="ml-2 text-[11px] text-info hover:underline" @click="showLimit(l.id, false)">
                       版本 {{ l.versionCount ?? 1 }}<template v-if="l.conditional"> · 含条件版本</template> {{ openLimit === l.id ? '▴' : '▾' }}
                     </button>
+                    <button class="ml-1.5 ctl !py-0 !px-1.5 !text-[11px]" @click="showLimit(l.id, true)">在线修改</button>
                   </div>
                 </div>
         </div>
@@ -510,9 +524,10 @@ const KIND_TITLE: Record<string, string> = {
           <div v-if="!profile.constraints.safety.length" class="text-fg-mute">本体中没有登记涉及本对象的报警联锁</div>
           <div v-for="s in profile.constraints.safety" :key="s.text" class="py-0.5">{{ s.text }}<span class="text-fg-mute"> · {{ s.mechanism }}</span></div>
         </div>
-        <div v-if="openLimit" class="lg:col-span-3">
+        <div v-if="openLimit" ref="limitPanel" class="lg:col-span-3 scroll-mt-4">
           <div class="text-fg-mute text-[11px]">限值 <span class="font-mono text-brand">{{ openLimit }}</span> 的版本（在线修改 = 追加版本，判断历史数据按当时生效的版本）</div>
-          <LimitVersions :limit-id="openLimit" :unit-name="profile.kind === 'equipment' ? profile.name : null" />
+          <LimitVersions :key="openLimit + editLimit" :limit-id="openLimit" :start-editing="editLimit"
+                         :unit-name="profile.kind === 'equipment' ? profile.name : null" />
         </div>
       </div>
 
