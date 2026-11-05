@@ -8,24 +8,24 @@
 
 ## 快速开始
 
+**Windows**：双击 `run_demo.bat`。窗口里依次检查 Python、依赖、数据、页面，后端就绪后自动打开浏览器
+（<http://localhost:8710/>）。**不要关这个黑窗口**，关掉就停止 Demo。
+
+- 只需要 Python 3.9+（安装时勾选「Add python.exe to PATH」）；前端页面已构建好放在 `frontend/dist`，不需要 Node.js；
+- 首次运行会自动 `pip install -r requirements.txt`，公司网络装不上时手动加镜像：
+  `python -m pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple`；
+- 启动失败时窗口会停住并给出中文原因（端口被占用、缺依赖、缺文件等），截图即可定位；端口冲突可先 `set V2_PORT=8711`。
+
+**Linux / macOS**：
+
 ```bash
-./run_demo.sh
+./run_demo.sh            # 或 python3 start_demo.py
 ```
 
-然后浏览器打开 <http://localhost:8710/>。Windows 用 `run_demo.bat`。
-
-首次运行会安装 Python 依赖、构建前端（需要 Node 18+）。改前端代码时用开发模式（后端 8710 + vite 5180）：
+改前端代码时用开发模式（后端 8710 + vite 5180，需要 Node 18+），改完 `npm run build` 更新 `frontend/dist` 一并提交：
 
 ```bash
 ./run_demo.sh dev
-```
-
-手动启动：
-
-```bash
-pip install -r requirements.txt
-python3 -m backend.main                  # 后端 + 已构建的前端，端口 8710（V2_PORT 可改）
-cd frontend && npm install && npm run dev # 开发服务器 5180，/api 代理到 8710
 ```
 
 ## 使用
@@ -48,7 +48,7 @@ cd frontend && npm install && npm run dev # 开发服务器 5180，/api 代理�
 ```
 6apa-demo-v2/
 ├── README.md / CLAUDE.md
-├── run_demo.sh / run_demo.bat
+├── run_demo.bat / run_demo.sh / start_demo.py   启动（bat 只负责找 Python，检查与启动都在 start_demo.py）
 ├── requirements.txt
 ├── data/
 │   ├── source/       复制自原 Demo 的 Excel 数据源（点表、工业关系、限值、规则、处置规程…）

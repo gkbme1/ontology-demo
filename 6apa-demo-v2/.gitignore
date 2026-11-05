@@ -1,7 +1,7 @@
 __pycache__/
 *.pyc
 frontend/node_modules/
-frontend/dist/
+# frontend/dist 已提交：Windows 上没有 Node.js 也能直接运行
 frontend/.env
 # 运行时编辑结果（首次启动从 data/seed 复制）
 data/store/*.json

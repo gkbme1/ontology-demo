@@ -1,15 +1,17 @@
 @echo off
-rem 一键启动 6APA 本体 Demo v2（Windows）。浏览器打开 http://localhost:8710/
+rem Start 6APA ontology demo v2 on Windows. Keep this file ASCII-only with CRLF line endings.
+cd /d "%~dp0"
 chcp 65001 >nul
-cd /d %~dp0
-python -c "import fastapi, uvicorn, pandas, openpyxl, numpy" 2>nul || pip install -r requirements.txt
-if not exist "data\config\6APA_空间层级.xlsx" python -m backend.tools.build_config
-if not exist "data\seed\phenomena.json" python -m backend.tools.build_seed
-if not exist "frontend\dist\index.html" (
-  pushd frontend
-  if not exist node_modules call npm install
-  call npm run build
-  popd
+set PYTHONIOENCODING=utf-8
+set PY=
+rem "python" may be the Microsoft Store stub, so actually run it before trusting it
+python -c "import sys" >nul 2>nul && set PY=python
+if not defined PY py -3 -c "import sys" >nul 2>nul && set PY=py -3
+if not defined PY (
+  echo [ERROR] Python not found. Install Python 3.9+ from https://www.python.org and tick "Add python.exe to PATH".
+  pause
+  exit /b 1
 )
-echo 打开 http://localhost:8710/
-python -m backend.main
+%PY% start_demo.py
+echo.
+pause

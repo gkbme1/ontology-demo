@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -24,14 +25,15 @@ DIST = ROOT / "frontend" / "dist"
 PORT = int(os.environ.get("V2_PORT", "8710"))
 HOST = os.environ.get("V2_HOST", "0.0.0.0")
 
-app = FastAPI(title="6APA 本体 Demo v2", version="0.1.0")
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):  # noqa: ANN202
+    get_ctx()  # 启动时加载本体，首个请求不用等
+    yield
+
+
+app = FastAPI(title="6APA 本体 Demo v2", version="0.1.0", lifespan=_lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.include_router(router)
-
-
-@app.on_event("startup")
-def _warm() -> None:
-    get_ctx()
 
 
 if DIST.exists():

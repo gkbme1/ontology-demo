@@ -37,6 +37,12 @@
   `data/seed/*.json`（`build_seed.py` 生成，已存在不覆盖，`--force` 覆盖）→ `data/store/*.json`（运行时编辑，不进 git；
   测试用 `V2_STORE_DIR` 指到临时目录）。改了 seed 生成逻辑后要 `--force` 重新生成并删掉 `data/store/*.json` 才生效。
 
+## Windows 运行注意
+
+- `run_demo.bat` 必须保持**纯 ASCII + CRLF**（`.gitattributes` 已约束），中文提示放在 `start_demo.py` 里；
+- `requirements.txt` 保持纯 ASCII：中文 Windows 上 pip 按 GBK 读它，含 UTF-8 中文会解码失败；
+- `frontend/dist` 是提交进仓库的（用户机器不一定有 Node.js）：改了前端必须 `npm run build` 并提交 dist。
+
 ## 关键口径
 
 - 工序 = 一张 DCS 流程画面；子工序写在图纸上，不单独成层。工序下固定 4 个节点：装置、计算组态、工况与根因、文档提取。
