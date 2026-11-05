@@ -4,7 +4,7 @@ import { computed, ref, watch } from 'vue'
 import { marked } from 'marked'
 import { api } from '@/api/client'
 import { nav, openObject, select } from '@/composables/useNav'
-import PidCanvas from '@/components/PidCanvas.vue'
+import DrawingView from '@/components/DrawingView.vue'
 import CalcPanel from '@/components/CalcPanel.vue'
 import PhenomenaPanel from '@/components/causal/PhenomenaPanel.vue'
 import CausalPanel from '@/components/causal/CausalPanel.vue'
@@ -45,8 +45,8 @@ watch(() => props.kind, async (k) => {
   if (k === 'section:cond' && !drawing.value) drawing.value = await api.opDrawing(props.opId)
 }, { immediate: true })
 
-function pick(id: string): void {
-  openObject(id, props.opId)
+function pick(id: string, _kind?: string, opId?: string): void {
+  openObject(id, opId ?? props.opId)
 }
 async function openDoc(id: string): Promise<void> {
   docView.value = await api.document(id)
@@ -75,8 +75,8 @@ const title = computed(() => ({
 
     <!-- 图纸 -->
     <template v-if="kind === 'drawing' && drawing">
-      <div class="text-xs text-fg-mute">{{ drawing.note }}。单击设备块或设备组标题查看设备信息。</div>
-      <PidCanvas :drawing="drawing" @pick="pick" />
+      <div class="text-xs text-fg-mute">单击图上的设备查看设备信息。{{ drawing.image ? '' : drawing.note }}</div>
+      <DrawingView :drawing="drawing" @pick="pick" />
       <div v-if="drawing.internalStreams?.length" class="text-xs text-fg-mute">本工序内部物料：{{ drawing.internalStreams.join('、') }}</div>
     </template>
 

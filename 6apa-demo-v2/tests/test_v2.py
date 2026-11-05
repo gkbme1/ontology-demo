@@ -92,6 +92,22 @@ class TabsTest(unittest.TestCase):
         self.assertEqual(d["subSteps"][0], "RB进料")
 
 
+class ImageDrawingTest(unittest.TestCase):
+    def test_op09_has_image_with_resolved_hotspots(self):
+        img = client.get("/api/v2/ops/OP-09/drawing").json()["image"]
+        self.assertEqual((img["width"], img["height"]), (1733, 890))
+        self.assertEqual(img["unresolved"], [])
+        spots = {h["name"]: h for h in img["hotspots"]}
+        self.assertEqual(spots["水解罐C"]["objectId"], _equip("水解罐C"))
+        self.assertEqual(spots["水解罐C"]["groupId"], _group("水解反应釜组"))
+        self.assertTrue(spots["硼酸罐A"]["otherOp"])  # 画面上有，点表归属 水解配置
+        self.assertEqual(client.get(img["url"]).status_code, 200)
+
+    def test_other_ops_fall_back_to_schematic(self):
+        self.assertIsNone(client.get("/api/v2/ops/OP-10/drawing").json()["image"])
+        self.assertEqual(client.get("/api/v2/drawings/OP-10/image").status_code, 404)
+
+
 class RuleTest(unittest.TestCase):
     def test_validate(self):
         with self.assertRaises(ValidationError):

@@ -9,12 +9,61 @@
 """
 from __future__ import annotations
 
+import json
 from collections import defaultdict
+from pathlib import Path
 from typing import Any
 
 from backend.v2.context import AppContext
 
 STREAM_TYPES = {"物料流股", "公用介质"}
+DRAWING_DIR = Path(__file__).resolve().parents[2] / "data" / "drawings"
+
+
+def image_path(op_id: str) -> Path | None:
+    cfg = _image_config(op_id)
+    return DRAWING_DIR / cfg["image"] if cfg else None
+
+
+def _image_config(op_id: str) -> dict[str, Any] | None:
+    f = DRAWING_DIR / f"{op_id}.json"
+    if not f.exists():
+        return None
+    cfg = json.loads(f.read_text("utf-8"))
+    return cfg if (DRAWING_DIR / cfg["image"]).exists() else None
+
+
+def _resolve_name(ctx: AppContext, op_id: str, name: str) -> tuple[str | None, str]:
+    """热区名称 → 本体对象：优先本工序、其次同工艺段、再全厂；先设备后设备组。"""
+    h = ctx.hierarchy
+    dcs = ctx.store.dcs
+    seg_ops = set(h.segment_of_op(op_id)["opIds"])
+    cands = [e for e in dcs.equipment.values() if e["name"] == name]
+    for scope in ({op_id}, seg_ops, None):
+        hit = [e for e in cands if scope is None or h.op_of_equipment.get(e["id"]) in scope]
+        if hit:
+            return hit[0]["id"], "equipment"
+    g = next((g for g in dcs.equipment_groups.values() if g["name"] == name), None)
+    return (g["id"], "group") if g else (None, "")
+
+
+def image_view(ctx: AppContext, op_id: str) -> dict[str, Any] | None:
+    """现场图纸（P&ID 截图）+ 热区。热区按名称落到本体对象，落不到的标出来。"""
+    cfg = _image_config(op_id)
+    if not cfg:
+        return None
+    dcs = ctx.store.dcs
+    spots = []
+    for hs in cfg.get("hotspots") or []:
+        oid, kind = _resolve_name(ctx, op_id, hs["name"])
+        group = (dcs.equipment.get(oid) or {}).get("equipmentGroupId") if kind == "equipment" else None
+        own_op = ctx.hierarchy.op_of_equipment.get(oid) if kind == "equipment" else (
+            (ctx.hierarchy.ops_of_group.get(oid) or [None])[0] if oid else None)
+        spots.append({**hs, "objectId": oid, "kind": kind, "groupId": group, "opId": own_op,
+                      "otherOp": bool(own_op and own_op != op_id)})
+    return {"url": f"/api/v2/drawings/{op_id}/image", "width": cfg["width"], "height": cfg["height"],
+            "source": cfg.get("source", ""), "note": cfg.get("note", ""), "hotspots": spots,
+            "unresolved": [s["name"] for s in spots if not s["objectId"]]}
 MAX_STREAMS = 10
 
 
@@ -123,4 +172,5 @@ def build(ctx: AppContext, op_id: str) -> dict[str, Any]:
         "internalStreams": sorted(internal),
         "kind": "schematic",
         "note": "示意图：按本体中的设备组与物理拓扑关系自动排布，不是现场 P&ID 原图",
+        "image": image_view(ctx, op_id),
     }

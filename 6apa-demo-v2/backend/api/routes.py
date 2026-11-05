@@ -148,6 +148,15 @@ def op_drawing(op_id: str) -> dict[str, Any]:
     return drawing.build(get_ctx(), op_id)
 
 
+@router.get("/drawings/{op_id}/image", include_in_schema=False)
+def drawing_image(op_id: str):  # noqa: ANN201
+    from fastapi.responses import FileResponse
+    path = drawing.image_path(op_id)
+    if not path:
+        raise HTTPException(404, f"工序 {op_id} 没有现场图纸")
+    return FileResponse(path)
+
+
 @router.get("/ops/{op_id}/conditions")
 def op_conditions(op_id: str) -> dict[str, Any]:
     ctx = get_ctx()

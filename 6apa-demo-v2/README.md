@@ -31,7 +31,8 @@ cd frontend && npm install && npm run dev # 开发服务器 5180，/api 代理�
 ## 使用
 
 1. 左侧「空间层级」第一屏只有 **105车间** 和 6 个工艺段。**双击工艺段**（如 6A_水解）进入工艺段内的层级树，顶部「返回车间导航」退回；
-2. 工艺段内：**单击工序**选中看概览，**双击工序**（或点「进入」）打开图纸。图纸顶部写子工序，单击设备块打开设备；
+2. 工艺段内：**单击工序**选中看概览，**双击工序**（或点「进入」）打开图纸。水解A-F 显示现场流程画面，单击图上的设备打开它；
+   其余工序暂无原图，显示本体示意图（顶部写子工序）；
 3. 工序下有 4 个节点：**装置**（设备组 / 设备）、**计算组态**、**工况与根因**、**文档提取**；
 4. 选中设备或设备组，右侧按页签显示：图纸位置与外观、参数、仪表、参数约束、拓扑关系、现象定义、根因影响关系、工艺影响关系、计算/指标、处置规程；
 5. **现象定义**：每个现象有判定规则（与 / 或任意嵌套，条件 = 参数 运算 阈值 持续时长，阈值可引用工艺限值），可新增、编辑、在模拟数据上试算；
@@ -53,6 +54,7 @@ cd frontend && npm install && npm run dev # 开发服务器 5180，/api 代理�
 │   ├── source/       复制自原 Demo 的 Excel 数据源（点表、工业关系、限值、规则、处置规程…）
 │   ├── config/       6APA_空间层级.xlsx：车间 / 工艺段 / 工序 定义与设备归属规则
 │   ├── seed/         现象、根因关系、计算组态的种子数据（JSON）
+│   ├── drawings/     现场图纸：图片 + 同名 JSON 热区（目前只有 OP-09 水解A-F）
 │   └── store/        运行时编辑结果（不进 git，首次启动从 seed 复制）
 ├── backend/
 │   ├── main.py       FastAPI 入口（8710），托管 frontend/dist
@@ -90,6 +92,7 @@ python3 -m backend.tools.build_seed --force     # 覆盖 data/seed/*.json（不�
 | `GET /api/v2/nav/space` | 车间 → 工艺段 |
 | `GET /api/v2/nav/segment/{SEG}` | 工艺段内的层级树 |
 | `GET /api/v2/nav/domain/{key}?parent=` | 其他分类（工业资产、工艺参数…） |
+| `GET /api/v2/drawings/{OP}/image` | 现场图纸图片 |
 | `GET /api/v2/ops/{OP}` · `/drawing` · `/conditions` · `/calculations` · `/documents` | 工序概览、图纸、工况与根因、计算组态、文档提取 |
 | `GET /api/v2/objects/{id}?op=` · `/tabs/{key}?op=` | 设备 / 设备组头部与 10 个页签 |
 | `GET/POST /api/v2/phenomena` · `GET/PUT/DELETE /api/v2/phenomena/{id}` | 现象 |

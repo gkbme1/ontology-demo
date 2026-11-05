@@ -6,7 +6,7 @@
 import { computed, ref, watch } from 'vue'
 import { api } from '@/api/client'
 import { nav, openObject } from '@/composables/useNav'
-import PidCanvas from '@/components/PidCanvas.vue'
+import DrawingView from '@/components/DrawingView.vue'
 import CalcPanel from '@/components/CalcPanel.vue'
 import ProcedureCard from '@/components/ProcedureCard.vue'
 import PhenomenaPanel from '@/components/causal/PhenomenaPanel.vue'
@@ -61,8 +61,8 @@ const anchorOptions = computed(() => {
 const tags = computed(() => (data.value?.items ?? []).filter((t: Any) => !tagKw.value || `${t.tag}${t.description}${t.equipment}${t.parameter}`.includes(tagKw.value)))
 const counts = computed<Record<string, number>>(() => head.value?.counts ?? {})
 
-function pick(id: string, kind: string): void {
-  if (kind === 'equipment' || kind === 'group') openObject(id, props.opId ?? head.value?.opId, 'drawing')
+function pick(id: string, kind: string, opId?: string): void {
+  if (kind === 'equipment' || kind === 'group') openObject(id, opId ?? props.opId ?? head.value?.opId, 'drawing')
 }
 function fmtBand(c: Any): string {
   const a = c.alarm ?? {}
@@ -99,8 +99,8 @@ function fmtBand(c: Any): string {
         <template v-else-if="data">
           <!-- 图纸位置与外观 -->
           <div v-if="tab === 'drawing'" class="space-y-4">
-            <div v-if="drawing" class="text-xs text-fg-mute">所在图纸：{{ drawing.name }}（流程画面 {{ drawing.screen }}）· {{ drawing.note }}</div>
-            <PidCanvas v-if="drawing" :drawing="drawing" :highlight="data.highlight" @pick="pick" />
+            <div v-if="drawing" class="text-xs text-fg-mute">所在图纸：{{ drawing.name }}（流程画面 {{ drawing.screen }}）</div>
+            <DrawingView v-if="drawing" :drawing="drawing" :highlight="data.highlight" @pick="pick" />
             <div v-else class="empty">该对象不在导航树的工序内，没有图纸位置</div>
             <div class="grid grid-cols-2 gap-4">
               <div class="card">
