@@ -1,0 +1,72 @@
+/**
+ * 全局导航状态：当前分类、空间层级的模式（车间导航 / 工艺段内）、当前选中对象。
+ * 右侧显示区按 selection.type 切换视图。
+ */
+import { reactive } from 'vue'
+import { api } from '@/api/client'
+
+export type SelType =
+  | 'none' | 'workshop' | 'segment' | 'op' | 'drawing' | 'section:devices' | 'section:calc'
+  | 'section:cond' | 'section:docs' | 'calc' | 'object' | 'domain-object' | 'domain-pending'
+
+export interface Selection {
+  type: SelType
+  id?: string // 对象 id / 工艺段 id / 工序 id / 计算组态 id
+  opId?: string
+  label?: string
+  tab?: string
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Any = any
+
+export const nav = reactive({
+  category: 'space',
+  mode: 'root' as 'root' | 'segment',
+  segmentId: '' as string,
+  selection: { type: 'none' } as Selection,
+  meta: null as Any,
+  // 树节点被选中的 key（用于高亮）
+  activeKey: '' as string,
+  // 编辑后递增，触发各视图刷新
+  version: 0
+})
+
+export async function loadMeta(): Promise<void> {
+  if (!nav.meta) nav.meta = await api.meta()
+}
+
+export function select(sel: Selection, key?: string): void {
+  nav.selection = { ...sel }
+  if (key !== undefined) nav.activeKey = key
+}
+
+export function enterSegment(segmentId: string, then?: Selection): void {
+  nav.category = 'space'
+  nav.mode = 'segment'
+  nav.segmentId = segmentId
+  select(then ?? { type: 'segment', id: segmentId }, then ? undefined : `seg:${segmentId}`)
+}
+
+export function backToWorkshop(): void {
+  nav.mode = 'root'
+  const seg = nav.segmentId
+  nav.segmentId = ''
+  select({ type: 'segment', id: seg }, `seg:${seg}`)
+}
+
+export function openDrawing(opId: string, segmentId?: string): void {
+  if (segmentId && (nav.mode !== 'segment' || nav.segmentId !== segmentId)) {
+    nav.mode = 'segment'
+    nav.segmentId = segmentId
+  }
+  select({ type: 'drawing', id: opId, opId }, opId)
+}
+
+export function openObject(objectId: string, opId?: string, tab?: string): void {
+  select({ type: 'object', id: objectId, opId, tab }, opId ? `${opId}|${objectId}` : objectId)
+}
+
+export function bump(): void {
+  nav.version++
+}

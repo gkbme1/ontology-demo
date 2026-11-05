@@ -1,0 +1,89 @@
+<script setup lang="ts">
+/** 计算组态列表 + 试算曲线（模拟数据）。 */
+import { ref, watch } from 'vue'
+import { api } from '@/api/client'
+import LineChart from './LineChart.vue'
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Any = any
+const props = defineProps<{ items: Any[]; opId?: string; targetId?: string; focusId?: string }>()
+
+const METHOD: Record<string, string> = { formula: '表达式', level_consumption: '液位差消耗量', rate: '变化速率' }
+const openId = ref(props.focusId ?? '')
+const runs = ref<Record<string, Any>>({})
+const detail = ref<Record<string, Any>>({})
+
+async function run(c: Any): Promise<void> {
+  openId.value = c.id
+  if (!detail.value[c.id]) detail.value[c.id] = await api.calculation(c.id)
+  runs.value[c.id] = null
+  runs.value[c.id] = await api.runCalc(c.id, { hours: 6, opId: props.opId, targetId: props.targetId })
+}
+watch(() => props.focusId, (id) => {
+  const c = props.items.find((x) => x.id === id)
+  if (c) run(c)
+}, { immediate: true })
+
+function inputText(c: Any): string {
+  return (c.inputs ?? []).map((i: Any) => {
+    const s = i.subject ?? {}
+    const what = s.kind === 'parameter' ? `本对象.${s.name}${s.index !== undefined ? `[第${s.index + 1}支]` : ''}` : s.kind === 'tag' ? s.tag : s.calcId
+    return `${i.var} = ${what}`
+  }).join('；')
+}
+</script>
+
+<template>
+  <div class="space-y-3">
+    <div v-if="!items.length" class="empty">暂无计算组态</div>
+    <div v-for="c in items" :key="c.id" class="card">
+      <div class="flex items-center gap-2">
+        <span class="text-brand font-mono">ƒ</span>
+        <span class="font-medium">{{ c.name }}</span>
+        <span class="text-[11px] text-fg-mute">{{ c.id }} · {{ METHOD[c.method] ?? c.method }} · {{ c.unit }}</span>
+        <span v-if="c.origin && c.origin !== '本对象'" class="pill pill-info">{{ c.origin }}</span>
+        <span class="pill pill-warn">{{ c.status === '已确认' ? '已确认' : '草案' }}</span>
+        <span class="flex-1" />
+        <button class="btn" @click="run(c)">试算（模拟数据）</button>
+      </div>
+      <dl class="kv mt-2">
+        <dt>挂载对象</dt><dd>{{ c.anchor?.name }}<span v-if="c.anchor?.kind === 'group'" class="text-fg-mute">（组内每台分别计算）</span></dd>
+        <dt>输入绑定</dt><dd class="font-mono text-xs">{{ inputText(c) }}</dd>
+        <dt v-if="c.expression">表达式</dt><dd v-if="c.expression" class="font-mono text-xs">{{ c.expression }}</dd>
+        <dt v-if="c.params">参数</dt><dd v-if="c.params" class="font-mono text-xs">{{ JSON.stringify(c.params) }}</dd>
+        <dt>说明</dt><dd class="text-fg-dim">{{ c.description }}</dd>
+        <dt>依据</dt><dd class="text-fg-dim">{{ c.basis }}</dd>
+        <template v-if="detail[c.id]?.usedBy?.length">
+          <dt>被引用</dt><dd><span v-for="u in detail[c.id].usedBy" :key="u.id" class="pill pill-plain mr-1">{{ u.name }}</span></dd>
+        </template>
+      </dl>
+      <div v-if="openId === c.id && runs[c.id] === null" class="text-fg-mute text-xs mt-2">计算中…</div>
+      <div v-if="openId === c.id && runs[c.id]" class="mt-3">
+        <div class="flex items-center gap-2 text-xs mb-1">
+          <span class="sim-tag">{{ runs[c.id].dataSource.label }}</span>
+          <span class="text-fg-mute">最近 6 小时</span>
+        </div>
+        <table class="tbl mb-2">
+          <thead><tr><th>对象</th><th>当前</th><th>均值</th><th>最大</th><th>最小</th><th>输入测点</th></tr></thead>
+          <tbody>
+            <tr v-for="r in runs[c.id].results" :key="r.targetId" class="!cursor-default">
+              <td>{{ r.targetName }}</td>
+              <template v-if="r.values">
+                <td class="tabular-nums">{{ r.current }}</td><td class="tabular-nums">{{ r.mean }}</td>
+                <td class="tabular-nums">{{ r.max }}</td><td class="tabular-nums">{{ r.min }}</td>
+              </template>
+              <td v-else colspan="4" class="text-warn">输入未落到测点：{{ r.unresolved.join('、') }}</td>
+              <td class="font-mono text-[11px] text-fg-mute">{{ r.inputs.map((i: Any) => `${i.var}:${i.tags.join(',')}`).join(' ') }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <LineChart
+          :times="runs[c.id].times"
+          :lines="runs[c.id].results.filter((r: Any) => r.values).slice(0, 6).map((r: Any) => ({ name: r.targetName, values: r.values }))"
+          :unit="runs[c.id].unit"
+          :height="200"
+        />
+      </div>
+    </div>
+  </div>
+</template>

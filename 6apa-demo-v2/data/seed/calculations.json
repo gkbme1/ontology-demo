@@ -1,0 +1,119 @@
+{
+ "note": "种子数据：由 backend/tools/build_seed.py 生成，全部为草案·待工艺确认",
+ "items": [
+  {
+   "id": "CALC-S11-01",
+   "name": "pH双支偏差",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
+    "areaCode": "S11"
+   },
+   "method": "formula",
+   "expression": "abs(a - b)",
+   "inputs": [
+    {
+     "var": "a",
+     "subject": {
+      "kind": "parameter",
+      "name": "反应体系pH",
+      "index": 0
+     }
+    },
+    {
+     "var": "b",
+     "subject": {
+      "kind": "parameter",
+      "name": "反应体系pH",
+      "index": 1
+     }
+    }
+   ],
+   "unit": "pH",
+   "description": "同一罐两支 pH 计（AT_1301x1 / x2）读数差的绝对值",
+   "basis": "R-S11-03",
+   "status": "草案·待工艺确认"
+  },
+  {
+   "id": "CALC-S11-02",
+   "name": "加氨速率（液位差法）",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-8e737067",
+    "name": "水解氨水计量罐组",
+    "areaCode": "S11"
+   },
+   "method": "level_consumption",
+   "inputs": [
+    {
+     "var": "level",
+     "subject": {
+      "kind": "parameter",
+      "name": "氨水计量罐液位"
+     }
+    }
+   ],
+   "params": {
+    "windowMin": 10,
+    "deadbandRatio": 0.01
+   },
+   "unit": "L/min",
+   "description": "计量罐液位只累计下降量（上升视为补液），按滑动时间窗折算速率；方法复制自 Agent Demo 的液位差消耗量",
+   "basis": "R-S11-04 / R-S11-05；关系「计量罐液位下降量即加氨量」",
+   "status": "草案·待工艺确认"
+  },
+  {
+   "id": "CALC-S11-03",
+   "name": "缓冲罐液位上升速率",
+   "anchor": {
+    "kind": "equipment",
+    "id": "equip-39c0ce5f",
+    "name": "水解缓冲罐",
+    "areaCode": "S11"
+   },
+   "method": "rate",
+   "inputs": [
+    {
+     "var": "level",
+     "subject": {
+      "kind": "parameter",
+      "name": "水解液缓冲罐液位"
+     }
+    }
+   ],
+   "params": {
+    "windowMin": 10
+   },
+   "unit": "m3/min",
+   "description": "水解液缓冲罐液位在滑动时间窗内的平均变化速率（正为上涨）",
+   "basis": "ARP-S11-10",
+   "status": "草案·待工艺确认"
+  },
+  {
+   "id": "CALC-S11-04",
+   "name": "水解罐平均温度",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
+    "areaCode": "S11"
+   },
+   "method": "formula",
+   "expression": "mean(t)",
+   "inputs": [
+    {
+     "var": "t",
+     "subject": {
+      "kind": "parameter",
+      "name": "釜内反应温度"
+     }
+    }
+   ],
+   "unit": "℃",
+   "description": "本台全部温度测点的均值（指标示例）",
+   "basis": "PL001",
+   "status": "草案·待工艺确认"
+  }
+ ]
+}
