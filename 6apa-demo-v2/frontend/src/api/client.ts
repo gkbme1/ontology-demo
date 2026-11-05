@@ -1,6 +1,8 @@
 /**
  * v2 后端 REST 客户端。页面组件不内置任何设备、测点、现象数据，全部经这里取。
  */
+import { staticBackend } from './static'
+
 const BASE = (import.meta.env.VITE_API_BASE ?? '').replace(/\/$/, '')
 
 export type Query = Record<string, string | number | boolean | null | undefined>
@@ -22,6 +24,7 @@ export class ApiError extends Error {
 }
 
 async function request<T>(method: string, path: string, body?: unknown, query?: Query): Promise<T> {
+  if (staticBackend) return staticBackend.handle(method, path, body, query) as Promise<T>
   const res = await fetch(`${BASE}/api/v2${path}${qs(query)}`, {
     method,
     headers: { Accept: 'application/json', ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}) },

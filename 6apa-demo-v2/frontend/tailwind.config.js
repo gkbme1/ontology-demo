@@ -4,12 +4,13 @@ export default {
   theme: {
     extend: {
       colors: {
-        ink: { DEFAULT: '#0a111d', panel: '#101a2b', panel2: '#16233a', raised: '#1c2c46' },
-        line: { DEFAULT: '#23344f', soft: '#1a2940' },
-        fg: { DEFAULT: '#dde7f7', dim: '#9fb0cc', mute: '#6f819e' },
-        brand: '#35c4d7',
-        ok: '#3fcf8e', warn: '#f2c744', err: '#f2557a', info: '#4c8dff',
-        equip: '#ff9f45', part: '#b07cff', prop: '#3fcf8e', tagc: '#f2c744', unmatched: '#6b7a90'
+        // 浅色主题：ink = 页面底色，panel = 卡片，panel2 = 表头 / 次级底色
+        ink: { DEFAULT: '#f4f6f9', panel: '#ffffff', panel2: '#f1f4f8', raised: '#e8edf3' },
+        line: { DEFAULT: '#d6dde7', soft: '#e6ebf1' },
+        fg: { DEFAULT: '#1f2937', dim: '#4b5563', mute: '#8391a2' },
+        brand: '#0e8fa3',
+        ok: '#15803d', warn: '#b45309', err: '#dc2626', info: '#2563eb',
+        equip: '#ea7a1a', part: '#8b5cf6', prop: '#15803d', tagc: '#b45309', unmatched: '#94a3b8'
       },
       fontFamily: {
         sans: ['"IBM Plex Sans"', '-apple-system', '"PingFang SC"', '"Microsoft YaHei"', 'sans-serif'],

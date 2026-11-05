@@ -92,62 +92,62 @@ function short(s: string, n = 13): string {
 </script>
 
 <template>
-  <div v-if="layout" class="overflow-auto rounded-[10px] border border-line bg-[#0c1524]">
+  <div v-if="layout" class="overflow-auto rounded-[10px] border border-line bg-[#fbfcfe]">
     <svg :width="layout.width" :height="layout.height" class="block select-none" style="font-family: inherit">
       <defs>
         <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-          <path d="M0,0 L10,5 L0,10 z" fill="#5d7aa3" />
+          <path d="M0,0 L10,5 L0,10 z" fill="#8197b3" />
         </marker>
         <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
-          <path d="M24 0 L0 0 0 24" fill="none" stroke="#132036" stroke-width="1" />
+          <path d="M24 0 L0 0 0 24" fill="none" stroke="#edf1f6" stroke-width="1" />
         </pattern>
       </defs>
       <rect x="0" y="0" :width="layout.width" :height="layout.height" fill="url(#grid)" />
       <!-- 标题与子工序 -->
-      <text x="16" y="24" fill="#dde7f7" font-size="14" font-weight="600">{{ drawing.name }}</text>
-      <text x="16" y="24" :dx="drawing.name.length * 14 + 12" fill="#6f819e" font-size="11">流程画面：{{ drawing.screen }}</text>
+      <text x="16" y="24" fill="#1f2937" font-size="14" font-weight="600">{{ drawing.name }}</text>
+      <text x="16" y="24" :dx="drawing.name.length * 14 + 12" fill="#7b8798" font-size="11">流程画面：{{ drawing.screen }}</text>
       <g v-if="drawing.subSteps?.length">
-        <text x="16" y="46" fill="#6f819e" font-size="11">子工序</text>
+        <text x="16" y="46" fill="#7b8798" font-size="11">子工序</text>
         <g v-for="(s, i) in drawing.subSteps" :key="s">
-          <rect :x="60 + i * 112" y="34" width="104" height="18" rx="9" fill="#16233a" stroke="#23344f" />
-          <text :x="112 + i * 112" y="47" fill="#9fb0cc" font-size="10.5" text-anchor="middle">{{ short(s, 9) }}</text>
-          <text v-if="i < drawing.subSteps.length - 1" :x="166 + i * 112" y="47" fill="#35c4d7" font-size="10" text-anchor="middle">›</text>
+          <rect :x="60 + i * 112" y="34" width="104" height="18" rx="9" fill="#eef3f8" stroke="#c9d4e0" />
+          <text :x="112 + i * 112" y="47" fill="#4b5563" font-size="10.5" text-anchor="middle">{{ short(s, 9) }}</text>
+          <text v-if="i < drawing.subSteps.length - 1" :x="166 + i * 112" y="47" fill="#0e8fa3" font-size="10" text-anchor="middle">›</text>
         </g>
       </g>
 
       <!-- 物料进出 -->
-      <path v-for="(l, i) in layout.streamLinks" :key="`sl${i}`" :d="l.d" fill="none" stroke="#2c4466" stroke-dasharray="4 3" stroke-width="1.2" marker-end="url(#arr)" />
+      <path v-for="(l, i) in layout.streamLinks" :key="`sl${i}`" :d="l.d" fill="none" stroke="#a9b8cb" stroke-dasharray="4 3" stroke-width="1.2" marker-end="url(#arr)" />
       <g v-for="s in layout.inlets" :key="`in${s.name}`">
-        <rect :x="s.x" :y="s.y" :width="STREAM_W" height="22" rx="4" :fill="s.type === '公用介质' ? '#1b2a22' : '#1f2433'" :stroke="s.type === '公用介质' ? '#2f6b4f' : '#3b4a6b'" />
-        <text :x="s.x + 8" :y="s.y + 15" font-size="11" :fill="s.type === '公用介质' ? '#7fd8a8' : '#b8c6dd'">{{ short(s.name, 12) }}<title>{{ s.type }}：{{ s.name }}</title></text>
+        <rect :x="s.x" :y="s.y" :width="STREAM_W" height="22" rx="4" :fill="s.type === '公用介质' ? '#ecfdf5' : '#eef2ff'" :stroke="s.type === '公用介质' ? '#6ee7b7' : '#a5b4fc'" />
+        <text :x="s.x + 8" :y="s.y + 15" font-size="11" :fill="s.type === '公用介质' ? '#047857' : '#334155'">{{ short(s.name, 12) }}<title>{{ s.type }}：{{ s.name }}</title></text>
       </g>
       <g v-for="s in layout.outlets" :key="`out${s.name}`">
-        <rect :x="s.x" :y="s.y" :width="STREAM_W" height="22" rx="4" fill="#2a2216" stroke="#7a5a2c" />
-        <text :x="s.x + 8" :y="s.y + 15" font-size="11" fill="#f2c27a">{{ short(s.name, 12) }}<title>{{ s.type }}：{{ s.name }}</title></text>
+        <rect :x="s.x" :y="s.y" :width="STREAM_W" height="22" rx="4" fill="#fff7ed" stroke="#fdba74" />
+        <text :x="s.x + 8" :y="s.y + 15" font-size="11" fill="#c2410c">{{ short(s.name, 12) }}<title>{{ s.type }}：{{ s.name }}</title></text>
       </g>
 
       <!-- 设备组间连线 -->
-      <path v-for="(e, i) in layout.edges" :key="`e${i}`" :d="e.d" fill="none" :stroke="e.back ? '#7a5a9c' : '#5d7aa3'" stroke-width="1.6" marker-end="url(#arr)">
+      <path v-for="(e, i) in layout.edges" :key="`e${i}`" :d="e.d" fill="none" :stroke="e.back ? '#9b7bc4' : '#8197b3'" stroke-width="1.6" marker-end="url(#arr)">
         <title>{{ e.predicate }}：{{ e.label }}</title>
       </path>
 
       <!-- 设备组 -->
       <g v-for="n in layout.nodes" :key="n.id" :transform="`translate(${n.x},${n.y})`">
         <rect :width="NODE_W" :height="n.h" rx="8"
-              :fill="hl.has(n.id) ? '#14324a' : '#101a2b'"
-              :stroke="hl.has(n.id) ? '#35c4d7' : n.kind === 'ungrouped' ? '#33415c' : '#2b4062'"
+              :fill="hl.has(n.id) ? '#dff3f6' : '#ffffff'"
+              :stroke="hl.has(n.id) ? '#0e8fa3' : n.kind === 'ungrouped' ? '#b6c2d1' : '#9fb3c8'"
               :stroke-dasharray="n.kind === 'ungrouped' ? '5 3' : ''" :stroke-width="hl.has(n.id) ? 2 : 1" />
         <g class="cursor-pointer" @click="n.kind === 'group' && emit('pick', n.id, 'group')">
           <rect :width="NODE_W" :height="HEAD_H" rx="8" fill="transparent" />
-          <text x="10" y="19" font-size="12" font-weight="600" :fill="n.kind === 'ungrouped' ? '#9fb0cc' : '#dde7f7'">{{ short(n.name, 16) }}<title>{{ n.name }}{{ n.type ? `（${n.type}）` : '' }}</title></text>
-          <text :x="NODE_W - 10" y="19" font-size="10.5" fill="#6f819e" text-anchor="end">{{ n.members.length }} 台</text>
+          <text x="10" y="19" font-size="12" font-weight="600" :fill="n.kind === 'ungrouped' ? '#4b5563' : '#1f2937'">{{ short(n.name, 16) }}<title>{{ n.name }}{{ n.type ? `（${n.type}）` : '' }}</title></text>
+          <text :x="NODE_W - 10" y="19" font-size="10.5" fill="#7b8798" text-anchor="end">{{ n.members.length }} 台</text>
         </g>
         <g v-for="(m, i) in n.shown" :key="m.id" class="cursor-pointer" @click="emit('pick', m.id, 'equipment')">
           <rect :x="chipX(i)" :y="chipY(i)" :width="(NODE_W - 16) / CHIP_COLS - 6" :height="CHIP_H - 4" rx="4"
-                :fill="hl.has(m.id) ? '#35c4d7' : '#16233a'" :stroke="hl.has(m.id) ? '#35c4d7' : '#23344f'" />
-          <text :x="chipX(i) + 6" :y="chipY(i) + 13" font-size="10.5" :fill="hl.has(m.id) ? '#0a111d' : '#b8c6dd'">{{ short(m.name, 9) }}<title>{{ m.name }} · {{ m.tagCount }} 个测点</title></text>
+                :fill="hl.has(m.id) ? '#0e8fa3' : '#eef3f8'" :stroke="hl.has(m.id) ? '#0e8fa3' : '#c9d4e0'" />
+          <text :x="chipX(i) + 6" :y="chipY(i) + 13" font-size="10.5" :fill="hl.has(m.id) ? '#ffffff' : '#334155'">{{ short(m.name, 9) }}<title>{{ m.name }} · {{ m.tagCount }} 个测点</title></text>
         </g>
-        <text v-if="n.more > 0" x="10" :y="n.h - 10" font-size="10.5" fill="#6f819e">另有 {{ n.more }} 台（见左侧树）</text>
+        <text v-if="n.more > 0" x="10" :y="n.h - 10" font-size="10.5" fill="#7b8798">另有 {{ n.more }} 台（见左侧树）</text>
       </g>
     </svg>
   </div>

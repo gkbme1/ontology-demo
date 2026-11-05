@@ -2,6 +2,7 @@
 /** 本体界面：左侧导航树，右侧显示区。 */
 import { onMounted, ref } from 'vue'
 import { api } from '@/api/client'
+import { staticBackend } from '@/api/static'
 import { bump, enterSegment, loadMeta, nav, openObject, select } from '@/composables/useNav'
 import NavPanel from '@/components/NavPanel.vue'
 import Overview from '@/views/Overview.vue'
@@ -68,6 +69,9 @@ const kind = (): string => nav.selection.type
         </div>
       </div>
       <span class="flex-1" />
+      <span v-if="staticBackend" class="pill pill-info" title="离线单文件版：数据为导出时的快照，现象与根因关系的编辑保存在本浏览器">
+        单文件版 · 数据快照 {{ staticBackend.info.generatedAt }}
+      </span>
       <span class="sim-tag" title="试算用的测点数据由内置模拟器生成">试算数据为模拟数据</span>
       <button class="ctl" title="现象 / 根因关系 / 计算组态恢复为种子数据" @click="reset">恢复种子数据</button>
     </header>

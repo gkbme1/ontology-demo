@@ -6,7 +6,22 @@
 设备信息按 10 个页签展示，并新增**现象定义（带判定规则）**、**根因影响关系（现象导致现象）**、**计算组态**三块。
 本目录自成一体：数据与需要复用的代码都已复制进来，不引用原 Demo 的任何文件。
 
-## 快速开始
+## 单文件版（推荐用于展示）
+
+`release/6APA本体Demo_v2.html` 是一个独立的 HTML 文件，**双击用 Chrome / Edge 打开即可**，不需要 Python、后端或网络，
+可以直接拷给别人或发邮件。
+
+- 包含全部导航、现场图纸、10 个页签、文档、其他分类，以及导出时预先算好的试算结果（模拟数据）；
+- 现象和根因影响关系可以新增 / 编辑 / 删除，保存在当前浏览器里（顶栏「恢复种子数据」清除）；
+- 局限：新写或改过的判定规则无法在单文件版里重新试算（会提示到完整版试算）；顶栏标有「单文件版 · 数据快照时间」。
+
+改了数据或代码后重新生成（需要 Node.js 18+，约 2 分钟）：
+
+```bash
+python3 -m backend.tools.export_static --build
+```
+
+## 快速开始（完整版）
 
 **Windows**：双击 `run_demo.bat`。窗口里依次检查 Python、依赖、数据、页面，后端就绪后自动打开浏览器
 （<http://localhost:8710/>）。**不要关这个黑窗口**，关掉就停止 Demo。
@@ -61,8 +76,9 @@
 │   ├── api/routes.py /api/v2 接口
 │   ├── v2/           本 Demo 新写的逻辑：层级、图纸、页签、现象 / 根因、判定规则求值、计算组态、模拟数据、文档
 │   ├── ontology/ services/   复制自原 Demo 的本体加载代码（原样，见 services/README.md）
-│   └── tools/        build_config.py（层级配置表）、build_seed.py（种子数据）
-├── frontend/         Vue 3 + Vite + Tailwind + ECharts
+│   └── tools/        build_config.py（层级配置表）、build_seed.py（种子数据）、export_static.py（单文件版）
+├── frontend/         Vue 3 + Vite + Tailwind + ECharts（浅色主题；src/api/static.ts = 单文件版的浏览器内「后端」）
+├── release/          6APA本体Demo_v2.html：单文件版
 ├── docs/
 │   ├── 设计说明.md    界面、数据模型、判定规则语义、待确认项
 │   └── source-docs/  规程类文档（SOP-S11-ALARM-001，模拟规程）

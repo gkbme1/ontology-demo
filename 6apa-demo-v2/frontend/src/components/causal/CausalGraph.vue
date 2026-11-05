@@ -12,7 +12,7 @@ const props = defineProps<{ graph: Any; height?: number }>()
 const emit = defineEmits<{ (e: 'pick', id: string): void }>()
 
 const CAT_COLOR: Record<string, string> = {
-  工艺: '#35c4d7', 设备: '#ff9f45', 仪表: '#b07cff', 操作: '#f2c744', 物料: '#3fcf8e', 公用工程: '#4c8dff', 环境: '#9fb0cc'
+  工艺: '#0e8fa3', 设备: '#ea7a1a', 仪表: '#8b5cf6', 操作: '#ca8a04', 物料: '#16a34a', 公用工程: '#2563eb', 环境: '#4b5563'
 }
 const NODE_W = 176
 const NODE_H = 30
@@ -89,7 +89,7 @@ function dim(id: string): boolean {
 </script>
 
 <template>
-  <div class="rounded-[10px] border border-line bg-[#0c1524]">
+  <div class="rounded-[10px] border border-line bg-[#fbfcfe]">
     <div class="flex flex-wrap gap-x-3 gap-y-1 px-3 pt-2 text-[10.5px] text-fg-mute">
       <span v-for="(c, k) in CAT_COLOR" :key="k" class="flex items-center gap-1"><i class="inline-block w-2.5 h-2.5 rounded-sm" :style="{ background: c }" />{{ k }}</span>
       <span>· 虚线框 = 判定规则待定义 · 虚线边 = 低置信度 · 左为原因、右为结果 · 悬停看相邻关系，单击节点看它由什么导致</span>
@@ -99,14 +99,14 @@ function dim(id: string): boolean {
       <svg :width="layout.width" :height="layout.height" class="block">
         <defs>
           <marker id="cg-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-            <path d="M0,0 L10,5 L0,10 z" fill="#5d7aa3" />
+            <path d="M0,0 L10,5 L0,10 z" fill="#8197b3" />
           </marker>
         </defs>
-        <text v-for="i in layout.layers" :key="`h${i}`" :x="PAD + (i - 1) * COL_W" y="20" font-size="10.5" fill="#6f819e">
+        <text v-for="i in layout.layers" :key="`h${i}`" :x="PAD + (i - 1) * COL_W" y="20" font-size="10.5" fill="#7b8798">
           {{ i === 1 ? '根因' : `第 ${i} 层` }}
         </text>
         <path v-for="e in layout.edges" :key="e.id" :d="e.d" fill="none" marker-end="url(#cg-arr)"
-              :stroke="hover && (e.cause === hover || e.effect === hover) ? '#35c4d7' : '#3b4f70'"
+              :stroke="hover && (e.cause === hover || e.effect === hover) ? '#0e8fa3' : '#a3b1c2'"
               :stroke-width="e.confidence === '高' ? 2 : 1.3" :stroke-dasharray="e.confidence === '低' ? '4 3' : ''"
               :opacity="hover && !(e.cause === hover || e.effect === hover) ? 0.15 : 1">
           <title>{{ e.causeName }} → {{ e.effectName }}：{{ e.mechanism }}（置信度 {{ e.confidence }}）</title>
@@ -114,11 +114,11 @@ function dim(id: string): boolean {
         <g v-for="n in layout.nodes" :key="n.id" :transform="`translate(${n.x},${n.y})`" class="cursor-pointer"
            :opacity="dim(n.id) ? 0.25 : n.inScope === false ? 0.6 : 1"
            @mouseenter="hover = n.id" @mouseleave="hover = ''" @click="emit('pick', n.id)">
-          <rect :width="NODE_W" :height="NODE_H" rx="6" :fill="`${CAT_COLOR[n.category] ?? '#9fb0cc'}22`"
-                :stroke="n.focus ? '#ffffff' : CAT_COLOR[n.category] ?? '#9fb0cc'" :stroke-width="n.focus ? 2.2 : 1.2"
+          <rect :width="NODE_W" :height="NODE_H" rx="6" :fill="`${CAT_COLOR[n.category] ?? '#4b5563'}22`"
+                :stroke="n.focus ? '#111827' : CAT_COLOR[n.category] ?? '#4b5563'" :stroke-width="n.focus ? 2.2 : 1.2"
                 :stroke-dasharray="n.hasRule ? '' : '4 3'" />
-          <text x="9" y="19" font-size="11.5" fill="#dde7f7">{{ short(n.name) }}</text>
-          <text :x="NODE_W - 7" y="19" font-size="9.5" fill="#6f819e" text-anchor="end">{{ n.asEffect ? `←${n.asEffect}` : '' }}</text>
+          <text x="9" y="19" font-size="11.5" fill="#1f2937">{{ short(n.name) }}</text>
+          <text :x="NODE_W - 7" y="19" font-size="9.5" fill="#7b8798" text-anchor="end">{{ n.asEffect ? `←${n.asEffect}` : '' }}</text>
           <title>{{ n.name }}（{{ n.category }} · {{ n.anchor }}）作为原因 {{ n.asCause }} 次，作为结果 {{ n.asEffect }} 次{{ n.hasRule ? '' : '；判定规则待定义' }}</title>
         </g>
       </svg>

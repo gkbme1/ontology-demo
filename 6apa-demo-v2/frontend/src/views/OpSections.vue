@@ -152,11 +152,11 @@ const title = computed(() => ({
 
 <style scoped>
 .md :deep(h1) { font-size: 18px; font-weight: 600; margin: 8px 0; }
-.md :deep(h2) { font-size: 15px; font-weight: 600; margin: 16px 0 6px; color: #35c4d7; }
+.md :deep(h2) { font-size: 15px; font-weight: 600; margin: 16px 0 6px; color: #0e8fa3; }
 .md :deep(h3) { font-size: 13.5px; font-weight: 600; margin: 12px 0 4px; }
-.md :deep(p), .md :deep(li) { color: #c5d2e6; margin: 4px 0; }
+.md :deep(p), .md :deep(li) { color: #334155; margin: 4px 0; }
 .md :deep(ul), .md :deep(ol) { padding-left: 20px; list-style: disc; }
 .md :deep(table) { border-collapse: collapse; margin: 6px 0; font-size: 12px; }
-.md :deep(th), .md :deep(td) { border: 1px solid #23344f; padding: 3px 6px; }
-.md :deep(blockquote) { border-left: 3px solid #23344f; padding-left: 8px; color: #9fb0cc; }
+.md :deep(th), .md :deep(td) { border: 1px solid #c9d4e0; padding: 3px 6px; }
+.md :deep(blockquote) { border-left: 3px solid #c9d4e0; padding-left: 8px; color: #4b5563; }
 </style>

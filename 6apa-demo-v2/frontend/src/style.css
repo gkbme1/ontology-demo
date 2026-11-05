@@ -3,16 +3,16 @@
 @tailwind utilities;
 
 @layer base {
-  :root { color-scheme: dark; }
+  :root { color-scheme: light; }
   html, body, #app { height: 100%; }
   body {
     @apply bg-ink text-fg font-sans text-[13px] leading-relaxed antialiased;
   }
-  ::selection { background: rgba(53, 196, 215, 0.3); }
+  ::selection { background: rgba(14, 143, 163, 0.2); }
 }
 
 @layer components {
-  .panel { @apply border border-line rounded-[11px] bg-ink-panel overflow-hidden; }
+  .panel { @apply border border-line rounded-[11px] bg-ink-panel overflow-hidden shadow-sm; }
   .panel-head { @apply flex items-center gap-2.5 px-4 py-3 border-b border-line-soft bg-ink-panel2; }
   .panel-head h3 { @apply text-[13px] font-semibold; }
   .panel-body { @apply px-4 py-3.5; }
@@ -61,14 +61,14 @@
 /* ---------------- v2 新增 ---------------- */
 @layer components {
   .btn { @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-line bg-ink-panel2 text-fg-dim hover:text-fg hover:border-brand disabled:opacity-40 disabled:cursor-not-allowed; }
-  .btn-primary { @apply bg-brand/90 border-brand text-ink hover:bg-brand hover:text-ink; }
+  .btn-primary { @apply bg-brand border-brand text-white hover:bg-brand/90 hover:text-white; }
   .btn-danger { @apply text-err border-err/40 hover:border-err hover:text-err; }
-  .inp { @apply px-2 py-1 rounded-md border border-line bg-ink text-fg text-xs outline-none focus:border-brand; }
+  .inp { @apply px-2 py-1 rounded-md border border-line bg-white text-fg text-xs outline-none focus:border-brand; }
   .tab-btn { @apply px-3 py-2 text-[12.5px] text-fg-mute border-b-2 border-transparent hover:text-fg whitespace-nowrap; }
   .tab-on { @apply text-fg border-brand; }
   .tree-row { @apply flex items-center gap-1.5 px-2 py-[3px] rounded cursor-pointer select-none text-[12.5px] text-fg-dim hover:bg-ink-panel2 hover:text-fg; }
   .tree-on { @apply bg-brand/[0.14] text-fg; }
   .sec-title { @apply text-[11px] tracking-wider uppercase text-fg-mute mb-2; }
-  .card { @apply border border-line rounded-[10px] bg-ink-panel px-4 py-3; }
+  .card { @apply border border-line rounded-[10px] bg-ink-panel px-4 py-3 shadow-sm; }
   .sim-tag { @apply pill pill-warn; }
 }

@@ -19,7 +19,7 @@ const props = defineProps<{
 
 const el = ref<HTMLDivElement>()
 let chart: echarts.ECharts | null = null
-const PALETTE = ['#35c4d7', '#f2c744', '#b07cff', '#3fcf8e', '#ff9f45', '#4c8dff']
+const PALETTE = ['#0e8fa3', '#ca8a04', '#8b5cf6', '#16a34a', '#ea7a1a', '#2563eb']
 
 function render(): void {
   if (!el.value) return
@@ -28,18 +28,18 @@ function render(): void {
     backgroundColor: 'transparent',
     color: PALETTE,
     grid: { left: 48, right: 16, top: 28, bottom: 28 },
-    tooltip: { trigger: 'axis', backgroundColor: '#16233a', borderColor: '#23344f', textStyle: { color: '#dde7f7', fontSize: 11 } },
-    legend: { top: 0, textStyle: { color: '#9fb0cc', fontSize: 11 }, itemHeight: 8 },
-    xAxis: { type: 'category', data: props.times, axisLabel: { color: '#6f819e', fontSize: 10 }, axisLine: { lineStyle: { color: '#23344f' } } },
-    yAxis: { type: 'value', scale: true, name: props.unit ?? '', nameTextStyle: { color: '#6f819e', fontSize: 10 },
-             axisLabel: { color: '#6f819e', fontSize: 10 }, splitLine: { lineStyle: { color: '#1a2940' } } },
+    tooltip: { trigger: 'axis', backgroundColor: '#ffffff', borderColor: '#c9d4e0', textStyle: { color: '#1f2937', fontSize: 11 } },
+    legend: { top: 0, textStyle: { color: '#4b5563', fontSize: 11 }, itemHeight: 8 },
+    xAxis: { type: 'category', data: props.times, axisLabel: { color: '#7b8798', fontSize: 10 }, axisLine: { lineStyle: { color: '#c9d4e0' } } },
+    yAxis: { type: 'value', scale: true, name: props.unit ?? '', nameTextStyle: { color: '#7b8798', fontSize: 10 },
+             axisLabel: { color: '#7b8798', fontSize: 10 }, splitLine: { lineStyle: { color: '#e6ebf1' } } },
     dataZoom: [{ type: 'inside' }],
     series: props.lines.map((l, i) => ({
       name: l.name, type: 'line', data: l.values, showSymbol: false, step: props.step ? 'end' : undefined,
       lineStyle: { width: 1.4 },
       markLine: i === 0 && props.threshold !== null && props.threshold !== undefined
-        ? { symbol: 'none', data: [{ yAxis: props.threshold }], lineStyle: { color: '#f2557a', type: 'dashed' },
-            label: { color: '#f2557a', fontSize: 10, formatter: `阈值 ${props.threshold}` } }
+        ? { symbol: 'none', data: [{ yAxis: props.threshold }], lineStyle: { color: '#dc2626', type: 'dashed' },
+            label: { color: '#dc2626', fontSize: 10, formatter: `阈值 ${props.threshold}` } }
         : undefined
     }))
   }, true)

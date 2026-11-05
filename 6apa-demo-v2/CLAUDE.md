@@ -44,6 +44,16 @@
 - `backend/main.py` 里强制注册 `.js → text/javascript` 等 MIME：Windows 注册表常把 .js 登记成 text/plain，页面会一片空白；
 - `frontend/dist` 是提交进仓库的（用户机器不一定有 Node.js）：改了前端必须 `npm run build` 并提交 dist。
 
+## 单文件版
+
+- `release/6APA本体Demo_v2.html` 由 `python3 -m backend.tools.export_static --build` 生成：前端 `--mode single` 内联成一个 HTML，
+  后端用**种子数据**跑一遍，把只读接口应答、试算结果、图纸 data URL 打包（JSON → gzip → base64）注入 `<script id="v2-data">`；
+- 前端 `src/api/static.ts`：有内嵌数据时 `client.ts` 的请求全部走它。只读接口查表（键 = 路径?参数排序、不编码，
+  与 `export_static.key()` 一致）；现象 / 根因关系在浏览器里现算并存 localStorage；试算只认导出时的规则；
+- **新增前端会请求的只读接口时，要在 `export_static.py` 里同步收集**，否则单文件版会报「未包含该数据」；
+  改了数据、种子或前端后要重新导出并提交 release 文件。
+- 主题为浅色：颜色在 `tailwind.config.js`（ink / line / fg 等），SVG / 图表里的颜色写在各组件内。
+
 ## 关键口径
 
 - 工序 = 一张 DCS 流程画面；子工序写在图纸上，不单独成层。工序下固定 4 个节点：装置、计算组态、工况与根因、文档提取。
