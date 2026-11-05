@@ -8,6 +8,7 @@
 """
 from __future__ import annotations
 
+import mimetypes
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -19,6 +20,13 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.api.routes import router
 from backend.v2.context import get_ctx
+
+# Windows 上 Python 从注册表读 MIME 类型，不少机器把 .js 登记成 text/plain，
+# 浏览器会拒绝执行 <script type="module">，页面一片空白。这里强制写对。
+for _ext, _type in ((".js", "text/javascript"), (".mjs", "text/javascript"), (".css", "text/css"),
+                    (".svg", "image/svg+xml"), (".json", "application/json"), (".png", "image/png"),
+                    (".html", "text/html")):
+    mimetypes.add_type(_type, _ext)
 
 ROOT = Path(__file__).resolve().parents[1]
 DIST = ROOT / "frontend" / "dist"

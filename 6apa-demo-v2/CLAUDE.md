@@ -41,6 +41,7 @@
 
 - `run_demo.bat` 必须保持**纯 ASCII + CRLF**（`.gitattributes` 已约束），中文提示放在 `start_demo.py` 里；
 - `requirements.txt` 保持纯 ASCII：中文 Windows 上 pip 按 GBK 读它，含 UTF-8 中文会解码失败；
+- `backend/main.py` 里强制注册 `.js → text/javascript` 等 MIME：Windows 注册表常把 .js 登记成 text/plain，页面会一片空白；
 - `frontend/dist` 是提交进仓库的（用户机器不一定有 Node.js）：改了前端必须 `npm run build` 并提交 dist。
 
 ## 关键口径
