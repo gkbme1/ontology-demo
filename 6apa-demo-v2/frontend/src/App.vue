@@ -9,6 +9,7 @@ import Overview from '@/views/Overview.vue'
 import OpSections from '@/views/OpSections.vue'
 import AssetPanel from '@/views/AssetPanel.vue'
 import GenericProfile from '@/views/GenericProfile.vue'
+import GlobalGraph from '@/views/GlobalGraph.vue'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any
@@ -58,7 +59,11 @@ const kind = (): string => nav.selection.type
   <div class="h-full flex flex-col">
     <header class="flex items-center gap-4 px-4 h-12 border-b border-line bg-ink-panel2 shrink-0">
       <div class="font-semibold tracking-wide"><span class="text-brand">◆</span> 6APA 本体 <span class="text-fg-mute text-xs font-normal">v2 · 105 车间</span></div>
-      <div class="relative w-[360px]">
+      <div class="flex rounded-md border border-line overflow-hidden text-xs font-medium">
+        <button class="px-3 py-1.5" :class="nav.page === 'browse' ? 'bg-brand text-white' : 'bg-white text-fg-dim hover:text-brand'" @click="nav.page = 'browse'">本体浏览</button>
+        <button class="px-3 py-1.5 border-l border-line" :class="nav.page === 'graph' ? 'bg-brand text-white' : 'bg-white text-fg-dim hover:text-brand'" @click="nav.page = 'graph'">◎ 全局图谱</button>
+      </div>
+      <div v-show="nav.page === 'browse'" class="relative w-[360px]">
         <input v-model="keyword" class="inp w-full !py-1.5" placeholder="搜索工序 / 设备组 / 设备 / 位号 / 现象" @input="onSearch" @keydown.esc="hits = []" />
         <div v-if="hits.length" class="absolute z-40 mt-1 w-full panel max-h-[420px] overflow-auto shadow-xl">
           <div v-for="(h, i) in hits" :key="i" class="tree-row !py-1.5" @click="go(h)">
@@ -77,6 +82,7 @@ const kind = (): string => nav.selection.type
     </header>
 
     <div v-if="error" class="empty m-6">{{ error }}</div>
+    <main v-else-if="ready && nav.page === 'graph'" class="flex-1 min-h-0 bg-ink"><GlobalGraph /></main>
     <div v-else-if="ready" class="flex-1 grid grid-cols-[320px_1fr] min-h-0">
       <NavPanel />
       <main class="min-h-0 overflow-hidden bg-ink">

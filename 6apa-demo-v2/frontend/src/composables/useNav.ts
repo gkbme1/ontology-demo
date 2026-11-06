@@ -29,7 +29,11 @@ export const nav = reactive({
   // 树节点被选中的 key（用于高亮）
   activeKey: '' as string,
   // 编辑后递增，触发各视图刷新
-  version: 0
+  version: 0,
+  // 顶层页面：本体浏览 / 全局图谱
+  page: 'browse' as 'browse' | 'graph',
+  // 从设备 / 工序跳到全局图谱时的定位
+  graphFocus: null as { id: string; hops?: number } | null
 })
 
 export async function loadMeta(): Promise<void> {
@@ -65,6 +69,11 @@ export function openDrawing(opId: string, segmentId?: string): void {
 
 export function openObject(objectId: string, opId?: string, tab?: string): void {
   select({ type: 'object', id: objectId, opId, tab }, opId ? `${opId}|${objectId}` : objectId)
+}
+
+export function openGlobalGraph(focusId?: string, hops = 2): void {
+  nav.graphFocus = focusId ? { id: focusId, hops } : null
+  nav.page = 'graph'
 }
 
 export function bump(): void {

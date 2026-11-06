@@ -116,6 +116,7 @@ def main() -> None:
 
     print("收集导航 / 工艺段 / 工序 …")
     col.fetch("/meta")
+    col.fetch("/global-graph")
     col.fetch("/nav/space")
     for seg in h.segments:
         col.fetch(f"/nav/segment/{seg}")

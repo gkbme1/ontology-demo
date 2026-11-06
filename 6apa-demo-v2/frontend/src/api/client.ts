@@ -51,6 +51,7 @@ export const api = {
   navSpace: () => request<Any>('GET', '/nav/space'),
   navSegment: (id: string) => request<Any>('GET', `/nav/segment/${id}`),
   navDomain: (key: string, parent?: string) => request<Any>('GET', `/nav/domain/${key}`, undefined, { parent }),
+  globalGraph: () => request<Any>('GET', '/global-graph'),
   search: (keyword: string) => request<Any>('GET', '/search', undefined, { keyword }),
   segment: (id: string) => request<Any>('GET', `/segments/${id}`),
   op: (id: string) => request<Any>('GET', `/ops/${id}`),

@@ -5,7 +5,7 @@
  */
 import { computed, ref, watch } from 'vue'
 import { api } from '@/api/client'
-import { nav, openObject } from '@/composables/useNav'
+import { nav, openGlobalGraph, openObject } from '@/composables/useNav'
 import DrawingView from '@/components/DrawingView.vue'
 import CalcPanel from '@/components/CalcPanel.vue'
 import ProcedureCard from '@/components/ProcedureCard.vue'
@@ -117,6 +117,7 @@ function fmtBand(c: Any): string {
           <span v-if="head.className" class="pill pill-plain">{{ head.className }}</span>
           <span class="text-[11px] text-fg-mute truncate" :title="head.badges.join(' · ')">{{ head.badges.join(' · ') }}</span>
           <span class="flex-1" />
+          <button class="ctl !py-0.5" title="在全局图谱中以本对象为中心查看 2 跳邻域" @click="openGlobalGraph(objectId, 2)">◎ 全局图谱定位</button>
           <span class="text-[11px] text-fg-mute whitespace-nowrap truncate max-w-[40%]">
             <span v-for="(p, i) in head.path" :key="p.id">{{ p.name }}<span v-if="i < head.path.length - 1"> › </span></span>
             <span v-if="head.opIds.length > 1" class="ml-1 text-info">（成员分属 {{ head.opIds.length }} 道工序）</span>

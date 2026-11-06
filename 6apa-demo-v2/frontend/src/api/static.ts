@@ -342,6 +342,15 @@ export class StaticBackend {
       }
     }
     if (path === '/search') return this.search(String(q.keyword ?? ''))
+    if (path === '/global-graph') {
+      // 导致关系用浏览器里（可能已编辑过）的当前数据
+      const g = clone(this.snap.get['/global-graph'])
+      const ids = new Set(g.nodes.map((n: Any) => n.id))
+      g.edges = g.edges.filter((e: Any) => e.type !== '导致').concat(
+        Object.values(this.links).filter((l) => ids.has(l.cause) && ids.has(l.effect))
+          .map((l) => ({ s: l.cause, t: l.effect, type: '导致', label: '导致', mechanism: l.mechanism ?? '', confidence: l.confidence })))
+      return g
+    }
     if ((m = path.match(/^\/calculations\/([^/]+)\/run$/))) {
       const r = this.snap.calcRuns
       const hit = r[`${m[1]}|${body?.opId ?? ''}|${body?.targetId ?? ''}`] ?? r[`${m[1]}|${body?.opId ?? ''}|`] ??

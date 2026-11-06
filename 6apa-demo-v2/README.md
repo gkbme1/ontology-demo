@@ -53,6 +53,9 @@ python3 -m backend.tools.export_static --build
 5. **现象定义**：每个现象有判定规则（与 / 或任意嵌套，条件 = 参数 运算 阈值 持续时长，阈值可引用工艺限值），可新增、编辑、在模拟数据上试算；
 6. **根因影响关系**：一条记录 = 「A 现象 导致 B 现象」，列表或关系图谱展示。点一个结果现象，弹窗查看它由哪些现象导致（可逐层往上追）。
 
+7. 顶栏「全局图谱」：整个本体一张图，可按视图 / 布局（工艺流程、层级、力导向）/ 中心对象 1～3 跳 / 关系类型筛选；
+   设备、工序页头部的「全局图谱定位」直接以该对象为中心打开。
+
 推荐演示路径：6A_水解 → 水解A-F → 水解罐C → 现象定义（试算「水解罐pH偏高」，编辑「反应期搅拌停止」看嵌套规则）
 → 根因影响关系 → 点「水解终点异常 / 氨耗偏低」看导致链。
 
@@ -116,4 +119,5 @@ python3 -m backend.tools.build_seed --force     # 覆盖 data/seed/*.json（不�
 | `POST /api/v2/phenomena/{id}/evaluate` · `POST /api/v2/rules/evaluate` | 试算（已保存的现象 / 未保存的规则） |
 | `GET/POST /api/v2/causal-links` · `PUT/DELETE /api/v2/causal-links/{id}` | 根因影响关系 |
 | `GET/POST /api/v2/calculations` · `POST /api/v2/calculations/{id}/run` | 计算组态与试算 |
+| `GET /api/v2/global-graph` | 全局图谱（全部节点与关系） |
 | `GET /api/v2/search?keyword=` | 搜索工序 / 设备组 / 设备 / 位号 / 现象 |

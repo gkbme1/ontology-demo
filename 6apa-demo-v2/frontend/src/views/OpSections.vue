@@ -3,7 +3,7 @@
 import { computed, ref, watch } from 'vue'
 import { marked } from 'marked'
 import { api } from '@/api/client'
-import { nav, openObject, select } from '@/composables/useNav'
+import { nav, openGlobalGraph, openObject, select } from '@/composables/useNav'
 import DrawingView from '@/components/DrawingView.vue'
 import CalcPanel from '@/components/CalcPanel.vue'
 import PhenomenaPanel from '@/components/causal/PhenomenaPanel.vue'
@@ -59,24 +59,25 @@ const title = computed(() => ({
 </script>
 
 <template>
-  <div class="h-full overflow-auto px-5 pb-5 space-y-4">
-    <div v-if="op" class="flex items-center gap-3 pt-5">
-      <div>
-        <div class="text-[11px] text-fg-mute"><span v-for="(p, i) in op.path" :key="p.id">{{ p.name }} › </span>{{ title }}</div>
-        <h2 class="text-[18px] font-semibold">{{ op.name }} · {{ title }}</h2>
-      </div>
+  <div class="h-full flex flex-col min-h-0">
+    <!-- 头部：一行（与设备页一致） -->
+    <div v-if="op" class="flex items-center gap-2 px-4 py-2 border-b border-line bg-ink-panel shrink-0">
+      <h2 class="text-[16px] font-semibold whitespace-nowrap">{{ op.name }} · {{ title }}</h2>
+      <span class="text-[11px] text-fg-mute whitespace-nowrap truncate"><span v-for="p in op.path.slice(0, 2)" :key="p.id">{{ p.name }} › </span>{{ op.name }}</span>
       <span class="flex-1" />
+      <button class="ctl" title="在全局图谱中以本工序为中心查看" @click="openGlobalGraph(opId, 2)">◎ 全局图谱定位</button>
       <button v-for="k in ['drawing', 'section:devices', 'section:calc', 'section:cond', 'section:docs']" :key="k"
-              class="ctl" :class="{ 'ctl-on': kind === k || (k === 'section:calc' && kind === 'calc') }"
+              class="asset-tab !py-0.5" :class="{ 'asset-tab-on': kind === k || (k === 'section:calc' && kind === 'calc') }"
               @click="select({ type: k as Any, id: opId, opId }, k === 'drawing' ? opId : `${opId}|${k.split(':')[1]}`)">
         {{ ({ drawing: '图纸', 'section:devices': '装置', 'section:calc': '计算组态', 'section:cond': '工况与根因', 'section:docs': '文档提取' } as Record<string, string>)[k] }}
       </button>
     </div>
+    <div class="flex-1 overflow-auto px-4 pb-4 space-y-3 min-h-0">
+    <div class="h-0" />
 
     <!-- 图纸 -->
     <template v-if="kind === 'drawing' && drawing">
-      <div class="text-xs text-fg-mute">单击图上的设备查看设备信息。{{ drawing.image ? '' : drawing.note }}</div>
-      <DrawingView :drawing="drawing" @pick="pick" />
+      <DrawingView :drawing="drawing" :caption="drawing.image ? '单击图上的设备查看设备信息' : drawing.note" @pick="pick" />
       <div v-if="drawing.internalStreams?.length" class="text-xs text-fg-mute">本工序内部物料：{{ drawing.internalStreams.join('、') }}</div>
     </template>
 
@@ -147,6 +148,7 @@ const title = computed(() => ({
     <Modal v-if="docView" :title="docView.title" wide @close="docView = null">
       <div class="md text-[13px] leading-relaxed" v-html="docHtml" />
     </Modal>
+    </div>
   </div>
 </template>
 

@@ -6,7 +6,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, Body, HTTPException, Query
 
 from backend.services import asset_model
-from backend.v2 import calculations, documents, drawing, nav, rule_eval, tabs
+from backend.v2 import calculations, documents, drawing, global_graph, nav, rule_eval, tabs
 from backend.v2.context import get_ctx, reload_ctx
 from backend.v2.phenomena import (
     AGGREGATES, CATEGORIES, CONFIDENCE, LIMIT_FIELDS, OPERATORS, STATUSES, NotFound, ValidationError,
@@ -69,6 +69,12 @@ def nav_segment(seg_id: str) -> dict[str, Any]:
 @router.get("/nav/domain/{key}")
 def nav_domain(key: str, parent: Optional[str] = None) -> dict[str, Any]:
     return _guard(nav.domain_tree, get_ctx(), key, parent)
+
+
+@router.get("/global-graph")
+def global_graph_view() -> dict[str, Any]:
+    """全局图谱：全部节点与关系（前端按视图 / 布局 / 跳数筛选）。"""
+    return global_graph.build(get_ctx())
 
 
 @router.get("/search")

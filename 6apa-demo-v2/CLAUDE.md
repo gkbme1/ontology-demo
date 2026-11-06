@@ -32,6 +32,7 @@
 | `calculations.py` | 计算组态（formula / level_consumption / rate） |
 | `simulator.py` | 确定性模拟数据 |
 | `design_params.py` | 设备设计参数（`data/config/6APA_设备设计参数.xlsx`，`build_design_params.py` 生成；值未填显示待补充） |
+| `global_graph.py` | 全局图谱数据（层级 / 设备 / 参数 / 物料 / 现象 + 7 类关系），前端 `views/GlobalGraph.vue` 用 ECharts 渲染 |
 | `documents.py` | 文档提取（规程文档登记 + 数据源统计） |
 
 - 数据：`data/source/*.xlsx`（复制来的数据源）→ `data/config/`（层级配置，`build_config.py` 生成）→
