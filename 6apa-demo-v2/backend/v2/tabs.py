@@ -13,8 +13,8 @@ from backend.v2.phenomena import rule_text
 TABS = [
     ("drawing", "图纸位置与外观"),
     ("parameters", "参数"),
-    ("constraints", "参数约束"),
     ("topology", "拓扑关系"),
+    ("constraints", "参数约束"),
     ("phenomena", "现象定义"),
     ("causal", "根因影响关系"),
     ("influence", "工艺影响关系"),

@@ -67,7 +67,7 @@ class TabsTest(unittest.TestCase):
         eid = _equip("水解罐C")
         head = client.get(f"/api/v2/objects/{eid}?op=OP-09").json()
         self.assertEqual([t["label"] for t in head["tabs"]],
-                         ["图纸位置与外观", "参数", "参数约束", "拓扑关系", "现象定义", "根因影响关系",
+                         ["图纸位置与外观", "参数", "拓扑关系", "参数约束", "现象定义", "根因影响关系",
                           "工艺影响关系", "计算/指标", "处置规程"])
         for t in head["tabs"]:
             r = client.get(f"/api/v2/objects/{eid}/tabs/{t['key']}?op=OP-09")

@@ -8,7 +8,7 @@ import { computed, ref } from 'vue'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any
-const props = defineProps<{ graph: Any; height?: number }>()
+const props = defineProps<{ graph: Any; height?: number; compact?: boolean }>()
 const emit = defineEmits<{ (e: 'pick', id: string): void }>()
 
 const CAT_COLOR: Record<string, string> = {
@@ -20,6 +20,7 @@ const COL_W = 250
 const ROW_H = 42
 const PAD = 20
 const TOP = 34
+const TOP_COMPACT = 10
 
 const hover = ref('')
 
@@ -51,11 +52,11 @@ const layout = computed(() => {
       }
       layer.sort((a, b) => bary(a) - bary(b))
     }
-    layer.forEach((n, i) => { pos[n.id] = { x: PAD + li * COL_W, y: TOP + i * ROW_H } })
+    layer.forEach((n, i) => { pos[n.id] = { x: PAD + li * COL_W, y: (props.compact ? TOP_COMPACT : TOP) + i * ROW_H } })
   })
   const maxRows = Math.max(1, ...layers.map((l) => l?.length ?? 0))
   const width = PAD * 2 + Math.max(1, layers.length) * COL_W - (COL_W - NODE_W)
-  const height = TOP + maxRows * ROW_H + PAD
+  const height = (props.compact ? TOP_COMPACT : TOP) + maxRows * ROW_H + (props.compact ? 4 : PAD)
   const edges = links.map((l) => {
     const a = pos[l.cause], b = pos[l.effect]
     const x1 = a.x + NODE_W, y1 = a.y + NODE_H / 2, x2 = b.x, y2 = b.y + NODE_H / 2
@@ -89,20 +90,20 @@ function dim(id: string): boolean {
 </script>
 
 <template>
-  <div class="rounded-[10px] border border-line bg-[#fbfcfe]">
-    <div class="flex flex-wrap gap-x-3 gap-y-1 px-3 pt-2 text-[10.5px] text-fg-mute">
+  <div :class="compact ? '' : 'rounded-[10px] border border-line bg-[#fbfcfe]'">
+    <div v-if="!compact" class="flex flex-wrap gap-x-3 gap-y-1 px-3 pt-2 text-[10.5px] text-fg-mute">
       <span v-for="(c, k) in CAT_COLOR" :key="k" class="flex items-center gap-1"><i class="inline-block w-2.5 h-2.5 rounded-sm" :style="{ background: c }" />{{ k }}</span>
       <span>· 虚线框 = 判定规则待定义 · 虚线边 = 低置信度 · 左为原因、右为结果 · 悬停看相邻关系，单击节点看它由什么导致</span>
     </div>
     <div v-if="!layout.nodes.length" class="empty m-4">暂无根因影响关系</div>
-    <div v-else class="overflow-auto" :style="{ maxHeight: `${height ?? 460}px` }">
+    <div v-else class="overflow-auto" :style="compact ? {} : { maxHeight: `${height ?? 460}px` }">
       <svg :width="layout.width" :height="layout.height" class="block">
         <defs>
           <marker id="cg-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
             <path d="M0,0 L10,5 L0,10 z" fill="#8197b3" />
           </marker>
         </defs>
-        <text v-for="i in layout.layers" :key="`h${i}`" :x="PAD + (i - 1) * COL_W" y="20" font-size="10.5" fill="#7b8798">
+        <text v-for="i in (compact ? 0 : layout.layers)" :key="`h${i}`" :x="PAD + (i - 1) * COL_W" y="20" font-size="10.5" fill="#7b8798">
           {{ i === 1 ? '根因' : `第 ${i} 层` }}
         </text>
         <path v-for="e in layout.edges" :key="e.id" :d="e.d" fill="none" marker-end="url(#cg-arr)"

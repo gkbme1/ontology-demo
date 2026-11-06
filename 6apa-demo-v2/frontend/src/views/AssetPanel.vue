@@ -10,6 +10,7 @@ import DrawingView from '@/components/DrawingView.vue'
 import CalcPanel from '@/components/CalcPanel.vue'
 import ProcedureCard from '@/components/ProcedureCard.vue'
 import InheritBox from '@/components/InheritBox.vue'
+import TopologyGraph from '@/components/TopologyGraph.vue'
 import CausePopup from '@/components/causal/CausePopup.vue'
 import PhenomenaPanel from '@/components/causal/PhenomenaPanel.vue'
 import CausalPanel from '@/components/causal/CausalPanel.vue'
@@ -62,6 +63,7 @@ const anchorOptions = computed(() => {
 })
 const paramGroup = ref('')
 const openVer = ref<Record<string, boolean>>({})
+const topoView = ref<'graph' | 'list'>('graph')
 const focusPhen = ref('')
 const popupPhen = ref('')
 const allPhen = ref<Any[]>([])
@@ -255,8 +257,15 @@ function fmtBand(c: Any): string {
           </div>
 
           <!-- 拓扑关系 -->
-          <div v-else-if="tab === 'topology'">
-            <table class="tbl">
+          <div v-else-if="tab === 'topology'" class="space-y-2">
+            <div class="flex items-center gap-2">
+              <button class="ctl" :class="{ 'ctl-on': topoView === 'graph' }" @click="topoView = 'graph'">关系图谱</button>
+              <button class="ctl" :class="{ 'ctl-on': topoView === 'list' }" @click="topoView = 'list'">列表</button>
+              <span class="text-xs text-fg-mute">{{ data.items.length }} 条关系</span>
+            </div>
+            <TopologyGraph v-if="topoView === 'graph'" :items="data.items" :center-name="head.name" :center-kind="head.kind"
+                           @open="(id: string) => openObject(id, opId ?? head.opId)" />
+            <table v-else class="tbl">
               <thead><tr><th class="w-12 !text-center">继承</th><th>层</th><th>类别</th><th>方向</th><th>关系</th><th>对象</th><th>说明</th><th>来源</th></tr></thead>
               <tbody>
                 <tr v-for="(r, i) in data.items" :key="i" class="!cursor-default">

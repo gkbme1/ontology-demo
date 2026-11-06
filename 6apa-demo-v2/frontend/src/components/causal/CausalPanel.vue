@@ -16,7 +16,7 @@ type Any = any
 const props = defineProps<{ links: Any[]; graph: Any; opId?: string; showInherit?: boolean }>()
 const emit = defineEmits<{ (e: 'changed'): void }>()
 
-const view = ref<'list' | 'graph'>('list')
+const view = ref<'blocks' | 'graph' | 'list'>('blocks')
 const kw = ref('')
 const popup = ref('')
 const editing = ref<Any | null>(null)
@@ -36,6 +36,14 @@ const grouped = computed(() => {
     .sort((a, b) => b.links.length - a.links.length)
 })
 
+// 某个结果现象的子图：结果 + 直接原因
+const nodeById = computed<Record<string, Any>>(() => Object.fromEntries((props.graph?.nodes ?? []).map((n: Any) => [n.id, n])))
+function subGraph(g: Any): Any {
+  const ids = new Set<string>([g.effect, ...g.links.map((l: Any) => l.cause)])
+  return { nodes: [...ids].map((id) => nodeById.value[id]).filter(Boolean).map((n: Any) => ({ ...n, focus: n.id === g.effect })),
+           links: g.links }
+}
+
 async function remove(l: Any): Promise<void> {
   if (!confirm(`删除「${l.causeName} → ${l.effectName}」？`)) return
   await api.deleteLink(l.id)
@@ -52,11 +60,12 @@ function changed(): void {
 <template>
   <div class="space-y-2">
     <div class="flex items-center gap-2">
+      <button class="ctl" :class="{ 'ctl-on': view === 'blocks' }" @click="view = 'blocks'">分组图谱</button>
+      <button class="ctl" :class="{ 'ctl-on': view === 'graph' }" @click="view = 'graph'">全局图谱</button>
       <button class="ctl" :class="{ 'ctl-on': view === 'list' }" @click="view = 'list'">列表</button>
-      <button class="ctl" :class="{ 'ctl-on': view === 'graph' }" @click="view = 'graph'">关系图谱</button>
-      <template v-if="view === 'list'">
+      <template v-if="view !== 'graph'">
         <input v-model="kw" class="inp w-52 ml-2" placeholder="筛选原因 / 结果" />
-        <label class="text-xs flex items-center gap-1 text-fg-dim"><input v-model="groupByEffect" type="checkbox" /> 按结果现象分组</label>
+        <label v-if="view === 'list'" class="text-xs flex items-center gap-1 text-fg-dim"><input v-model="groupByEffect" type="checkbox" /> 按结果现象分组</label>
       </template>
       <span class="text-xs text-fg-mute">{{ links.length }} 条导致关系</span>
       <span class="flex-1" />
@@ -64,6 +73,29 @@ function changed(): void {
     </div>
 
     <CausalGraph v-if="view === 'graph'" :graph="graph" :height="460" @pick="(id: string) => (popup = id)" />
+
+    <!-- 分组图谱：一个结果现象一块，左侧是导致它的现象 -->
+    <template v-else-if="view === 'blocks'">
+      <div class="flex flex-wrap gap-x-3 gap-y-1 text-[10.5px] text-fg-mute">
+        <span>每块 = 一个结果现象及导致它的现象（左 → 右）· 虚线框 = 判定规则待定义 · 虚线边 = 低置信度 · 单击节点查看导致链</span>
+      </div>
+      <div v-if="!grouped.length" class="empty">暂无根因影响关系</div>
+      <div class="grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(560px, 1fr))">
+        <div v-for="g in grouped" :key="g.effect" class="card !p-0 overflow-hidden">
+          <div class="flex items-center gap-2 px-3 py-2 bg-ink-panel2 border-b border-line-soft">
+            <button class="font-medium text-fg hover:text-brand truncate" @click="popup = g.effect">{{ g.name }}</button>
+            <span class="text-[11px] text-fg-mute truncate">{{ g.anchor }}</span>
+            <span class="flex-1" />
+            <span v-if="showInherit && g.links.every((l: Any) => l.inherited)" class="pill pill-plain" title="这组导致关系继承自设备组">继承</span>
+            <span class="text-[11px] text-fg-mute whitespace-nowrap">由 {{ g.links.length }} 个现象导致</span>
+            <button class="ctl" @click="popup = g.effect">导致链</button>
+          </div>
+          <div class="px-2 py-2 bg-[#fbfcfe]">
+            <CausalGraph :graph="subGraph(g)" compact @pick="(id: string) => (popup = id)" />
+          </div>
+        </div>
+      </div>
+    </template>
 
     <template v-else>
       <div v-if="!rows.length" class="empty">暂无根因影响关系</div>
