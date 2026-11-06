@@ -36,14 +36,15 @@ function gotoSpace(): void {
 </script>
 
 <template>
-  <div class="h-full overflow-auto p-5 space-y-4">
+  <div class="h-full overflow-auto px-5 pb-5 space-y-4">
+    <div class="h-1" />
     <div v-if="error" class="empty">{{ error }}</div>
     <template v-if="prof">
       <div class="flex items-center gap-3">
         <h2 class="text-[18px] font-semibold">{{ prof.name }}</h2>
         <span class="pill pill-plain">{{ prof.header?.className ?? prof.kind }}</span>
         <span class="flex-1" />
-        <button v-if="head?.opId" class="btn btn-primary" @click="gotoSpace">在空间层级中打开（10 个页签）</button>
+        <button v-if="head?.opId" class="btn btn-primary" @click="gotoSpace">在空间层级中打开（9 个页签）</button>
       </div>
       <div v-if="prof.header?.classPath" class="text-xs text-fg-mute">{{ prof.header.classPath.join(' › ') }}</div>
       <div class="card">

@@ -101,7 +101,9 @@ function fmtBand(c: Any): string {
       </div>
 
       <!-- 页签内容 -->
-      <div class="flex-1 overflow-auto px-4 py-3 min-h-0">
+      <!-- 滚动容器不留上内边距：表头 sticky 贴顶，内容不会从表头上方透出 -->
+      <div class="flex-1 overflow-auto px-4 pb-3 min-h-0">
+        <div class="h-3" />
         <div v-if="loading && !data" class="text-fg-mute">加载中…</div>
         <template v-else-if="data">
           <!-- 图纸位置与外观 -->

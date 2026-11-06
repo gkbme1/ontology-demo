@@ -19,7 +19,7 @@
 
   .tbl { @apply w-full border-collapse text-[12.5px]; }
   .tbl th {
-    @apply sticky top-0 bg-ink-panel2 text-fg-mute font-medium text-[11px] tracking-wider
+    @apply sticky top-0 z-10 bg-ink-panel2 text-fg-mute font-medium text-[11px] tracking-wider
            uppercase text-left px-3 py-2 border-b border-line whitespace-nowrap;
   }
   .tbl td { @apply px-3 py-2 border-b border-line-soft align-top; }

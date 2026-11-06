@@ -12,7 +12,8 @@ const emit = defineEmits<{ (e: 'close'): void }>()
           <slot name="actions" />
           <button class="ctl" @click="emit('close')">关闭</button>
         </div>
-        <div class="panel-body max-h-[78vh] overflow-auto">
+        <div class="max-h-[78vh] overflow-auto px-4 pb-3.5">
+          <div class="h-3.5" />
           <slot />
         </div>
       </div>

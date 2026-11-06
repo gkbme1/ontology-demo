@@ -59,8 +59,8 @@ const title = computed(() => ({
 </script>
 
 <template>
-  <div class="h-full overflow-auto p-5 space-y-4">
-    <div v-if="op" class="flex items-center gap-3">
+  <div class="h-full overflow-auto px-5 pb-5 space-y-4">
+    <div v-if="op" class="flex items-center gap-3 pt-5">
       <div>
         <div class="text-[11px] text-fg-mute"><span v-for="(p, i) in op.path" :key="p.id">{{ p.name }} › </span>{{ title }}</div>
         <h2 class="text-[18px] font-semibold">{{ op.name }} · {{ title }}</h2>
