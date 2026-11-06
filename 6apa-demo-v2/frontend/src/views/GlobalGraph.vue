@@ -205,6 +205,8 @@ function render(): void {
   }, true)
   chart.off('click')
   chart.on('click', (p: Any) => { if (p.dataType === 'node') selected.value = p.data.raw })
+  chart.off('dblclick')
+  chart.on('dblclick', (p: Any) => { if (p.dataType === 'node') showHops(p.data.raw.id, 1) })
 }
 
 onMounted(async () => {
@@ -232,6 +234,20 @@ function pickCenter(): void {
   if (!q) return
   const n = data.value.nodes.find((x: Any) => x.name === q) ?? data.value.nodes.find((x: Any) => x.name.includes(q))
   if (n) setCenter(n.id)
+}
+// 范围按钮：有中心用中心；没有中心但选中了节点，就以选中的节点为中心
+const hopHint = ref(false)
+function chooseHops(h: number): void {
+  if (h === 0) { hops.value = 0; return }
+  const id = centerId.value || selected.value?.id
+  if (!id) { hopHint.value = true; setTimeout(() => (hopHint.value = false), 4000); return }
+  showHops(id, h)
+}
+function showHops(id: string, h: number): void {
+  centerId.value = id
+  hops.value = h
+  centerQuery.value = byId.value[id]?.name ?? ''
+  selected.value = byId.value[id] ?? null
 }
 function setCenter(id: string): void {
   centerId.value = id
@@ -277,13 +293,18 @@ const canOpen = (n: Any) => ['工艺段', '工序', '设备组', '设备', '现�
         <select v-model="segFilter" class="inp"><option value="">全部</option><option v-for="s in data?.segments ?? []" :key="s.id" :value="s.id">{{ s.name }}</option></select>
       </label>
       <span class="flex items-center gap-1.5"><span class="text-fg-mute">中心</span>
-        <input v-model="centerQuery" list="gg-names" class="inp w-44" placeholder="输入对象名称" @change="pickCenter" @keydown.enter="pickCenter" />
+        <span v-if="centerId" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-brand text-white font-medium">
+          {{ byId[centerId]?.name }}<button class="opacity-80 hover:opacity-100" title="清除中心，回到全部" @click="clearCenter">✕</button>
+        </span>
+        <input v-else v-model="centerQuery" list="gg-names" class="inp w-44" placeholder="输入名称，或单击图中节点" @change="pickCenter" @keydown.enter="pickCenter" />
         <datalist id="gg-names"><option v-for="n in nameOptions" :key="n.id" :value="n.name">{{ n.type }}</option></datalist>
-        <button v-if="centerId" class="ctl !py-0.5" @click="clearCenter">清除</button>
       </span>
-      <span class="flex items-center gap-1"><span class="text-fg-mute">范围</span>
-        <button v-for="h in [0, 1, 2, 3]" :key="h" class="ctl !py-0.5" :class="{ 'ctl-on': hops === h }" :disabled="h > 0 && !centerId"
-                :title="h > 0 && !centerId ? '先选择中心对象' : ''" @click="hops = h">{{ h === 0 ? '全部' : `${h} 跳` }}</button>
+      <span class="relative flex items-center gap-1"><span class="text-fg-mute">范围</span>
+        <button v-for="h in [0, 1, 2, 3]" :key="h" class="ctl !py-0.5" :class="{ 'ctl-on': hops === h }"
+                :title="h === 0 ? '显示全部' : `只看中心对象 ${h} 步以内能连到的对象`" @click="chooseHops(h)">{{ h === 0 ? '全部' : `${h} 跳` }}</button>
+        <span v-if="hopHint" class="absolute left-0 top-full mt-1 z-20 whitespace-nowrap rounded-md bg-fg text-white px-2 py-1 shadow-lg">
+          先单击图中一个节点（或在「中心」框输入名称），再点 1 / 2 / 3 跳
+        </span>
       </span>
       <span class="flex items-center gap-1 flex-wrap"><span class="text-fg-mute">关系</span>
         <button v-for="e in EDGE_TYPES" :key="e.name" class="ctl !py-0.5" :class="{ 'ctl-on': edgeOn.has(e.name) }" @click="toggleEdge(e.name)">
@@ -291,6 +312,7 @@ const canOpen = (n: Any) => ['工艺段', '工序', '设备组', '设备', '现�
         </button>
       </span>
       <span class="flex-1" />
+      <span v-if="centerId && hops" class="text-brand">显示与「{{ byId[centerId]?.name }}」相隔 {{ hops }} 步以内的对象</span>
       <span class="text-fg-mute">节点 {{ sub.nodes.length }} · 关系 {{ sub.edges.length }}</span>
     </div>
 
@@ -300,7 +322,7 @@ const canOpen = (n: Any) => ['工艺段', '工序', '设备组', '设备', '现�
         <div v-if="!data" class="absolute inset-0 grid place-items-center text-fg-mute">加载中…</div>
         <div v-else-if="!sub.nodes.length" class="absolute inset-0 grid place-items-center text-fg-mute">当前筛选下没有节点</div>
         <div class="absolute right-3 bottom-2 text-[11px] text-fg-mute bg-white/80 rounded px-2 py-0.5">
-          滚轮缩放 · 拖拽平移 · 悬停高亮相邻 · 单击看详情 · {{ data?.note }}
+          单击节点看详情 · 双击节点看它的 1 跳邻域 · 选中节点后点「1 / 2 / 3 跳」看更远 · 滚轮缩放 · 拖拽平移
         </div>
       </div>
       <!-- 详情 -->
@@ -314,7 +336,8 @@ const canOpen = (n: Any) => ['工艺段', '工序', '设备组', '设备', '现�
           <button class="ctl !px-1.5 !py-0" @click="selected = null">✕</button>
         </div>
         <div class="flex flex-wrap gap-1.5">
-          <button class="btn" @click="setCenter(selected.id)">以此为中心</button>
+          <span class="text-fg-mute self-center">以它为中心看：</span>
+          <button v-for="h in [1, 2, 3]" :key="h" class="btn" :class="{ 'btn-primary': centerId === selected.id && hops === h }" @click="showHops(selected.id, h)">{{ h }} 跳</button>
           <button v-if="canOpen(selected)" class="btn btn-primary" @click="openInBrowse(selected)">在本体浏览中打开</button>
         </div>
         <dl class="kv">
