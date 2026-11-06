@@ -3,10 +3,11 @@
 import { ref, watch } from 'vue'
 import { api } from '@/api/client'
 import LineChart from './LineChart.vue'
+import InheritBox from './InheritBox.vue'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any
-const props = defineProps<{ items: Any[]; opId?: string; targetId?: string; focusId?: string }>()
+const props = defineProps<{ items: Any[]; opId?: string; targetId?: string; focusId?: string; showInherit?: boolean }>()
 
 const METHOD: Record<string, string> = { formula: '表达式', level_consumption: '液位差消耗量', rate: '变化速率' }
 const openId = ref(props.focusId ?? '')
@@ -41,7 +42,7 @@ function inputText(c: Any): string {
         <span class="text-brand font-mono">ƒ</span>
         <span class="font-medium">{{ c.name }}</span>
         <span class="text-[11px] text-fg-mute">{{ c.id }} · {{ METHOD[c.method] ?? c.method }} · {{ c.unit }}</span>
-        <span v-if="c.origin && c.origin !== '本对象'" class="pill pill-info">{{ c.origin }}</span>
+        <span v-if="showInherit" class="inline-flex items-center gap-1 text-[11px] text-fg-mute"><InheritBox :checked="c.inherited" :from="c.inheritedFrom" />继承</span>
         <span class="pill pill-warn">{{ c.status === '已确认' ? '已确认' : '草案' }}</span>
         <span class="flex-1" />
         <button class="btn" @click="run(c)">试算（模拟数据）</button>

@@ -95,11 +95,11 @@ class Anchors:
         e = cands[0]
         return {"kind": "equipment", "id": e["id"], "name": e["name"], "areaCode": e.get("areaCode")}
 
-    def by_tags(self, tag_names: list[str], fallback_area: str) -> dict[str, Any] | None:
+    def by_tags(self, tag_names: list[str], fallback_area: str, only_area: bool = False) -> dict[str, Any] | None:
         groups, equips = Counter(), Counter()
         for n in tag_names:
             t = self.tags.get(n)
-            if not t:
+            if not t or (only_area and t.get("areaCode") != fallback_area):
                 continue
             if t.get("equipmentGroupId"):
                 groups[t["equipmentGroupId"]] += 1
@@ -345,6 +345,112 @@ def cards_seed(a: Anchors, limits: dict[str, dict[str, Any]]) -> tuple[list[dict
     return phen, links
 
 
+# ------------------------------------------------------------------ 工况现象（被参数约束引用）
+S11_TANK_MODES = ("进料过程", "水解反应期", "出料过程", "中和过程")
+
+
+def limit_area_code(dcs: Any, limit: dict[str, Any]) -> str | None:
+    """限值表的工段名与点表写法不一致（全角括号、大小写），按点表的归一化方式查。"""
+    name = (limit.get("area") or "").strip().lower().replace("（", "(").replace("）", ")")
+    aid = dcs.area_by_name.get(name)
+    return aid[5:] if aid else None
+
+
+def ctx_(name: str) -> dict[str, Any]:
+    return {"kind": "context", "name": name}
+
+
+def _range_text(lo: Any, hi: Any) -> str:
+    lo_t = int(lo) if lo is not None else 0
+    hi_t = "∞" if hi is None else int(hi)
+    return f"换酶后第 {lo_t}～{hi_t} 批"
+
+
+def condition_seed(a: Anchors, store: OntologyStore, limits: dict[str, dict[str, Any]]) -> list[dict]:
+    """限值的「适用工况」与限值版本的「换酶后批次区间」都定义成类别为「工况」的现象。
+
+    - conditionKey：mode:<工段>:<工况> / batch:<工段>:<下限>-<上限>，参数约束据此引用；
+    - S11 的 进料过程 / 水解反应期 / 出料过程 按 6APA_工序与阶段.xlsx 的 DCS 识别条件写判定规则，
+      换酶后批次区间按 EBR 运行上下文写规则；其余工况先只登记，判定规则待定义。
+    """
+    from backend.services import limit_versions
+
+    dcs = store.dcs
+    tank = a.group("水解反应釜组(水解罐A–K)")
+    s11_rules = {
+        "进料过程": (cond(P("RB进料阀"), "=", val(1)), "阶段「进料」：RB 进料阀开（XV_1302x_VAL2 = 1）"),
+        "水解反应期": (OR(AND(cond(P("搅拌运行"), "=", val(1)), cond(P("氨水进料阀"), "=", val(1))),
+                         AND(cond(P("搅拌运行"), "=", val(1)), cond(P("氨水进料阀"), "=", val(0)))),
+                      "阶段「反应」或「终点判定」：搅拌运行，氨水进料阀开（滴加氨水）或已关（氨耗趋零）"),
+        "出料过程": (cond(P("出料流量检测"), "=", val(1)), "阶段「出料」：出料流量检测有信号（XV_1308x_FT = 1）"),
+    }
+    out: list[dict] = []
+    seen: dict[str, dict] = {}
+    n = 0
+
+    def area_code(limit: dict[str, Any]) -> str | None:
+        return limit_area_code(dcs, limit)
+
+    def anchor_for(limit: dict[str, Any], code: str) -> dict[str, Any] | None:
+        if code == "S11" and (limit.get("operatingMode") in S11_TANK_MODES or limit.get("appliesTo") in (
+                "釜内反应温度", "反应体系pH", "釜内反应液位", "搅拌运行状态", "RB进料流量", "硼酸进料流量")):
+            return tank
+        try:
+            tags, _ = __import__("backend.services.process_limits", fromlist=["x"]).resolve_targets(store, limit)
+        except Exception:  # noqa: BLE001
+            return None
+        return a.by_tags([t["name"] for t in tags], code, only_area=True)
+
+    for lid, limit in sorted(limits.items()):
+        code = area_code(limit)
+        if code not in INCLUDED_AREAS:
+            continue
+        mode = (limit.get("operatingMode") or "").strip()
+        if mode:
+            key = f"mode:{code}:{mode}"
+            if key in seen:
+                seen[key]["source"]["ref"] += f"、{lid}"
+            else:
+                anchor = anchor_for(limit, code)
+                if anchor:
+                    n += 1
+                    rule, desc = s11_rules.get(mode, (None, "")) if code == "S11" else (None, "")
+                    seen[key] = {
+                        "id": f"PH-W{n:03d}", "name": f"工况·{mode}", "anchor": anchor, "category": "工况", "severity": "提示",
+                        "conditionKey": key,
+                        "description": desc or f"{limit.get('area')} 处于「{mode}」工况",
+                        "rule": rule, "status": DRAFT,
+                        "note": "按 6APA_工序与阶段.xlsx 的 DCS 识别条件" if rule else "工况识别条件待定义",
+                        "source": {"kind": "工艺限值·适用工况", "ref": lid},
+                    }
+                    out.append(seen[key])
+        for v in limit_versions.versions(store, lid)["items"]:
+            lo, hi = v.get("enzymeMin"), v.get("enzymeMax")
+            if lo is None and hi is None:
+                continue
+            key = f"batch:{code}:{int(lo) if lo is not None else 0}-{'' if hi is None else int(hi)}"
+            if key in seen:
+                if lid not in seen[key]["source"]["ref"]:
+                    seen[key]["source"]["ref"] += f"、{lid}"
+                continue
+            anchor = anchor_for(limit, code)
+            if not anchor:
+                continue
+            n += 1
+            parts = [cond(ctx_("换酶后批次数"), ">=", val(lo if lo is not None else 0))]
+            if hi is not None:
+                parts.append(cond(ctx_("换酶后批次数"), "<=", val(hi)))
+            seen[key] = {
+                "id": f"PH-W{n:03d}", "name": _range_text(lo, hi), "anchor": anchor, "category": "工况", "severity": "提示",
+                "conditionKey": key, "description": "本罐自上次换酶以来的批次数在此区间（来自 EBR 换酶记录）",
+                "rule": parts[0] if len(parts) == 1 else AND(*parts), "status": DRAFT,
+                "note": "运行上下文取自 EBR，本 Demo 未接入，试算显示无法判定",
+                "source": {"kind": "限值版本·适用条件", "ref": lid},
+            }
+            out.append(seen[key])
+    return out
+
+
 def build(force: bool = False) -> None:
     targets = {k: SEED_DIR / f"{k}.json" for k in ("phenomena", "causal_links", "calculations")}
     if all(p.exists() for p in targets.values()) and not force:
@@ -355,6 +461,7 @@ def build(force: bool = False) -> None:
     limits = {l["id"]: l for l in process_limits._load()}
     p1, l1, calcs = hydrolysis_seed(anchors)
     p2, l2 = cards_seed(anchors, limits)
+    p2 += condition_seed(anchors, store, limits)
     SEED_DIR.mkdir(parents=True, exist_ok=True)
     note = "种子数据：由 backend/tools/build_seed.py 生成，全部为草案·待工艺确认"
     for key, items in (("phenomena", p1 + p2), ("causal_links", l1 + l2), ("calculations", calcs)):

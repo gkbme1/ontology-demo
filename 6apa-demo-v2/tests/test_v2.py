@@ -67,7 +67,7 @@ class TabsTest(unittest.TestCase):
         eid = _equip("水解罐C")
         head = client.get(f"/api/v2/objects/{eid}?op=OP-09").json()
         self.assertEqual([t["label"] for t in head["tabs"]],
-                         ["图纸位置与外观", "参数 · 仪表", "参数约束", "拓扑关系", "现象定义", "根因影响关系",
+                         ["图纸位置与外观", "参数", "参数约束", "拓扑关系", "现象定义", "根因影响关系",
                           "工艺影响关系", "计算/指标", "处置规程"])
         for t in head["tabs"]:
             r = client.get(f"/api/v2/objects/{eid}/tabs/{t['key']}?op=OP-09")
@@ -85,6 +85,28 @@ class TabsTest(unittest.TestCase):
         phen = client.get(f"/api/v2/objects/{eid}/tabs/phenomena").json()["items"]
         names = {p["name"]: p["origin"] for p in phen}
         self.assertEqual(names.get("水解罐pH偏高"), "继承自设备组")
+
+    def test_constraints_link_to_condition_phenomena(self):
+        r = client.get(f"/api/v2/objects/{_equip('水解罐C')}/tabs/constraints").json()
+        self.assertNotIn("structure", r)  # 结构约束检查已去掉
+        pl = {c["id"]: c for c in r["operating"]}
+        self.assertEqual(pl["PL001"]["modePhenomenon"]["name"], "工况·水解反应期")
+        conds = {v["id"]: (v["phenomenon"] or {}).get("name") for v in pl["PL001"]["versions"]}
+        self.assertEqual(conds["PL001-V1"], "换酶后第 801～∞ 批")
+        self.assertEqual(conds["PL001-V0"], "换酶后第 1～800 批")  # 基础版本覆盖其余批次
+        self.assertTrue(pl["PL001"]["inherited"])
+        # 引用的工况现象出现在本台的现象定义里（继承自设备组）
+        phen = {p["id"]: p for p in client.get(f"/api/v2/objects/{_equip('水解罐C')}/tabs/phenomena").json()["items"]}
+        self.assertIn(pl["PL001"]["modePhenomenon"]["id"], phen)
+        self.assertTrue(phen[pl["PL001"]["modePhenomenon"]["id"]]["inherited"])
+
+    def test_inherit_flags_on_all_tabs(self):
+        eid = _equip("水解罐C")
+        for key, field in (("parameters", "items"), ("constraints", "operating"), ("topology", "items"),
+                           ("phenomena", "items"), ("causal", "links"), ("influence", "items"), ("calc", "items")):
+            items = client.get(f"/api/v2/objects/{eid}/tabs/{key}").json()[field]
+            self.assertTrue(items, key)
+            self.assertTrue(all("inherited" in x for x in items), key)
 
     def test_group_drawing_members_filtered_by_op(self):
         gid = _group("水解反应釜组")
@@ -126,6 +148,13 @@ class RuleTest(unittest.TestCase):
             {"type": "group", "op": "AND", "children": [
                 {"type": "condition", "subject": {"kind": "parameter", "name": "搅拌运行"}, "operator": "change",
                  "from": 1, "to": 0}]}]})
+
+    def test_context_subject(self):
+        rule = {"type": "condition", "subject": {"kind": "context", "name": "换酶后批次数"}, "operator": ">=",
+                "threshold": {"kind": "value", "value": 801}}
+        validate_rule(rule)
+        r = client.post("/api/v2/rules/evaluate", json={"anchorId": _group("水解反应釜组"), "rule": rule, "hours": 1}).json()
+        self.assertEqual(r["results"][0]["conditions"][0]["status"], "无法判定")
 
     def test_rule_text(self):
         text = rule_text(CTX.phen.get("PH-S11-03")["rule"], CTX.limits)

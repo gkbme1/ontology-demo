@@ -24,6 +24,7 @@ function removeChild(i: number): void { props.rule.children.splice(i, 1) }
 function onSubjectKind(c: Any, kind: string): void {
   if (kind === 'parameter') c.subject = { kind, name: '' }
   else if (kind === 'tag') c.subject = { kind, tag: '' }
+  else if (kind === 'context') c.subject = { kind, name: '换酶后批次数' }
   else c.subject = { kind, calcId: props.calcs[0]?.id ?? '' }
 }
 function onOperator(c: Any, op: string): void {
@@ -67,6 +68,7 @@ function limitHint(c: Any): string {
           <option value="parameter">本对象属性</option>
           <option value="tag">DCS 位号</option>
           <option value="calc">计算组态</option>
+          <option value="context">运行上下文</option>
         </select>
         <template v-if="c.subject.kind === 'parameter'">
           <input v-model="c.subject.name" class="inp w-40" list="v2-param-list" placeholder="属性名，如 反应体系pH" />
@@ -75,6 +77,9 @@ function limitHint(c: Any): string {
           </select>
         </template>
         <input v-else-if="c.subject.kind === 'tag'" v-model="c.subject.tag" class="inp w-32 font-mono" placeholder="如 TI_1303" />
+        <select v-else-if="c.subject.kind === 'context'" v-model="c.subject.name" class="inp w-36" title="来自 EBR / MOM 的运行上下文">
+          <option>换酶后批次数</option><option>工艺阶段</option><option>班次</option>
+        </select>
         <select v-else v-model="c.subject.calcId" class="inp w-44">
           <option v-for="k in calcs" :key="k.id" :value="k.id">{{ k.name }}</option>
         </select>

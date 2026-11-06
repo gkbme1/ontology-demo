@@ -14,6 +14,7 @@ export function subjectText(s: Any, calcNames: Record<string, string> = {}): str
   if (s.kind === 'parameter') return `本对象.${s.name || '?'}`
   if (s.kind === 'tag') return `位号 ${s.tag || '?'}`
   if (s.kind === 'calc') return `计算 ${calcNames[s.calcId] ?? s.calcId ?? '?'}`
+  if (s.kind === 'context') return `上下文.${s.name || '?'}`
   return '?'
 }
 

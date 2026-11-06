@@ -9,10 +9,11 @@ import { bump } from '@/composables/useNav'
 import CausalGraph from './CausalGraph.vue'
 import CausePopup from './CausePopup.vue'
 import LinkEditor from './LinkEditor.vue'
+import InheritBox from '../InheritBox.vue'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any
-const props = defineProps<{ links: Any[]; graph: Any; opId?: string }>()
+const props = defineProps<{ links: Any[]; graph: Any; opId?: string; showInherit?: boolean }>()
 const emit = defineEmits<{ (e: 'changed'): void }>()
 
 const view = ref<'list' | 'graph'>('list')
@@ -78,6 +79,7 @@ function changed(): void {
           <table class="tbl">
             <tbody>
               <tr v-for="l in g.links" :key="l.id" @click="popup = l.cause">
+                <td v-if="showInherit" class="w-12" @click.stop><InheritBox :checked="l.inherited" :from="l.inheritedFrom" /></td>
                 <td class="w-[32%]"><span class="text-brand">{{ l.causeName }}</span><div class="text-[11px] text-fg-mute">{{ l.causeAnchor }}</div></td>
                 <td class="text-fg-dim">{{ l.mechanism }}<div class="text-[11px] text-fg-mute">{{ l.basis }}</div></td>
                 <td class="whitespace-nowrap"><span class="pill pill-plain">{{ l.confidence }}</span> <span class="pill" :class="l.status === '已确认' ? 'pill-ok' : 'pill-warn'">{{ l.status === '已确认' ? '已确认' : '草案' }}</span></td>
@@ -91,9 +93,10 @@ function changed(): void {
         </div>
       </template>
       <table v-else class="tbl">
-        <thead><tr><th>编号</th><th>原因现象</th><th></th><th>结果现象</th><th>机理 / 依据</th><th>置信度</th><th></th></tr></thead>
+        <thead><tr><th v-if="showInherit" class="w-12 !text-center">继承</th><th>编号</th><th>原因现象</th><th></th><th>结果现象</th><th>机理 / 依据</th><th>置信度</th><th></th></tr></thead>
         <tbody>
           <tr v-for="l in rows" :key="l.id" @click="popup = l.effect">
+            <td v-if="showInherit" @click.stop><InheritBox :checked="l.inherited" :from="l.inheritedFrom" /></td>
             <td class="font-mono text-[11px] text-fg-mute">{{ l.id }}</td>
             <td>{{ l.causeName }}<div class="text-[11px] text-fg-mute">{{ l.causeAnchor }}</div></td>
             <td class="text-brand">导致</td>

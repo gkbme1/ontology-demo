@@ -71,6 +71,8 @@
   .sec-title { @apply text-[11px] tracking-wider uppercase text-fg-mute mb-2; }
   .card { @apply border border-line rounded-[10px] bg-ink-panel px-4 py-3 shadow-sm; }
   .sim-tag { @apply pill pill-warn; }
+  /* 可点击跳转到现象的链接（工况、限值版本适用条件） */
+  .phen-link { @apply inline-flex items-center px-1.5 py-px rounded border border-brand/40 bg-brand/10 text-brand text-[12px] hover:bg-brand hover:text-white; }
   /* 设备页签：按钮样式，选中实心高亮，一眼能看出有哪些页签 */
   .asset-tab { @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-md border border-line bg-white text-[13px] font-medium text-fg-dim shadow-sm hover:border-brand hover:text-brand whitespace-nowrap; }
   .asset-tab-on { @apply bg-brand border-brand text-white hover:text-white; }

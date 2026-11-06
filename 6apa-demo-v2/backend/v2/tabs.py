@@ -12,7 +12,7 @@ from backend.v2.phenomena import rule_text
 
 TABS = [
     ("drawing", "图纸位置与外观"),
-    ("parameters", "参数 · 仪表"),
+    ("parameters", "参数"),
     ("constraints", "参数约束"),
     ("topology", "拓扑关系"),
     ("phenomena", "现象定义"),
@@ -151,8 +151,13 @@ def _parameters(ctx: AppContext, object_id: str, prof: dict[str, Any], op_id: st
                       "linkTotal": a.get("dataLinkTotal"), "groupLinkTotal": a.get("groupLinkTotal")})
     if object_id.startswith("egrp-"):
         items += _member_signals(ctx, object_id, op_id)
+    for x in items:
+        _inherit(x, bool(x.get("inheritedFrom")), f"设备组 {x.get('inheritedFrom')}" if x.get("inheritedFrom") else None)
     name, etype, group_name = _equipment_type(ctx, object_id)
     design = ctx.design.for_object(name, etype, group_name)
+    tpl = (ctx.design.template_for(etype, name) or {}).get("name")
+    for x in design:
+        _inherit(x, True, f"类「{tpl}」参数模板")
     pos = next((i for i, x in enumerate(items) if x["group"] != "基本信息"), len(items))
     items[pos:pos] = design
     counts = {g: sum(1 for x in items if x["group"] == g) for g in PARAM_GROUPS}
@@ -188,6 +193,79 @@ def header(ctx: AppContext, object_id: str, op_id: str | None) -> dict[str, Any]
     }
 
 
+def _group_name(ctx: AppContext, object_id: str) -> str | None:
+    gid = (ctx.store.dcs.equipment.get(object_id) or {}).get("equipmentGroupId")
+    return ctx.store.dcs.equipment_groups[gid]["name"] if gid else None
+
+
+def _inherit(item: dict[str, Any], inherited: bool, source: str | None) -> dict[str, Any]:
+    """统一的继承标记：inherited = 是否继承自类对象（设备组 / 设备类型模板），inheritedFrom = 来源说明。"""
+    item["inherited"] = bool(inherited)
+    item["inheritedFrom"] = source if inherited else None
+    return item
+
+
+def _limit_area(ctx: AppContext, limit: dict[str, Any]) -> str | None:
+    name = (limit.get("area") or "").strip().lower().replace("（", "(").replace("）", ")")
+    aid = ctx.store.dcs.area_by_name.get(name)
+    return aid[5:] if aid else None
+
+
+def _condition_phen(ctx: AppContext, key: str | None) -> dict[str, Any] | None:
+    """按 conditionKey 找工况现象（参数约束引用）。"""
+    if not key:
+        return None
+    p = next((p for p in ctx.phen.phenomena.values() if p.get("conditionKey") == key), None)
+    return {"id": p["id"], "name": p["name"], "hasRule": bool(p.get("rule")),
+            "anchor": (p.get("anchor") or {}).get("name", "")} if p else None
+
+
+def _constraints(ctx: AppContext, object_id: str, prof: dict[str, Any]) -> dict[str, Any]:
+    """参数约束：工艺限值 + 限值版本；适用工况、版本适用条件都关联到「工况」现象。"""
+    from backend.services import limit_versions
+
+    cons = prof.get("constraints") or {}
+    group_name = _group_name(ctx, object_id)
+    inherited_attrs = {a["name"] for a in prof.get("attributes") or [] if a.get("inheritedFrom")}
+    items = []
+    for c in cons.get("operating") or []:
+        limit = ctx.limits.get(c["id"]) or {}
+        code = _limit_area(ctx, limit)
+        mode = c.get("operatingMode") or ""
+        versions = []
+        try:
+            raw = limit_versions.versions(ctx.store, c["id"])["items"]
+        except Exception:  # noqa: BLE001
+            raw = []
+        ranged = any(v.get("enzymeMin") is not None or v.get("enzymeMax") is not None for v in raw)
+        # 基础版本 V0 覆盖「其余批次」：若只有一个 [a, ∞) 的版本，V0 实际对应 1～a-1 批
+        open_ended = [v for v in raw if v.get("enzymeMin") is not None and v.get("enzymeMax") is None]
+        bounded = [v for v in raw if v.get("enzymeMax") is not None]
+        base_phen = None
+        if len(open_ended) == 1 and not bounded:
+            a = int(open_ended[0]["enzymeMin"])
+            base_phen = _condition_phen(ctx, f"batch:{code}:1-{a - 1}") or _condition_phen(ctx, f"batch:{code}:0-{a - 1}")
+        for v in raw:
+            lo, hi = v.get("enzymeMin"), v.get("enzymeMax")
+            phen = base_phen if v.get("base") else None
+            if lo is not None or hi is not None:
+                phen = _condition_phen(ctx, f"batch:{code}:{int(lo) if lo is not None else 0}-{'' if hi is None else int(hi)}")
+            versions.append({
+                "id": v["id"], "base": v.get("base"), "conditionText": v.get("conditionText") or "",
+                "conditionNote": "其余情况（基础版本）" if v.get("base") and ranged else "",
+                "phenomenon": phen,
+                "normal": f"{v.get('normalLow')}~{v.get('normalHigh')}", "lh": f"{v.get('low')}~{v.get('high')}",
+                "llhh": f"{v.get('lowLow')}~{v.get('highHigh')}", "sourceType": v.get("sourceType") or "",
+                "effective": v.get("effectiveFromText") or "自始", "editor": v.get("editor") or "",
+                "reason": v.get("reason") or "", "status": v.get("status") or "",
+            })
+        inherited = object_id.startswith("equip-") and c.get("appliesTo") in inherited_attrs
+        items.append(_inherit({**c, "modePhenomenon": _condition_phen(ctx, f"mode:{code}:{mode}") if mode else None,
+                               "versions": versions}, inherited, f"设备组 {group_name}"))
+    return {"operating": items, "safety": cons.get("safety") or [],
+            "note": "工况与版本适用条件都是「工况」类现象，点击可跳到现象定义；判断历史数据时按当时生效的版本"}
+
+
 def _calcs_for(ctx: AppContext, object_id: str) -> list[dict[str, Any]]:
     group_id = (ctx.store.dcs.equipment.get(object_id) or {}).get("equipmentGroupId")
     out = []
@@ -216,27 +294,39 @@ def tab(ctx: AppContext, object_id: str, key: str, op_id: str | None = None) -> 
     if key == "parameters":
         return _parameters(ctx, object_id, prof, op_id)
     if key == "constraints":
-        cons = prof.get("constraints") or {}
-        return {"operating": cons.get("operating") or [], "safety": cons.get("safety") or [],
-                "structure": cons.get("structure") or [], "check": cons.get("check")}
+        return _constraints(ctx, object_id, prof)
     if key == "topology":
         rel = prof.get("relations") or {}
         items = [r for r in (rel.get("classRelations") or []) + (rel.get("groupRelations") or [])
                  if r.get("category") in ("物理拓扑关系", "空间层级", "设备分类", "结构关系")]
+        gname = _group_name(ctx, object_id)
+        items = [_inherit(dict(r), r.get("layer") == "所属组", f"设备组 {gname}") for r in items]
         return {"items": items, "instances": prof.get("instances") or []}
     if key == "phenomena":
-        items = [phenomenon_view(ctx, p, origin) for p, origin in ctx.phenomena_for_object(object_id)]
+        gname = _group_name(ctx, object_id)
+        items = [_inherit(phenomenon_view(ctx, p, origin), origin == "继承自设备组", f"设备组 {gname}")
+                 for p, origin in ctx.phenomena_for_object(object_id)]
         return {"items": items}
     if key == "causal":
-        own = {p["id"] for p, _ in ctx.phenomena_for_object(object_id)}
+        pairs = ctx.phenomena_for_object(object_id)
+        own = {p["id"] for p, _ in pairs}
+        mine = {p["id"] for p, o in pairs if o == "本对象"}
         links = [l for l in ctx.phen.links.values() if l["cause"] in own or l["effect"] in own]
-        return {"links": [link_view(ctx, l) for l in links], "graph": graph_view(ctx, own, links)}
+        gname = _group_name(ctx, object_id)
+        views = [_inherit(link_view(ctx, l), not ({l["cause"], l["effect"]} & mine), f"设备组 {gname}") for l in links]
+        return {"links": views, "graph": graph_view(ctx, own, links)}
     if key == "influence":
         rel = prof.get("relations") or {}
         items = [r for r in rel.get("attributeRelations") or [] if r.get("category") in INFLUENCE_CATEGORIES]
+        own_attrs = {a["name"] for a in prof.get("attributes") or [] if not a.get("inheritedFrom")}
+        gname = _group_name(ctx, object_id)
+        items = [_inherit(dict(r), object_id.startswith("equip-") and not ({r.get("from"), r.get("to")} & own_attrs),
+                          f"设备组 {gname}") for r in items]
         return {"items": items, "note": "工艺属性之间的影响关系（正向 / 负向影响、质量关系），来自工业关系表"}
     if key == "calc":
-        calcs = [{**c, "methodText": c.get("method")} for c in _calcs_for(ctx, object_id)]
+        gname = _group_name(ctx, object_id)
+        calcs = [_inherit({**c, "methodText": c.get("method")}, c["origin"] == "继承自设备组", f"设备组 {gname}")
+                 for c in _calcs_for(ctx, object_id)]
         derived = [a for a in prof.get("attributes") or [] if a.get("kind") == "工艺属性" and not a.get("dataLinks")]
         return {"items": calcs, "capabilities": prof.get("capabilities") or [],
                 "derivedCandidates": [{"name": a["name"], "description": a.get("description") or ""} for a in derived]}

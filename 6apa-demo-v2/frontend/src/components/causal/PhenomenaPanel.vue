@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** 现象列表：判定规则、角色（原因 / 结果次数）、试算、编辑、删除、新增。 */
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { api } from '@/api/client'
 import { bump } from '@/composables/useNav'
 import Modal from '../Modal.vue'
@@ -8,6 +8,7 @@ import RuleView from '../rules/RuleView.vue'
 import EvalResult from '../rules/EvalResult.vue'
 import PhenomenonEditor from '../rules/PhenomenonEditor.vue'
 import CausePopup from './CausePopup.vue'
+import InheritBox from '../InheritBox.vue'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any
@@ -15,6 +16,8 @@ const props = defineProps<{
   items: Any[]
   anchorOptions: { id: string; name: string; kind: string }[]
   opId?: string
+  showInherit?: boolean
+  focusId?: string
 }>()
 const emit = defineEmits<{ (e: 'changed'): void }>()
 
@@ -33,6 +36,17 @@ onMounted(async () => {
   allPhen.value = p.items
   calcNames.value = Object.fromEntries(c.items.map((x: Any) => [x.id, x.name]))
 })
+
+// 从参数约束跳过来时：高亮并滚动到该现象
+const flash = ref('')
+watch(() => [props.focusId, props.items], async () => {
+  if (!props.focusId) return
+  kw.value = ''
+  onlyRule.value = false
+  flash.value = props.focusId
+  await nextTick()
+  document.getElementById(`phen-row-${props.focusId}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+}, { immediate: true })
 
 const rows = computed(() => props.items.filter((p) =>
   (!kw.value || p.name.includes(kw.value) || (p.anchor?.name ?? '').includes(kw.value)) && (!onlyRule.value || p.hasRule)))
@@ -71,16 +85,16 @@ function changed(): void {
     </div>
     <div v-if="!rows.length" class="empty">暂无现象定义</div>
     <table v-else class="tbl">
-      <thead><tr><th>现象</th><th>挂载对象</th><th>判定规则</th><th>角色</th><th>状态</th><th></th></tr></thead>
+      <thead><tr><th v-if="showInherit" class="w-12 !text-center">继承</th><th>现象</th><th>挂载对象</th><th>判定规则</th><th>角色</th><th>状态</th><th></th></tr></thead>
       <tbody>
-        <tr v-for="p in rows" :key="p.id" @click="popup = p.id">
+        <tr v-for="p in rows" :id="`phen-row-${p.id}`" :key="p.id" :class="{ '!bg-brand/15 outline outline-2 outline-brand/60': flash === p.id }" @click="popup = p.id">
+          <td v-if="showInherit" @click.stop><InheritBox :checked="p.inherited" :from="p.inheritedFrom" /></td>
           <td class="min-w-[150px]">
-            <div class="font-medium text-fg">{{ p.name }}</div>
+            <div class="font-medium text-fg">{{ p.name }} <span v-if="p.category === '工况'" class="pill pill-info">工况</span></div>
             <div class="text-[11px] text-fg-mute">{{ p.id }} · {{ p.category }} · {{ p.severity }}</div>
           </td>
           <td class="text-fg-dim">
             {{ p.anchor?.name }}
-            <div v-if="p.origin && p.origin !== '本对象'" class="text-[11px] text-info">{{ p.origin }}</div>
           </td>
           <td class="max-w-[420px]"><RuleView :rule="p.rule" :calc-names="calcNames" /></td>
           <td class="whitespace-nowrap text-xs">

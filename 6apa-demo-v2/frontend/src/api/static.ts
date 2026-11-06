@@ -96,6 +96,7 @@ export class StaticBackend {
     if (s?.kind === 'parameter') return `本对象.${s.name || '?'}`
     if (s?.kind === 'tag') return `位号 ${s.tag || '?'}`
     if (s?.kind === 'calc') return `计算 ${this.snap.base.calcNames[s.calcId] ?? s.calcId ?? '?'}`
+    if (s?.kind === 'context') return `上下文.${s.name || '?'}`
     return '?'
   }
   private threshold(t: Any): string {
@@ -128,7 +129,9 @@ export class StaticBackend {
     return { asCause: ls.filter((l) => l.cause === pid).length, asEffect: ls.filter((l) => l.effect === pid).length }
   }
   private view(p: Any, origin = ''): Any {
-    return { ...p, ruleText: this.ruleText(p.rule), hasRule: !!p.rule, roles: this.roles(p.id), opIds: this.ops(p), origin }
+    const inherited = origin === '继承自设备组'
+    return { ...p, ruleText: this.ruleText(p.rule), hasRule: !!p.rule, roles: this.roles(p.id), opIds: this.ops(p), origin,
+             inherited, inheritedFrom: inherited ? `设备组 ${p.anchor?.name ?? ''}` : null }
   }
   private linkView(l: Any): Any {
     const c = this.phen[l.cause] ?? {}
@@ -325,9 +328,18 @@ export class StaticBackend {
       return { items: this.forObject(m[1]).map(([p, o]) => this.view(p, o)) }
     }
     if ((m = path.match(/^\/objects\/([^/]+)\/tabs\/causal$/))) {
-      const own = new Set(this.forObject(m[1]).map(([p]) => p.id))
+      const pairs = this.forObject(m[1])
+      const own = new Set(pairs.map(([p]) => p.id))
+      const mine = new Set(pairs.filter(([, o]) => o === '本对象').map(([p]) => p.id))
+      const gname = pairs.find(([, o]) => o !== '本对象')?.[0]?.anchor?.name ?? ''
       const links = this.touching(own)
-      return { links: links.map((l) => this.linkView(l)), graph: this.graph(own, links) }
+      return {
+        links: links.map((l) => {
+          const inherited = !mine.has(l.cause) && !mine.has(l.effect)
+          return { ...this.linkView(l), inherited, inheritedFrom: inherited ? `设备组 ${gname}` : null }
+        }),
+        graph: this.graph(own, links)
+      }
     }
     if (path === '/search') return this.search(String(q.keyword ?? ''))
     if ((m = path.match(/^\/calculations\/([^/]+)\/run$/))) {

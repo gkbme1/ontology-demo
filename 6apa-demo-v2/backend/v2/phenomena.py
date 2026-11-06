@@ -1,6 +1,8 @@
 """现象、判定规则、根因影响关系。
 
 现象（Phenomenon）：对当前情况的描述，如「水解罐pH偏高」「反应期搅拌停止」。
+  类别「工况」的现象描述运行状态（如 工况·水解反应期、换酶后第 801～∞ 批），带 conditionKey，
+  被参数约束（限值的适用工况、限值版本的适用条件）引用。
   - 挂在一个本体对象上（设备组 / 设备），设备组上的现象对组内每台设备生效；
   - 带一条判定规则：条件树，「与 / 或」任意嵌套，叶子是单个条件；
   - 同一个现象既可以是原因，也可以是结果，角色由根因影响关系决定。
@@ -10,7 +12,8 @@
   条件 {"type": "condition",
         "subject": {"kind": "parameter", "name": "反应体系pH"}      本对象的工艺属性（自动落到本台的测点）
                  | {"kind": "tag", "tag": "AT_1301A1"}              直接指定 DCS 位号
-                 | {"kind": "calc", "calcId": "CALC-S11-01"}         计算组态的输出,
+                 | {"kind": "calc", "calcId": "CALC-S11-01"}         计算组态的输出
+                 | {"kind": "context", "name": "换酶后批次数"}        运行上下文（EBR / MOM，如换酶后批次数、班次）,
         "aggregate": "any" | "all" | "mean",                         一个属性落到多个测点时如何合并（默认 any）
         "operator": ">" | ">=" | "<" | "<=" | "=" | "!=" | "change",  change = 由 from 变 to
         "threshold": {"kind": "value", "value": 8.2}
@@ -45,7 +48,7 @@ LIMIT_FIELDS = {
     "normalHigh": "正常上限", "high": "高限", "highHigh": "高高限",
 }
 AGGREGATES = {"any": "任一测点", "all": "全部测点", "mean": "测点均值"}
-CATEGORIES = ["工艺", "设备", "仪表", "操作", "物料", "公用工程", "环境"]
+CATEGORIES = ["工况", "工艺", "设备", "仪表", "操作", "物料", "公用工程", "环境"]
 STATUSES = ["草案·待工艺确认", "已确认", "停用"]
 CONFIDENCE = ["高", "中", "低"]
 DRAFT = "草案·待工艺确认"
@@ -86,6 +89,8 @@ def subject_text(subject: dict[str, Any] | None, calc_names: dict[str, str] | No
     if kind == "calc":
         cid = subject.get("calcId") or "?"
         return f"计算 {(calc_names or {}).get(cid, cid)}"
+    if kind == "context":
+        return f"上下文.{subject.get('name') or '?'}"
     return "?"
 
 
@@ -156,8 +161,10 @@ def validate_rule(rule: Any, path: str = "rule") -> None:
         raise ValidationError(f"{path}.subject.tag 不能为空")
     if sk == "calc" and not subject.get("calcId"):
         raise ValidationError(f"{path}.subject.calcId 不能为空")
-    if sk not in ("parameter", "tag", "calc"):
-        raise ValidationError(f"{path}.subject.kind 只能是 parameter / tag / calc")
+    if sk == "context" and not subject.get("name"):
+        raise ValidationError(f"{path}.subject.name 不能为空（运行上下文名称，如 换酶后批次数）")
+    if sk not in ("parameter", "tag", "calc", "context"):
+        raise ValidationError(f"{path}.subject.kind 只能是 parameter / tag / calc / context")
     op = rule.get("operator")
     if op not in OPERATORS:
         raise ValidationError(f"{path}.operator 不支持：{op}")

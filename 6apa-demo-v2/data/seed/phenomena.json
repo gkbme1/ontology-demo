@@ -3635,6 +3635,907 @@
     "kind": "处置卡·可能原因",
     "ref": "ARP-S15-01 #1"
    }
+  },
+  {
+   "id": "PH-W001",
+   "name": "工况·水解反应期",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
+    "areaCode": "S11"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S11:水解反应期",
+   "description": "阶段「反应」或「终点判定」：搅拌运行，氨水进料阀开（滴加氨水）或已关（氨耗趋零）",
+   "rule": {
+    "type": "group",
+    "op": "OR",
+    "children": [
+     {
+      "type": "group",
+      "op": "AND",
+      "children": [
+       {
+        "type": "condition",
+        "subject": {
+         "kind": "parameter",
+         "name": "搅拌运行"
+        },
+        "operator": "=",
+        "aggregate": "any",
+        "durationSec": 0,
+        "threshold": {
+         "kind": "value",
+         "value": 1
+        }
+       },
+       {
+        "type": "condition",
+        "subject": {
+         "kind": "parameter",
+         "name": "氨水进料阀"
+        },
+        "operator": "=",
+        "aggregate": "any",
+        "durationSec": 0,
+        "threshold": {
+         "kind": "value",
+         "value": 1
+        }
+       }
+      ]
+     },
+     {
+      "type": "group",
+      "op": "AND",
+      "children": [
+       {
+        "type": "condition",
+        "subject": {
+         "kind": "parameter",
+         "name": "搅拌运行"
+        },
+        "operator": "=",
+        "aggregate": "any",
+        "durationSec": 0,
+        "threshold": {
+         "kind": "value",
+         "value": 1
+        }
+       },
+       {
+        "type": "condition",
+        "subject": {
+         "kind": "parameter",
+         "name": "氨水进料阀"
+        },
+        "operator": "=",
+        "aggregate": "any",
+        "durationSec": 0,
+        "threshold": {
+         "kind": "value",
+         "value": 0
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "status": "草案·待工艺确认",
+   "note": "按 6APA_工序与阶段.xlsx 的 DCS 识别条件",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL001、PL002、PL009、PL010"
+   }
+  },
+  {
+   "id": "PH-W002",
+   "name": "换酶后第 801～∞ 批",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
+    "areaCode": "S11"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "batch:S11:801-",
+   "description": "本罐自上次换酶以来的批次数在此区间（来自 EBR 换酶记录）",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "context",
+     "name": "换酶后批次数"
+    },
+    "operator": ">=",
+    "aggregate": "any",
+    "durationSec": 0,
+    "threshold": {
+     "kind": "value",
+     "value": 801.0
+    }
+   },
+   "status": "草案·待工艺确认",
+   "note": "运行上下文取自 EBR，本 Demo 未接入，试算显示无法判定",
+   "source": {
+    "kind": "限值版本·适用条件",
+    "ref": "PL001、PL002"
+   }
+  },
+  {
+   "id": "PH-W003",
+   "name": "换酶后第 1～800 批",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
+    "areaCode": "S11"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "batch:S11:1-800",
+   "description": "本罐自上次换酶以来的批次数在此区间（来自 EBR 换酶记录）",
+   "rule": {
+    "type": "group",
+    "op": "AND",
+    "children": [
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "context",
+       "name": "换酶后批次数"
+      },
+      "operator": ">=",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "value",
+       "value": 1.0
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "context",
+       "name": "换酶后批次数"
+      },
+      "operator": "<=",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "value",
+       "value": 800.0
+      }
+     }
+    ]
+   },
+   "status": "草案·待工艺确认",
+   "note": "运行上下文取自 EBR，本 Demo 未接入，试算显示无法判定",
+   "source": {
+    "kind": "限值版本·适用条件",
+    "ref": "PL002"
+   }
+  },
+  {
+   "id": "PH-W004",
+   "name": "工况·进萃取前",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-059537b1",
+    "name": "水解液换热器组",
+    "areaCode": "S12"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S12:进萃取前",
+   "description": "萃取与反萃（苯乙酸分离） 处于「进萃取前」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL003"
+   }
+  },
+  {
+   "id": "PH-W005",
+   "name": "工况·结晶期",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-759b264c",
+    "name": "6APA结晶罐组R112–R125",
+    "areaCode": "S13"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S13:结晶期",
+   "description": "6APA批次结晶与离心 处于「结晶期」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL004"
+   }
+  },
+  {
+   "id": "PH-W006",
+   "name": "工况·结晶终点",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-759b264c",
+    "name": "6APA结晶罐组R112–R125",
+    "areaCode": "S13"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S13:结晶终点",
+   "description": "6APA批次结晶与离心 处于「结晶终点」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL005"
+   }
+  },
+  {
+   "id": "PH-W007",
+   "name": "工况·酸化萃取期",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-486703e9",
+    "name": "萃取喷射器(酸化混合器)",
+    "areaCode": "S12"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S12:酸化萃取期",
+   "description": "萃取与反萃（苯乙酸分离） 处于「酸化萃取期」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL006、PL025、PL047"
+   }
+  },
+  {
+   "id": "PH-W008",
+   "name": "工况·离心机运行期",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-09c4e266",
+    "name": "RSE300提取离心机组",
+    "areaCode": "S01"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S01:离心机运行期",
+   "description": "提取·RSE300一/二萃 处于「离心机运行期」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL007"
+   }
+  },
+  {
+   "id": "PH-W009",
+   "name": "工况·常态",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-cd8f2bdc",
+    "name": "薄膜蒸发器组",
+    "areaCode": "S09"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S09:常态",
+   "description": "薄膜蒸发（RB脱溶） 处于「常态」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL008"
+   }
+  },
+  {
+   "id": "PH-W010",
+   "name": "工况·进料过程",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
+    "areaCode": "S11"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S11:进料过程",
+   "description": "阶段「进料」：RB 进料阀开（XV_1302x_VAL2 = 1）",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "parameter",
+     "name": "RB进料阀"
+    },
+    "operator": "=",
+    "aggregate": "any",
+    "durationSec": 0,
+    "threshold": {
+     "kind": "value",
+     "value": 1
+    }
+   },
+   "status": "草案·待工艺确认",
+   "note": "按 6APA_工序与阶段.xlsx 的 DCS 识别条件",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL011、PL012、PL042"
+   }
+  },
+  {
+   "id": "PH-W011",
+   "name": "工况·中和过程",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
+    "areaCode": "S11"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S11:中和过程",
+   "description": "酶法水解 处于「中和过程」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL013"
+   }
+  },
+  {
+   "id": "PH-W012",
+   "name": "工况·进料过程",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-1afb05b9",
+    "name": "一萃离心机组",
+    "areaCode": "S12"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S12:进料过程",
+   "description": "萃取与反萃（苯乙酸分离） 处于「进料过程」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL014"
+   }
+  },
+  {
+   "id": "PH-W013",
+   "name": "工况·离心分离",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-09c4e266",
+    "name": "RSE300提取离心机组",
+    "areaCode": "S01"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S01:离心分离",
+   "description": "提取·RSE300一/二萃 处于「离心分离」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL015"
+   }
+  },
+  {
+   "id": "PH-W014",
+   "name": "工况·加酸过程",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-7c9a7776",
+    "name": "稀硫酸在线混合器M2123",
+    "areaCode": "S01"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S01:加酸过程",
+   "description": "提取·RSE300一/二萃 处于「加酸过程」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL016"
+   }
+  },
+  {
+   "id": "PH-W015",
+   "name": "工况·换热过程",
+   "anchor": {
+    "kind": "equipment",
+    "id": "equip-d788cdf8",
+    "name": "水解液缓冲罐",
+    "areaCode": "S12"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S12:换热过程",
+   "description": "萃取与反萃（苯乙酸分离） 处于「换热过程」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL017"
+   }
+  },
+  {
+   "id": "PH-W016",
+   "name": "工况·三萃模式",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-17521e7a",
+    "name": "RSE200提取离心机组(三萃)",
+    "areaCode": "S02"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S02:三萃模式",
+   "description": "提取·RSE200三萃及溶媒周转 处于「三萃模式」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL024"
+   }
+  },
+  {
+   "id": "PH-W017",
+   "name": "工况·提取萃取期",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-09c4e266",
+    "name": "RSE300提取离心机组",
+    "areaCode": "S01"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S01:提取萃取期",
+   "description": "提取·RSE300一/二萃 处于「提取萃取期」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL026、PL027"
+   }
+  },
+  {
+   "id": "PH-W018",
+   "name": "工况·提取萃取期",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-17521e7a",
+    "name": "RSE200提取离心机组(三萃)",
+    "areaCode": "S02"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S02:提取萃取期",
+   "description": "提取·RSE200三萃及溶媒周转 处于「提取萃取期」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL028"
+   }
+  },
+  {
+   "id": "PH-W019",
+   "name": "工况·进料过程",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-e05bb657",
+    "name": "发酵滤液储罐组",
+    "areaCode": "S01"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S01:进料过程",
+   "description": "提取·RSE300一/二萃 处于「进料过程」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL029"
+   }
+  },
+  {
+   "id": "PH-W020",
+   "name": "工况·外送前",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-ae7a6c3f",
+    "name": "三级废酸水罐/废酸水中和罐V2124",
+    "areaCode": "S01"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S01:外送前",
+   "description": "提取·RSE300一/二萃 处于「外送前」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL030"
+   }
+  },
+  {
+   "id": "PH-W021",
+   "name": "工况·常态",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-51ddf544",
+    "name": "破乳剂缓冲罐(出料缓冲罐)",
+    "areaCode": "S04"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S04:常态",
+   "description": "破乳剂配制 处于「常态」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL031"
+   }
+  },
+  {
+   "id": "PH-W022",
+   "name": "工况·配制完成",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-d452abc0",
+    "name": "稀硫酸配置罐组",
+    "areaCode": "S03"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S03:配制完成",
+   "description": "稀硫酸配制 处于「配制完成」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL032"
+   }
+  },
+  {
+   "id": "PH-W023",
+   "name": "工况·过滤期",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-993783b1",
+    "name": "芬特过滤器组",
+    "areaCode": "S06"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S06:过滤期",
+   "description": "活性炭脱色与芬特过滤 处于「过滤期」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL033、PL034"
+   }
+  },
+  {
+   "id": "PH-W024",
+   "name": "工况·抽提期",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-3ec89f52",
+    "name": "抽提一级离心机组(CT1)",
+    "areaCode": "S07"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S07:抽提期",
+   "description": "6APA抽提（碳酸钾反萃） 处于「抽提期」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL036、PL037、PL038"
+   }
+  },
+  {
+   "id": "PH-W025",
+   "name": "工况·蒸发期",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-cd8f2bdc",
+    "name": "薄膜蒸发器组",
+    "areaCode": "S09"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S09:蒸发期",
+   "description": "薄膜蒸发（RB脱溶） 处于「蒸发期」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL039、PL040"
+   }
+  },
+  {
+   "id": "PH-W026",
+   "name": "工况·常态",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-c08fc9a1",
+    "name": "水解热水罐",
+    "areaCode": "S10"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S10:常态",
+   "description": "水解辅料配制 处于「常态」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL041"
+   }
+  },
+  {
+   "id": "PH-W027",
+   "name": "工况·常态",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-97598723",
+    "name": "水解液缓冲罐",
+    "areaCode": "S11"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S11:常态",
+   "description": "酶法水解 处于「常态」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL043"
+   }
+  },
+  {
+   "id": "PH-W028",
+   "name": "工况·出料过程",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
+    "areaCode": "S11"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S11:出料过程",
+   "description": "阶段「出料」：出料流量检测有信号（XV_1308x_FT = 1）",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "parameter",
+     "name": "出料流量检测"
+    },
+    "operator": "=",
+    "aggregate": "any",
+    "durationSec": 0,
+    "threshold": {
+     "kind": "value",
+     "value": 1
+    }
+   },
+   "status": "草案·待工艺确认",
+   "note": "按 6APA_工序与阶段.xlsx 的 DCS 识别条件",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL044"
+   }
+  },
+  {
+   "id": "PH-W029",
+   "name": "工况·输送期",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-41838baf",
+    "name": "重液缓冲罐/萃取离心机重相缓冲罐",
+    "areaCode": "S12"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S12:输送期",
+   "description": "萃取与反萃（苯乙酸分离） 处于「输送期」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL045"
+   }
+  },
+  {
+   "id": "PH-W030",
+   "name": "工况·反萃期",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-f6e9368f",
+    "name": "反萃离心机组",
+    "areaCode": "S12"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S12:反萃期",
+   "description": "萃取与反萃（苯乙酸分离） 处于「反萃期」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL046"
+   }
+  },
+  {
+   "id": "PH-W031",
+   "name": "工况·加氨期",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-759b264c",
+    "name": "6APA结晶罐组R112–R125",
+    "areaCode": "S13"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S13:加氨期",
+   "description": "6APA批次结晶与离心 处于「加氨期」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL048"
+   }
+  },
+  {
+   "id": "PH-W032",
+   "name": "工况·离心洗涤期",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-f5258a09",
+    "name": "1600离心机组",
+    "areaCode": "S13"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S13:离心洗涤期",
+   "description": "6APA批次结晶与离心 处于「离心洗涤期」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL049、PL050"
+   }
+  },
+  {
+   "id": "PH-W033",
+   "name": "工况·连续结晶",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-95ebf1f5",
+    "name": "一级结晶罐C101(北罐)",
+    "areaCode": "S14"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S14:连续结晶",
+   "description": "6APA连续结晶 处于「连续结晶」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL051、PL052、PL053、PL054"
+   }
+  },
+  {
+   "id": "PH-W034",
+   "name": "工况·常态",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-74363d52",
+    "name": "室外盐酸储罐组",
+    "areaCode": "S15"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S15:常态",
+   "description": "结晶辅料储运（氨水/盐酸/软水） 处于「常态」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL055、PL056"
+   }
+  },
+  {
+   "id": "PH-W035",
+   "name": "工况·干燥期",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-c0651c7c",
+    "name": "6APA干燥系统(双锥/二合一)",
+    "areaCode": "S16"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S16:干燥期",
+   "description": "6APA干燥 处于「干燥期」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL057"
+   }
+  },
+  {
+   "id": "PH-W036",
+   "name": "工况·批次",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-1ccb86ab",
+    "name": "RB缓冲罐A/B（薄膜出料）",
+    "areaCode": "S09"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S09:批次",
+   "description": "薄膜蒸发（RB脱溶） 处于「批次」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL062、PL063、PL064"
+   }
   }
  ]
 }
