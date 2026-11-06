@@ -67,7 +67,7 @@ class TabsTest(unittest.TestCase):
         eid = _equip("水解罐C")
         head = client.get(f"/api/v2/objects/{eid}?op=OP-09").json()
         self.assertEqual([t["label"] for t in head["tabs"]],
-                         ["图纸位置与外观", "参数", "仪表", "参数约束", "拓扑关系", "现象定义", "根因影响关系",
+                         ["图纸位置与外观", "参数 · 仪表", "参数约束", "拓扑关系", "现象定义", "根因影响关系",
                           "工艺影响关系", "计算/指标", "处置规程"])
         for t in head["tabs"]:
             r = client.get(f"/api/v2/objects/{eid}/tabs/{t['key']}?op=OP-09")
@@ -75,8 +75,13 @@ class TabsTest(unittest.TestCase):
 
     def test_instruments_and_inherited_phenomena(self):
         eid = _equip("水解罐C")
-        tags = {t["tag"] for t in client.get(f"/api/v2/objects/{eid}/tabs/instruments").json()["items"]}
+        r = client.get(f"/api/v2/objects/{eid}/tabs/parameters").json()
+        tags = {l["tag"] for x in r["items"] for l in x["links"]}
         self.assertTrue({"AT_1301C1", "AT_1301C2", "TI_1301C"} <= tags)
+        self.assertEqual(len(tags), len(CTX.tags_of_equipment[eid]))  # 仪表并入后一个测点都不少
+        design = [x for x in r["items"] if x["group"] == "设计参数"]
+        self.assertIn("材质", {x["name"] for x in design})
+        self.assertTrue(all(x["pending"] for x in design))  # 未填写，显示待补充，不编造
         phen = client.get(f"/api/v2/objects/{eid}/tabs/phenomena").json()["items"]
         names = {p["name"]: p["origin"] for p in phen}
         self.assertEqual(names.get("水解罐pH偏高"), "继承自设备组")

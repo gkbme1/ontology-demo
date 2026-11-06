@@ -1,6 +1,6 @@
 # 6apa-demo-v2：项目上下文（给新会话的交接说明）
 
-国药威奇达 105 车间工业本体界面 Demo 第二版。需求原文：车间 → 工艺段 → 工序（P&ID）导航；设备 / 设备组 10 个页签；
+国药威奇达 105 车间工业本体界面 Demo 第二版。需求原文：车间 → 工艺段 → 工序（P&ID）导航；设备 / 设备组 9 个页签；
 现象（带判定规则）与根因影响关系（现象导致现象）。设计细节见 `docs/设计说明.md`，使用见 `README.md`。
 
 ## 工作约定
@@ -26,11 +26,12 @@
 | `hierarchy.py` | 读 `data/config/6APA_空间层级.xlsx`，设备按「工段编号 + 设备匹配正则」归到工序 |
 | `nav.py` | 左侧树：空间层级、工艺段内树、其他分类（复用 `asset_model.tree`） |
 | `drawing.py` | 工序图纸：现场图纸（`data/drawings/<OP>.json` 热区按设备名落到对象）+ 本体示意图（设备组 + 物理拓扑 + 进出物料，分层布局） |
-| `tabs.py` | 10 个页签 |
+| `tabs.py` | 9 个页签（「参数 · 仪表」合并：基本信息 / 设计参数 / 工艺属性 / 测量 / 状态 / 控制） |
 | `phenomena.py` | 现象 / 根因关系的模型、校验、JSON 持久化、导致链追溯 |
 | `rule_eval.py` | 判定规则求值（逐台、持续时长、与 / 或、change）、计算组态试算 |
 | `calculations.py` | 计算组态（formula / level_consumption / rate） |
 | `simulator.py` | 确定性模拟数据 |
+| `design_params.py` | 设备设计参数（`data/config/6APA_设备设计参数.xlsx`，`build_design_params.py` 生成；值未填显示待补充） |
 | `documents.py` | 文档提取（规程文档登记 + 数据源统计） |
 
 - 数据：`data/source/*.xlsx`（复制来的数据源）→ `data/config/`（层级配置，`build_config.py` 生成）→

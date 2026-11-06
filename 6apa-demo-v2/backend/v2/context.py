@@ -7,6 +7,7 @@ from typing import Any
 from backend.ontology.indexes import OntologyStore
 from backend.services import asset_model, process_limits
 from backend.v2.calculations import CalcStore
+from backend.v2.design_params import DesignParams
 from backend.v2.hierarchy import Hierarchy
 from backend.v2.phenomena import PhenomenonStore
 
@@ -17,6 +18,7 @@ class AppContext:
         self.hierarchy = Hierarchy(self.store)
         self.phen = PhenomenonStore()
         self.calcs = CalcStore()
+        self.design = DesignParams()
         self.limits = {l["id"]: l for l in process_limits._load()}
         dcs = self.store.dcs
         self.tag_by_name = {t["name"]: t for t in dcs.tags.values()}

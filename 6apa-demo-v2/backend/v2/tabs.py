@@ -12,8 +12,7 @@ from backend.v2.phenomena import rule_text
 
 TABS = [
     ("drawing", "图纸位置与外观"),
-    ("parameters", "参数"),
-    ("instruments", "仪表"),
+    ("parameters", "参数 · 仪表"),
     ("constraints", "参数约束"),
     ("topology", "拓扑关系"),
     ("phenomena", "现象定义"),
@@ -77,6 +76,94 @@ def _scope_members(ctx: AppContext, object_id: str, op_id: str | None) -> list[s
     return []
 
 
+PARAM_GROUPS = ["基本信息", "设计参数", "工艺属性", "测量", "状态", "控制"]
+_KIND_TO_GROUP = {"固有": "基本信息", "工艺属性": "工艺属性", "测量": "测量", "状态": "状态", "控制": "控制"}
+
+
+def _equipment_type(ctx: AppContext, object_id: str) -> tuple[str, str, str | None]:
+    """(名称, 设备类型, 所属设备组名)"""
+    dcs = ctx.store.dcs
+    if object_id in dcs.equipment_groups:
+        g = dcs.equipment_groups[object_id]
+        return g["name"], g.get("equipmentType") or "", None
+    e = dcs.equipment.get(object_id) or {}
+    g = dcs.equipment_groups.get(e.get("equipmentGroupId") or "") or {}
+    return e.get("name", object_id), g.get("equipmentType") or "", g.get("name")
+
+
+def _member_signals(ctx: AppContext, group_id: str, op_id: str | None) -> list[dict[str, Any]]:
+    """设备组：成员的测量 / 状态 / 控制参数按名称合并成一行，各台的位号列在一起（原「仪表」页签的内容）。"""
+    members = _scope_members(ctx, group_id, op_id) if op_id else ctx.group_members(group_id)
+    rows: dict[tuple[str, str], dict[str, Any]] = {}
+    for m in members:
+        for a in ctx.profile(m).get("attributes") or []:
+            group = _KIND_TO_GROUP.get(a.get("kind") or "")
+            if group not in ("测量", "状态", "控制"):
+                continue
+            row = rows.setdefault((group, a["name"]), {
+                "group": group, "name": a["name"], "valueType": a.get("valueType") or "", "value": None,
+                "description": "组内各台", "note": "", "links": [], "inheritedFrom": None})
+            for l in a.get("dataLinks") or []:
+                tag = ctx.tag_by_name.get(l.get("tag") or "") or {}
+                if tag.get("equipmentId") != m or any(x["tag"] == l["tag"] for x in row["links"]):
+                    continue
+                row["links"].append({"tag": l["tag"], "desc": l.get("desc") or tag.get("rawDescription") or "",
+                                     "unit": l.get("unit") or tag.get("unit") or "", "block": tag.get("blockType") or "",
+                                     "station": tag.get("station") or "", "equipment": tag.get("equipmentName") or "",
+                                     "limit": (ctx.limit_of_tag.get(l["tag"]) or {}).get("id"), "own": True})
+    out = [r for r in rows.values() if r["links"]]
+    for r in out:
+        r["description"] = f"组内 {len({l['equipment'] for l in r['links']})} 台"
+    return sorted(out, key=lambda r: (["测量", "状态", "控制"].index(r["group"]), r["name"]))
+
+
+def _parameters(ctx: AppContext, object_id: str, prof: dict[str, Any], op_id: str | None) -> dict[str, Any]:
+    """参数 · 仪表：固有属性、设计参数、工艺属性、测量 / 状态 / 控制参数合在一张表，数据关联（DCS 位号）直接列在行里。"""
+    dcs = ctx.store.dcs
+    allowed: set[str] | None = None
+    if object_id.startswith("egrp-"):
+        # 设备组在某道工序下只列本工序成员的测点（不属于任何成员的组级测点保留）
+        members = set(_scope_members(ctx, object_id, op_id)) if op_id else set()
+        if members:
+            everyone = set(ctx.group_members(object_id))
+            allowed = {t["name"] for e in members for t in ctx.tags_of_equipment.get(e, [])}
+            allowed |= {t["name"] for tid in dcs.equipment_groups[object_id].get("tagIds") or []
+                        if (t := dcs.tags.get(tid)) and t.get("equipmentId") not in everyone}
+    items: list[dict[str, Any]] = []
+    for a in prof.get("attributes") or []:
+        group = _KIND_TO_GROUP.get(a.get("kind") or "", a.get("kind") or "其他")
+        links = []
+        for l in a.get("dataLinks") or []:
+            if allowed is not None and l.get("tag") not in allowed:
+                continue
+            tag = ctx.tag_by_name.get(l.get("tag") or "") or {}
+            links.append({"tag": l.get("tag"), "desc": l.get("desc") or tag.get("rawDescription") or "",
+                          "unit": l.get("unit") or tag.get("unit") or "", "block": l.get("blockType") or tag.get("blockType") or "",
+                          "station": l.get("station") or tag.get("station") or "", "equipment": tag.get("equipmentName") or "",
+                          "limit": (ctx.limit_of_tag.get(l.get("tag") or "") or {}).get("id"),
+                          # 共用设备 / 组级属性会关联到其他设备上的测点，前端淡化显示并标出所在设备
+                          "own": object_id.startswith("egrp-") or tag.get("equipmentId") == object_id})
+        if allowed is not None and a.get("dataLinks") and not links and group in ("测量", "状态", "控制"):
+            continue  # 该测点只在其他工序的成员上
+        items.append({"group": group, "name": a.get("name"), "valueType": a.get("valueType") or "",
+                      "value": a.get("value"), "description": a.get("description") or "",
+                      "note": a.get("note") or "", "links": links, "inheritedFrom": a.get("inheritedFrom"),
+                      "linkTotal": a.get("dataLinkTotal"), "groupLinkTotal": a.get("groupLinkTotal")})
+    if object_id.startswith("egrp-"):
+        items += _member_signals(ctx, object_id, op_id)
+    name, etype, group_name = _equipment_type(ctx, object_id)
+    design = ctx.design.for_object(name, etype, group_name)
+    pos = next((i for i, x in enumerate(items) if x["group"] != "基本信息"), len(items))
+    items[pos:pos] = design
+    counts = {g: sum(1 for x in items if x["group"] == g) for g in PARAM_GROUPS}
+    return {"items": items, "groups": [g for g in PARAM_GROUPS if counts[g]], "counts": counts,
+            "tagTotal": len({l["tag"] for x in items for l in x["links"] if l["own"]}),
+            "scope": "本组" if object_id.startswith("egrp-") else "本台",
+            "designTemplate": (ctx.design.template_for(etype, name) or {}).get("name"),
+            "designPending": sum(1 for x in design if x["pending"]),
+            "note": "基本信息与设计参数是设备的固定参数；工艺属性与测量 / 状态 / 控制参数的数据关联（DCS 位号）直接列在行里"}
+
+
 def header(ctx: AppContext, object_id: str, op_id: str | None) -> dict[str, Any]:
     prof = ctx.profile(object_id)
     h = ctx.hierarchy
@@ -127,27 +214,7 @@ def tab(ctx: AppContext, object_id: str, key: str, op_id: str | None = None) -> 
                 "appearance": appearance, "header": prof.get("header"), "members": members,
                 "note": "外观照片 / 三维模型暂无数据源，这里列出设备的固有属性"}
     if key == "parameters":
-        items = [a for a in prof.get("attributes") or [] if a.get("kind") == "工艺属性"]
-        return {"items": items, "note": "本体工艺属性（工艺量）；数据关联列出落到本对象的 DCS 测点"}
-    if key == "instruments":
-        if object_id.startswith("egrp-"):
-            members = _scope_members(ctx, object_id, op_id) or ctx.group_members(object_id)
-            tags = [t for e in members for t in ctx.tags_of_equipment.get(e, [])]
-            own = set(members)
-            tags += [t for tid in dcs.equipment_groups[object_id].get("tagIds") or []
-                     if (t := dcs.tags.get(tid)) and t.get("equipmentId") not in own]
-        else:
-            tags = ctx.tags_of_equipment.get(object_id, [])
-        rows = [{
-            "tag": t["name"], "description": t.get("rawDescription") or "", "equipment": t.get("equipmentName") or "",
-            "parameter": t.get("parameterName") or "", "type": t.get("parameterType") or "",
-            "unit": t.get("unit") or t.get("standardUnit") or "", "block": t.get("blockType") or "",
-            "station": t.get("station") or "", "screen": t.get("processScreen") or "",
-            "limit": (ctx.limit_of_tag.get(t["name"]) or {}).get("id"),
-        } for t in tags]
-        rows.sort(key=lambda r: (r["equipment"], r["tag"]))
-        kinds = {k: [a for a in prof.get("attributes") or [] if a.get("kind") == k] for k in ("测量", "状态", "控制")}
-        return {"items": rows, "byKind": kinds, "total": len(rows)}
+        return _parameters(ctx, object_id, prof, op_id)
     if key == "constraints":
         cons = prof.get("constraints") or {}
         return {"operating": cons.get("operating") or [], "safety": cons.get("safety") or [],

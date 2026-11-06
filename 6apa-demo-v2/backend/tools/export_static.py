@@ -37,8 +37,8 @@ from backend.main import app  # noqa: E402
 from backend.v2.context import get_ctx  # noqa: E402
 from backend.v2 import drawing as drawing_mod, nav  # noqa: E402
 
-STATIC_TABS = ["parameters", "constraints", "topology", "influence", "calc", "procedures"]
-OP_TABS = ["drawing", "instruments"]  # 设备组在不同工序下内容不同
+STATIC_TABS = ["constraints", "topology", "influence", "calc", "procedures"]
+OP_TABS = ["drawing", "parameters"]  # 设备组在不同工序下内容不同
 
 
 def key(path: str, query: dict[str, Any] | None = None) -> str:

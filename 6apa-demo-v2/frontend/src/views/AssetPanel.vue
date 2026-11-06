@@ -58,7 +58,13 @@ const anchorOptions = computed(() => {
   const g = head.value.group
   return g ? [self, { id: g.id, name: g.name, kind: 'group' }] : [self]
 })
-const tags = computed(() => (data.value?.items ?? []).filter((t: Any) => !tagKw.value || `${t.tag}${t.description}${t.equipment}${t.parameter}`.includes(tagKw.value)))
+const paramGroup = ref('')
+const GROUP_PILL: Record<string, string> = {
+  基本信息: 'pill-plain', 设计参数: 'pill-warn', 工艺属性: 'pill-ok', 测量: 'pill-info', 状态: 'pill-info', 控制: 'pill-info'
+}
+const params = computed(() => (data.value?.items ?? []).filter((a: Any) =>
+  (!paramGroup.value || a.group === paramGroup.value) &&
+  (!tagKw.value || `${a.name}${a.description}${a.links?.map((l: Any) => l.tag + l.desc).join('') ?? ''}`.toLowerCase().includes(tagKw.value.toLowerCase()))))
 const counts = computed<Record<string, number>>(() => head.value?.counts ?? {})
 
 function pick(id: string, kind: string, opId?: string): void {
@@ -121,42 +127,49 @@ function fmtBand(c: Any): string {
             </div>
           </div>
 
-          <!-- 参数 -->
+          <!-- 参数 · 仪表：分类筛选 + 一张表，DCS 位号直接列在行里 -->
           <div v-else-if="tab === 'parameters'">
-            <div class="text-xs text-fg-mute mb-2">{{ data.note }}</div>
-            <table class="tbl">
-              <thead><tr><th>参数</th><th>类型 / 单位</th><th>说明</th><th>数据关联（测点）</th><th>来源</th></tr></thead>
-              <tbody>
-                <tr v-for="a in data.items" :key="a.name" class="!cursor-default">
-                  <td class="font-medium">{{ a.name }}</td>
-                  <td class="text-fg-dim whitespace-nowrap">{{ a.valueType }}</td>
-                  <td class="text-fg-dim">{{ a.description }}<div v-if="a.note" class="text-[11px] text-fg-mute">{{ a.note }}</div></td>
-                  <td>
-                    <span v-for="l in a.dataLinks" :key="l.tag" class="pill pill-plain mr-1 font-mono" :title="l.desc">{{ l.tag }}</span>
-                    <span v-if="!a.dataLinks?.length" class="text-fg-mute text-xs">无测点（派生量或待补）</span>
-                  </td>
-                  <td class="text-[11px] text-fg-mute">{{ a.inheritedFrom ? `继承自 ${a.inheritedFrom}` : '' }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- 仪表 -->
-          <div v-else-if="tab === 'instruments'">
-            <div class="flex items-center gap-2 mb-2">
-              <input v-model="tagKw" class="inp w-60" placeholder="筛选位号 / 描述 / 设备 / 参数" />
-              <span class="text-xs text-fg-mute">{{ tags.length }} / {{ data.total }} 个测点</span>
+            <div class="flex flex-wrap items-center gap-1.5 mb-2">
+              <button class="ctl" :class="{ 'ctl-on': !paramGroup }" @click="paramGroup = ''">全部 <span class="text-fg-mute">{{ data.items.length }}</span></button>
+              <button v-for="g in data.groups" :key="g" class="ctl" :class="{ 'ctl-on': paramGroup === g }" @click="paramGroup = g">
+                {{ g }} <span class="text-fg-mute">{{ data.counts[g] }}</span>
+              </button>
+              <input v-model="tagKw" class="inp w-56 ml-2" placeholder="筛选参数名 / 位号 / 描述" />
+              <span class="flex-1" />
+              <span class="text-[11px] text-fg-mute">{{ data.scope }} {{ data.tagTotal }} 个 DCS 测点<template v-if="data.designPending"> · 设计参数 {{ data.designPending }} 项待补充</template></span>
             </div>
             <table class="tbl">
-              <thead><tr><th>位号</th><th>描述</th><th>设备</th><th>参数</th><th>类型</th><th>单位</th><th>块</th><th>站</th><th>限值</th></tr></thead>
+              <thead><tr><th class="w-[84px]">类别</th><th>参数</th><th class="w-[110px]">类型 · 单位</th><th>值 / 数据关联（DCS 位号）</th></tr></thead>
               <tbody>
-                <tr v-for="t in tags" :key="t.tag" class="!cursor-default">
-                  <td class="font-mono text-brand">{{ t.tag }}</td><td>{{ t.description }}</td><td class="text-fg-dim">{{ t.equipment }}</td>
-                  <td class="text-fg-dim">{{ t.parameter }}</td><td class="text-fg-dim whitespace-nowrap">{{ t.type }}</td><td>{{ t.unit }}</td>
-                  <td class="text-fg-mute">{{ t.block }}</td><td class="text-fg-mute">{{ t.station }}</td><td class="font-mono text-xs">{{ t.limit ?? '' }}</td>
+                <tr v-for="(a, i) in params" :key="i" class="!cursor-default">
+                  <td><span class="pill" :class="GROUP_PILL[a.group] ?? 'pill-plain'">{{ a.group }}</span></td>
+                  <td>
+                    <div class="font-medium">{{ a.name }}</div>
+                    <div v-if="a.description" class="text-[11px] text-fg-mute">{{ a.description }}</div>
+                    <div v-if="a.inheritedFrom" class="text-[11px] text-fg-mute">继承自设备组 {{ a.inheritedFrom }}</div>
+                  </td>
+                  <td class="text-fg-dim whitespace-nowrap">{{ a.valueType }}</td>
+                  <td>
+                    <span v-if="a.group === '设计参数' && a.pending" class="text-fg-mute italic">待补充</span>
+                    <span v-else-if="a.value !== undefined && a.value !== null && a.value !== ''" class="font-medium">{{ a.value }}<span v-if="a.group === '设计参数' && a.valueType !== '文本'" class="text-fg-mute"> {{ a.valueType }}</span></span>
+                    <span v-if="a.note" class="text-[11px] text-fg-mute ml-1">{{ a.note }}</span>
+                    <div v-if="a.links.length" class="flex flex-wrap gap-1 mt-0.5">
+                      <span v-for="l in a.links" :key="l.tag" class="pill font-mono"
+                            :class="l.own ? 'pill-info' : 'pill-mute'"
+                            :title="`${l.desc}${l.unit ? ' · ' + l.unit : ''}${l.limit ? ' · 限值 ' + l.limit : ''}${l.own ? '' : ' · 测点在 ' + l.equipment}`">
+                        {{ l.tag }}<span v-if="l.unit" class="opacity-70">{{ l.unit }}</span><span v-if="!l.own" class="opacity-70">@{{ l.equipment }}</span>
+                      </span>
+                    </div>
+                    <span v-else-if="!a.note && ['工艺属性', '测量', '状态', '控制'].includes(a.group) && (a.value === undefined || a.value === null)" class="text-[11px] text-fg-mute">
+                      无本台测点{{ a.groupLinkTotal ? `（设备组共 ${a.groupLinkTotal} 个）` : '（派生量或待补）' }}
+                    </span>
+                  </td>
                 </tr>
               </tbody>
             </table>
+            <div class="text-[11px] text-fg-mute mt-2">
+              设计参数来自 data/config/6APA_设备设计参数.xlsx（模板「{{ data.designTemplate ?? '无匹配模板' }}」），按设备档案 / 铭牌填写后重新导出即可显示；灰色位号表示测点在其他设备上（共用设备或组级属性）。
+            </div>
           </div>
 
           <!-- 参数约束 -->

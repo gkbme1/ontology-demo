@@ -3,7 +3,7 @@
 国药威奇达 105 车间（6-APA 原料药合成）工业本体界面 Demo，第二版。
 
 与第一版（`../6apa-ontology-demo`）的区别：按「车间 → 工艺段 → 工序（P&ID）→ 装置 → 设备组 / 设备」重新组织导航，
-设备信息按 10 个页签展示，并新增**现象定义（带判定规则）**、**根因影响关系（现象导致现象）**、**计算组态**三块。
+设备信息按 9 个页签展示，并新增**现象定义（带判定规则）**、**根因影响关系（现象导致现象）**、**计算组态**三块。
 本目录自成一体：数据与需要复用的代码都已复制进来，不引用原 Demo 的任何文件。
 
 ## 单文件版（推荐用于展示）
@@ -11,7 +11,7 @@
 `release/6APA本体Demo_v2.html` 是一个独立的 HTML 文件，**双击用 Chrome / Edge 打开即可**，不需要 Python、后端或网络，
 可以直接拷给别人或发邮件。
 
-- 包含全部导航、现场图纸、10 个页签、文档、其他分类，以及导出时预先算好的试算结果（模拟数据）；
+- 包含全部导航、现场图纸、9 个页签、文档、其他分类，以及导出时预先算好的试算结果（模拟数据）；
 - 现象和根因影响关系可以新增 / 编辑 / 删除，保存在当前浏览器里（顶栏「恢复种子数据」清除）；
 - 局限：新写或改过的判定规则无法在单文件版里重新试算（会提示到完整版试算）；顶栏标有「单文件版 · 数据快照时间」。
 
@@ -110,7 +110,7 @@ python3 -m backend.tools.build_seed --force     # 覆盖 data/seed/*.json（不�
 | `GET /api/v2/nav/domain/{key}?parent=` | 其他分类（工业资产、工艺参数…） |
 | `GET /api/v2/drawings/{OP}/image` | 现场图纸图片 |
 | `GET /api/v2/ops/{OP}` · `/drawing` · `/conditions` · `/calculations` · `/documents` | 工序概览、图纸、工况与根因、计算组态、文档提取 |
-| `GET /api/v2/objects/{id}?op=` · `/tabs/{key}?op=` | 设备 / 设备组头部与 10 个页签 |
+| `GET /api/v2/objects/{id}?op=` · `/tabs/{key}?op=` | 设备 / 设备组头部与 9 个页签 |
 | `GET/POST /api/v2/phenomena` · `GET/PUT/DELETE /api/v2/phenomena/{id}` | 现象 |
 | `GET /api/v2/phenomena/{id}/chain?direction=up|down` | 由什么导致 / 会导致什么 |
 | `POST /api/v2/phenomena/{id}/evaluate` · `POST /api/v2/rules/evaluate` | 试算（已保存的现象 / 未保存的规则） |
