@@ -322,7 +322,8 @@ def tab(ctx: AppContext, object_id: str, key: str, op_id: str | None = None) -> 
         gname = _group_name(ctx, object_id)
         items = [_inherit(dict(r), object_id.startswith("equip-") and not ({r.get("from"), r.get("to")} & own_attrs),
                           f"设备组 {gname}") for r in items]
-        return {"items": items, "note": "工艺属性之间的影响关系（正向 / 负向影响、质量关系），来自工业关系表"}
+        own_names = sorted({a["name"] for a in prof.get("attributes") or [] if a.get("kind") == "工艺属性"})
+        return {"items": items, "own": own_names, "note": "工艺属性之间的影响关系（正向 / 负向影响、质量关系），来自工业关系表"}
     if key == "calc":
         gname = _group_name(ctx, object_id)
         calcs = [_inherit({**c, "methodText": c.get("method")}, c["origin"] == "继承自设备组", f"设备组 {gname}")

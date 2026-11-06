@@ -11,6 +11,7 @@ import CalcPanel from '@/components/CalcPanel.vue'
 import ProcedureCard from '@/components/ProcedureCard.vue'
 import InheritBox from '@/components/InheritBox.vue'
 import TopologyGraph from '@/components/TopologyGraph.vue'
+import InfluenceGraph from '@/components/InfluenceGraph.vue'
 import CausePopup from '@/components/causal/CausePopup.vue'
 import PhenomenaPanel from '@/components/causal/PhenomenaPanel.vue'
 import CausalPanel from '@/components/causal/CausalPanel.vue'
@@ -35,11 +36,17 @@ async function loadHead(): Promise<void> {
     error.value = String((e as Error).message)
   }
 }
+// 同一页签刷新（编辑、关弹窗后）时保留旧数据直到新数据到达，子面板不卸载，用户选的视图（图谱 / 列表）不丢
+let loadedKey = ''
 async function loadTab(): Promise<void> {
+  const key = `${props.objectId}|${props.opId ?? ''}|${tab.value}`
   loading.value = true
-  data.value = null
+  if (key !== loadedKey) data.value = null
   try {
-    data.value = await api.objectTab(props.objectId, tab.value, props.opId)
+    const res = await api.objectTab(props.objectId, tab.value, props.opId)
+    if (key !== `${props.objectId}|${props.opId ?? ''}|${tab.value}`) return  // 期间切了页签
+    data.value = res
+    loadedKey = key
     if (tab.value === 'drawing' && data.value.opId) {
       if (drawing.value?.opId !== data.value.opId) drawing.value = await api.opDrawing(data.value.opId)
     }
@@ -64,6 +71,7 @@ const anchorOptions = computed(() => {
 const paramGroup = ref('')
 const openVer = ref<Record<string, boolean>>({})
 const topoView = ref<'graph' | 'list'>('graph')
+const inflView = ref<'graph' | 'list'>('graph')
 const focusPhen = ref('')
 const popupPhen = ref('')
 const allPhen = ref<Any[]>([])
@@ -292,9 +300,14 @@ function fmtBand(c: Any): string {
           <CausalPanel v-else-if="tab === 'causal'" :links="data.links" :graph="data.graph" :op-id="opId ?? head.opId" show-inherit @changed="loadTab" />
 
           <!-- 工艺影响关系 -->
-          <div v-else-if="tab === 'influence'">
-            <div class="text-xs text-fg-mute mb-2">{{ data.note }}</div>
+          <div v-else-if="tab === 'influence'" class="space-y-2">
+            <div class="flex items-center gap-2">
+              <button class="ctl" :class="{ 'ctl-on': inflView === 'graph' }" @click="inflView = 'graph'">关系图谱</button>
+              <button class="ctl" :class="{ 'ctl-on': inflView === 'list' }" @click="inflView = 'list'">列表</button>
+              <span class="text-xs text-fg-mute">{{ data.items.length }} 条 · {{ data.note }}</span>
+            </div>
             <div v-if="!data.items.length" class="empty">暂无工艺影响关系</div>
+            <InfluenceGraph v-else-if="inflView === 'graph'" :items="data.items" :own="data.own" />
             <table v-else class="tbl">
               <thead><tr><th class="w-12 !text-center">继承</th><th>影响方</th><th>关系</th><th>被影响方</th><th>机理</th><th>测点</th><th>来源</th></tr></thead>
               <tbody>

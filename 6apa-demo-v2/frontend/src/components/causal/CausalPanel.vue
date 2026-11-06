@@ -36,6 +36,13 @@ const grouped = computed(() => {
     .sort((a, b) => b.links.length - a.links.length)
 })
 
+// 全局图谱默认不画孤立现象（如未被导致关系引用的工况现象）
+const showIsolated = ref(false)
+const linkedIds = computed(() => new Set((props.graph?.links ?? []).flatMap((l: Any) => [l.cause, l.effect])))
+const isolatedCount = computed(() => (props.graph?.nodes ?? []).filter((n: Any) => !linkedIds.value.has(n.id)).length)
+const globalGraph = computed(() => showIsolated.value || !props.graph ? props.graph
+  : { ...props.graph, nodes: props.graph.nodes.filter((n: Any) => linkedIds.value.has(n.id)) })
+
 // 某个结果现象的子图：结果 + 直接原因
 const nodeById = computed<Record<string, Any>>(() => Object.fromEntries((props.graph?.nodes ?? []).map((n: Any) => [n.id, n])))
 function subGraph(g: Any): Any {
@@ -67,12 +74,15 @@ function changed(): void {
         <input v-model="kw" class="inp w-52 ml-2" placeholder="筛选原因 / 结果" />
         <label v-if="view === 'list'" class="text-xs flex items-center gap-1 text-fg-dim"><input v-model="groupByEffect" type="checkbox" /> 按结果现象分组</label>
       </template>
+      <label v-if="view === 'graph'" class="text-xs flex items-center gap-1 text-fg-dim ml-2">
+        <input v-model="showIsolated" type="checkbox" /> 显示没有导致关系的现象（{{ isolatedCount }}）
+      </label>
       <span class="text-xs text-fg-mute">{{ links.length }} 条导致关系</span>
       <span class="flex-1" />
       <button class="btn btn-primary" @click="creating = true">+ 新增导致关系</button>
     </div>
 
-    <CausalGraph v-if="view === 'graph'" :graph="graph" :height="460" @pick="(id: string) => (popup = id)" />
+    <CausalGraph v-if="view === 'graph'" :graph="globalGraph" height="calc(100vh - 290px)" @pick="(id: string) => (popup = id)" />
 
     <!-- 分组图谱：一个结果现象一块，左侧是导致它的现象 -->
     <template v-else-if="view === 'blocks'">

@@ -8,7 +8,7 @@ import { computed, ref } from 'vue'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any
-const props = defineProps<{ graph: Any; height?: number; compact?: boolean }>()
+const props = defineProps<{ graph: Any; height?: number | string; compact?: boolean }>()
 const emit = defineEmits<{ (e: 'pick', id: string): void }>()
 
 const CAT_COLOR: Record<string, string> = {
@@ -96,7 +96,7 @@ function dim(id: string): boolean {
       <span>· 虚线框 = 判定规则待定义 · 虚线边 = 低置信度 · 左为原因、右为结果 · 悬停看相邻关系，单击节点看它由什么导致</span>
     </div>
     <div v-if="!layout.nodes.length" class="empty m-4">暂无根因影响关系</div>
-    <div v-else class="overflow-auto" :style="compact ? {} : { maxHeight: `${height ?? 460}px` }">
+    <div v-else class="overflow-auto" :style="compact ? {} : { maxHeight: typeof height === 'string' ? height : `${height ?? 460}px` }">
       <svg :width="layout.width" :height="layout.height" class="block">
         <defs>
           <marker id="cg-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
