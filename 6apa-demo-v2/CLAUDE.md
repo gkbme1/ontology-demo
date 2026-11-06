@@ -29,7 +29,8 @@
 | `tabs.py` | 9 个页签（「参数 · 仪表」合并：基本信息 / 设计参数 / 工艺属性 / 测量 / 状态 / 控制） |
 | `phenomena.py` | 现象 / 根因关系的模型、校验、JSON 持久化、导致链追溯 |
 | `rule_eval.py` | 判定规则求值（逐台、持续时长、与 / 或、change）、计算组态试算 |
-| `calculations.py` | 计算组态（formula / level_consumption / rate） |
+| `calculations.py` | 计算组态 = 作用范围 + 引用算法（algorithmId）+ 参数绑定（bindings），不写算法本身 |
+| `algorithms.py` | 算法库（`data/config/6APA_算法库.json` 的调用契约）+ 内置实现（代替算法服务） |
 | `simulator.py` | 确定性模拟数据 |
 | `design_params.py` | 设备设计参数（`data/config/6APA_设备设计参数.xlsx`，`build_design_params.py` 生成；值未填显示待补充） |
 | `global_graph.py` | 全局图谱数据（层级 / 设备 / 参数 / 物料 / 现象 + 7 类关系），前端 `views/GlobalGraph.vue` 用 ECharts 渲染 |
@@ -55,6 +56,11 @@
 - **新增前端会请求的只读接口时，要在 `export_static.py` 里同步收集**，否则单文件版会报「未包含该数据」；
   改了数据、种子或前端后要重新导出并提交 release 文件。
 - 主题为浅色：颜色在 `tailwind.config.js`（ink / line / fg 等），SVG / 图表里的颜色写在各组件内。
+
+## 结构口径
+
+- 工序下直接是设备组 / 设备；计算组态、算法库、工况与根因、文档提取是全局的（`/api/v2/scope/*?seg=&op=`、`/api/v2/algorithms`），
+  在左侧树顶部「全局」块；设备页签只显示与本对象相关的条目（页签名：现象/工况定义、计算组态）。
 
 ## 关键口径
 

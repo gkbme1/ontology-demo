@@ -8,6 +8,7 @@ import { api } from '@/api/client'
 export type SelType =
   | 'none' | 'workshop' | 'segment' | 'op' | 'drawing' | 'section:devices' | 'section:calc'
   | 'section:cond' | 'section:docs' | 'calc' | 'object' | 'domain-object' | 'domain-pending'
+  | 'global:calc' | 'global:algo' | 'global:cond' | 'global:docs'
 
 export interface Selection {
   type: SelType

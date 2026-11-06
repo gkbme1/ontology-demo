@@ -40,11 +40,13 @@ class HierarchyTest(unittest.TestCase):
                          ["6A_提取", "6A_脱色", "6A_抽提", "6A_水解", "6A_结晶", "6A_干燥"])
         self.assertTrue(all("children" not in s for s in ws["children"]))  # 第一屏不出现工序 / 设备
 
-    def test_segment_ops_and_four_sections(self):
+    def test_segment_ops_list_devices_and_globals(self):
         r = client.get("/api/v2/nav/segment/SEG-04").json()
         self.assertEqual([o["label"] for o in r["items"]], ["水解A-F", "水解G-K", "水解配置", "萃取"])
-        for op in r["items"]:
-            self.assertEqual([s["label"] for s in op["children"]], ["装置", "计算组态", "工况与根因", "文档提取"])
+        for op in r["items"]:  # 工序下直接是设备组 / 设备
+            self.assertTrue(all(c["kind"] in ("group", "equipment") for c in op["children"]))
+        g = client.get("/api/v2/nav/space").json()["globals"]
+        self.assertEqual([x["label"] for x in g], ["计算组态", "算法库", "工况与根因", "文档提取"])
         r1 = client.get("/api/v2/nav/segment/SEG-01").json()
         self.assertEqual([o["label"] for o in r1["items"]], ["提取_RSE200", "提取_RSE300", "水洗", "稀硫酸配置", "破乳剂配置"])
 
@@ -67,8 +69,8 @@ class TabsTest(unittest.TestCase):
         eid = _equip("水解罐C")
         head = client.get(f"/api/v2/objects/{eid}?op=OP-09").json()
         self.assertEqual([t["label"] for t in head["tabs"]],
-                         ["图纸位置与外观", "参数", "拓扑关系", "参数约束", "现象定义", "根因影响关系",
-                          "工艺影响关系", "计算/指标", "处置规程"])
+                         ["图纸位置与外观", "参数", "拓扑关系", "参数约束", "现象/工况定义", "根因影响关系",
+                          "工艺影响关系", "计算组态", "处置规程"])
         for t in head["tabs"]:
             r = client.get(f"/api/v2/objects/{eid}/tabs/{t['key']}?op=OP-09")
             self.assertEqual(r.status_code, 200, t["key"])
@@ -219,10 +221,26 @@ class CalcTest(unittest.TestCase):
         self.assertEqual(len(r["results"]), 6)
         self.assertTrue(all(x["min"] >= 0 for x in r["results"]))  # 只计下降量，速率不为负
 
-    def test_formula_whitelist(self):
-        bad = {"name": "x", "anchor": {"id": _group("水解反应釜组")}, "method": "formula", "expression": "__import__('os')",
-               "inputs": [{"var": "a", "subject": {"kind": "parameter", "name": "反应体系pH"}}]}
+    def test_calc_must_reference_registered_algorithm(self):
+        bad = {"name": "x", "anchor": {"id": _group("水解反应釜组")}, "algorithmId": "ALG-NOT-EXIST", "bindings": {}}
         self.assertEqual(client.post("/api/v2/calculations", json=bad).status_code, 400)
+        missing = {"name": "x", "anchor": {"id": _group("水解反应釜组")}, "algorithmId": "ALG-ABS-DIFF",
+                   "bindings": {"a": {"kind": "parameter", "name": "反应体系pH", "index": 0}}}
+        self.assertEqual(client.post("/api/v2/calculations", json=missing).status_code, 400)  # b 未绑定
+
+    def test_cross_device_calc(self):
+        r = client.post("/api/v2/calculations/CALC-G-02/run", json={"hours": 2}).json()
+        self.assertEqual(r["results"][0]["targetName"], "6A_水解")
+        self.assertEqual(len(r["results"][0]["inputs"][0]["tags"]), 11)  # 11 台水解罐的罐温
+
+    def test_scope_views(self):
+        c = client.get("/api/v2/scope/conditions", params={"seg": "SEG-04"}).json()
+        self.assertTrue(c["phenomena"] and c["links"])
+        calcs = client.get("/api/v2/scope/calculations", params={"op": "OP-09"}).json()["items"]
+        self.assertIn("CALC-G-01", {x["id"] for x in calcs})  # 工艺段级组态也出现在其工序的筛选里
+        self.assertTrue(all(x["algorithm"]["id"] for x in calcs))
+        algos = client.get("/api/v2/algorithms").json()["items"]
+        self.assertTrue(any(a["usedBy"] for a in algos))
 
 
 class DocsAndSearchTest(unittest.TestCase):

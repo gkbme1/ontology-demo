@@ -1,12 +1,16 @@
-"""计算组态：派生量 / 指标的定义与试算。
+"""计算组态：引用算法库里的算法，把算法的每个输入参数绑定到本体。
 
-一条计算组态 = 挂载对象 + 方法 + 输入绑定 + 输出单位。设备组上的组态对组内每台设备分别计算。
-方法：
-- formula            表达式，如 abs(a - b)、mean(t)。输入带 index 时取该属性的第 index 个测点（一维），
-                     不带 index 时是「测点 × 时间」二维，用 mean / max / min / sum 沿测点方向合并；
-- level_consumption  液位差消耗量：只累计液位下降量（上升视为补液，不抵扣），死区过滤仪表抖动，
-                     按滑动时间窗折算速率（单位 / min）。算法复制自 Agent Demo 的 level_consumption；
-- rate               滑动时间窗内的平均变化速率（单位 / min，正为上涨）。
+一条计算组态 = 作用范围（设备 / 设备组 / 工艺段）+ 引用的算法（algorithmId）+ 参数绑定（bindings）+ 输出单位。
+计算组态里不写算法本身：算法的调用方式与参数定义登记在算法库（data/config/6APA_算法库.json，
+backend/v2/algorithms.py），本体只定义「传哪个参数」。
+
+参数绑定 bindings = {算法输入名: 绑定}，绑定形式：
+- {"kind": "parameter", "name": "反应体系pH", "index": 0}   本对象的属性（设备组上的组态对组内每台分别计算）；
+                                                            index 取该属性的第 n 个测点
+- {"kind": "groupParameter", "groupId": "egrp-…", "name": "釜内反应温度"}  设备组全部成员的该属性（跨装置统计）
+- {"kind": "tag", "tag": "TI_1303"}                        直接指定 DCS 位号
+- {"kind": "calc", "calcId": "CALC-…"}                     另一条计算组态的输出
+- {"kind": "const", "value": 10}                           常量（算法的配置参数，如时间窗）
 
 计算组态的输出可在判定规则里作为条件主体引用（subject.kind = calc）。
 """
@@ -23,126 +27,79 @@ from typing import Any, Callable
 
 import numpy as np
 
+from backend.v2.algorithms import AlgorithmError, AlgorithmLibrary
+
 ROOT = Path(__file__).resolve().parents[2]
 SEED_FILE = ROOT / "data" / "seed" / "calculations.json"
 STORE_FILE = Path(os.environ.get("V2_STORE_DIR") or ROOT / "data" / "store") / "calculations.json"
-METHODS = {
-    "formula": "表达式",
-    "level_consumption": "液位差消耗量（只计下降，按时间窗折算速率）",
-    "rate": "变化速率（时间窗内平均）",
-}
+BINDING_KINDS = {"parameter": "本对象参数", "groupParameter": "设备组全部成员的参数", "tag": "DCS 位号",
+                 "calc": "计算组态输出", "const": "常量"}
 
 
 class CalcError(ValueError):
     pass
 
 
-def level_movements(values: list[float], deadband: float) -> dict[str, Any]:
-    """按死区跟踪液位：返回累计下降量、累计上升量、补液（上升段）次数。（复制自 Agent Demo）"""
-    anchor = values[0]
-    dropped = risen = 0.0
-    refills = 0
-    rising = False
-    for value in values[1:]:
-        if value < anchor - deadband:
-            dropped += anchor - value
-            anchor = value
-            rising = False
-        elif value > anchor + deadband:
-            if not rising:
-                refills += 1
-                rising = True
-            risen += value - anchor
-            anchor = value
-    return {"dropped": dropped, "risen": risen, "refills": refills}
-
-
-def _drops_per_step(values: np.ndarray, deadband: float) -> np.ndarray:
-    """逐点版本的 level_movements：返回每一步计入的下降量，便于做滑动时间窗求和。"""
-    out = np.zeros(len(values))
-    anchor = float(values[0])
-    for i in range(1, len(values)):
-        v = float(values[i])
-        if v < anchor - deadband:
-            out[i] = anchor - v
-            anchor = v
-        elif v > anchor + deadband:
-            anchor = v
-    return out
-
-
-def _rolling_sum(x: np.ndarray, window: int) -> np.ndarray:
-    c = np.concatenate([[0.0], np.cumsum(x)])
-    idx = np.arange(1, len(x) + 1)
-    lo = np.maximum(0, idx - window)
-    return c[idx] - c[lo]
-
-
-def _safe_eval(expr: str, env: dict[str, Any]) -> np.ndarray:
-    def agg(fn: Callable) -> Callable:
-        return lambda x: fn(x, axis=0) if np.ndim(x) == 2 else x
-    namespace = {
-        "abs": np.abs, "mean": agg(np.mean), "max": agg(np.max), "min": agg(np.min), "sum": agg(np.sum),
-        "sqrt": np.sqrt, "where": np.where, **env,
-    }
-    try:
-        code = compile(expr, "<calc>", "eval")
-    except SyntaxError as exc:
-        raise CalcError(f"表达式语法错误：{exc.msg}")
-    for name in code.co_names:
-        if name not in namespace:
-            raise CalcError(f"表达式里有未定义的名称：{name}")
-    return np.asarray(eval(code, {"__builtins__": {}}, namespace), dtype=float)  # noqa: S307 名称已白名单校验
+def binding_text(b: dict[str, Any], names: dict[str, str] | None = None) -> str:
+    kind = b.get("kind")
+    if kind == "parameter":
+        idx = b.get("index")
+        return f"本对象.{b.get('name')}" + (f"[第 {idx + 1} 个测点]" if idx is not None else "")
+    if kind == "groupParameter":
+        return f"设备组「{(names or {}).get(b.get('groupId') or '', b.get('groupId'))}」全部成员.{b.get('name')}"
+    if kind == "tag":
+        return f"位号 {b.get('tag')}"
+    if kind == "calc":
+        return f"计算组态 {(names or {}).get(b.get('calcId') or '', b.get('calcId'))}"
+    if kind == "const":
+        return f"常量 {b.get('value')}"
+    return "?"
 
 
 def compute(calc: dict[str, Any], resolve: Callable[[dict[str, Any]], list[tuple[str, np.ndarray]]],
-            times: np.ndarray) -> dict[str, Any]:
-    """resolve(subject) → [(位号, 序列)]。返回 {values, inputs, unresolved}。"""
+            times: np.ndarray, algos: AlgorithmLibrary) -> dict[str, Any]:
+    """resolve(绑定) → [(位号, 序列)]。按绑定取数后调用算法。返回 {values, inputs, unresolved}。"""
     step_min = (times[1] - times[0]) / 60.0 if len(times) > 1 else 1.0
+    try:
+        algo = algos.get(calc.get("algorithmId") or "")
+    except AlgorithmError as exc:
+        raise CalcError(str(exc))
+    bindings = calc.get("bindings") or {}
+    args: dict[str, Any] = {}
     inputs, unresolved = [], []
-    env: dict[str, Any] = {}
-    for inp in calc.get("inputs") or []:
-        subject = inp.get("subject") or {}
-        found = resolve(subject)
-        index = subject.get("index")
-        if index is not None:
-            found = found[index:index + 1] if len(found) > index else []
-        if not found:
-            unresolved.append(inp.get("var"))
+    for inp in algo["inputs"]:
+        b = bindings.get(inp["name"])
+        if b is None:
+            if inp.get("required"):
+                unresolved.append(inp["name"])
             continue
-        inputs.append({"var": inp.get("var"), "tags": [n for n, _ in found]})
-        mat = np.vstack([s for _, s in found])
-        env[inp["var"]] = mat[0] if index is not None else mat
+        if b.get("kind") == "const":
+            args[inp["name"]] = b.get("value")
+            inputs.append({"var": inp["name"], "tags": [], "const": b.get("value")})
+            continue
+        found = resolve(b)
+        idx = b.get("index")
+        if idx is not None:
+            found = found[idx:idx + 1] if len(found) > idx else []
+        if not found:
+            unresolved.append(inp["name"])
+            continue
+        inputs.append({"var": inp["name"], "tags": [n for n, _ in found]})
+        args[inp["name"]] = np.vstack([s for _, s in found])
     if unresolved:
         return {"values": None, "inputs": inputs, "unresolved": unresolved}
-    method = calc.get("method")
-    params = calc.get("params") or {}
-    window = max(1, int(round(float(params.get("windowMin", 10)) / step_min)))
-    if method == "formula":
-        values = _safe_eval(calc.get("expression") or "", env)
-        if values.ndim == 2:
-            values = values.mean(axis=0)
-    elif method == "level_consumption":
-        mat = np.atleast_2d(next(iter(env.values())))
-        total = np.zeros(mat.shape[1])
-        for row in mat:
-            span = float(np.max(row) - np.min(row))
-            deadband = span * float(params.get("deadbandRatio", 0.01)) if span > 0 else 0.0
-            total += _rolling_sum(_drops_per_step(row, deadband), window)
-        values = total / (window * step_min)
-    elif method == "rate":
-        row = np.atleast_2d(next(iter(env.values()))).mean(axis=0)
-        shifted = np.concatenate([np.full(window, row[0]), row[:-window]])
-        values = (row - shifted) / (window * step_min)
-    else:
-        raise CalcError(f"不支持的计算方法：{method}")
+    try:
+        values = algos.invoke(algo["id"], args, step_min)
+    except AlgorithmError as exc:
+        raise CalcError(str(exc))
     if np.ndim(values) == 0:
         values = np.full(len(times), float(values))
     return {"values": values, "inputs": inputs, "unresolved": []}
 
 
 class CalcStore:
-    def __init__(self, seed_file: Path = SEED_FILE, store_file: Path = STORE_FILE) -> None:
+    def __init__(self, algos: AlgorithmLibrary, seed_file: Path = SEED_FILE, store_file: Path = STORE_FILE) -> None:
+        self.algos = algos
         self.seed_file, self.store_file = seed_file, store_file
         self._lock = threading.RLock()
         self.reload()
@@ -172,20 +129,26 @@ class CalcStore:
 
     def _clean(self, body: dict[str, Any], current: dict[str, Any] | None = None) -> dict[str, Any]:
         data = copy.deepcopy(current) if current else {}
-        for key in ("name", "anchor", "method", "expression", "inputs", "params", "unit", "description", "basis", "status"):
+        for key in ("name", "anchor", "algorithmId", "bindings", "unit", "description", "basis", "status"):
             if key in body:
                 data[key] = body[key]
         if not (data.get("name") or "").strip():
             raise CalcError("名称不能为空")
         if not (data.get("anchor") or {}).get("id"):
-            raise CalcError("计算组态必须挂在一个本体对象上")
-        if data.get("method") not in METHODS:
-            raise CalcError(f"方法只能是：{'、'.join(METHODS)}")
-        if not data.get("inputs"):
-            raise CalcError("至少要绑定一个输入")
-        if data["method"] == "formula":
-            env = {i["var"]: np.zeros((1, 3)) for i in data["inputs"]}
-            _safe_eval(data.get("expression") or "", env)
+            raise CalcError("计算组态必须有作用范围（设备 / 设备组 / 工艺段）")
+        try:
+            algo = self.algos.get(data.get("algorithmId") or "")
+        except AlgorithmError as exc:
+            raise CalcError(str(exc))
+        bindings = data.get("bindings") or {}
+        for inp in algo["inputs"]:
+            if inp.get("required") and inp["name"] not in bindings:
+                raise CalcError(f"算法「{algo['name']}」的参数「{inp['label']}」必须绑定")
+        for name, b in bindings.items():
+            if name not in {i["name"] for i in algo["inputs"]}:
+                raise CalcError(f"算法「{algo['name']}」没有参数 {name}")
+            if b.get("kind") not in BINDING_KINDS:
+                raise CalcError(f"参数 {name} 的绑定类型只能是：{'、'.join(BINDING_KINDS)}")
         data.setdefault("status", "草案·待工艺确认")
         return data
 

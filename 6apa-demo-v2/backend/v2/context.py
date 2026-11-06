@@ -6,6 +6,7 @@ from typing import Any
 
 from backend.ontology.indexes import OntologyStore
 from backend.services import asset_model, process_limits
+from backend.v2.algorithms import AlgorithmLibrary
 from backend.v2.calculations import CalcStore
 from backend.v2.design_params import DesignParams
 from backend.v2.hierarchy import Hierarchy
@@ -17,7 +18,8 @@ class AppContext:
         self.store = OntologyStore()
         self.hierarchy = Hierarchy(self.store)
         self.phen = PhenomenonStore()
-        self.calcs = CalcStore()
+        self.algos = AlgorithmLibrary()
+        self.calcs = CalcStore(self.algos)
         self.design = DesignParams()
         self.limits = {l["id"]: l for l in process_limits._load()}
         dcs = self.store.dcs
@@ -57,6 +59,8 @@ class AppContext:
             return dcs.equipment_groups[object_id]["name"]
         if object_id in self.hierarchy.ops:
             return self.hierarchy.ops[object_id]["name"]
+        if object_id in self.hierarchy.segments:
+            return self.hierarchy.segments[object_id]["name"]
         return object_id
 
     def object_kind(self, object_id: str) -> str:
@@ -97,6 +101,17 @@ class AppContext:
             out.append({"name": attr["name"], "kind": attr.get("kind"),
                         "tags": [l.get("tag") for l in attr.get("dataLinks") or []]})
         return out
+
+    def scope_ops(self, object_id: str) -> list[str]:
+        """对象落在哪些工序：设备 / 设备组按层级归属，工序是自己，工艺段是它的全部工序，车间是全部。"""
+        h = self.hierarchy
+        if object_id in h.ops:
+            return [object_id]
+        if object_id in h.segments:
+            return list(h.segments[object_id]["opIds"])
+        if any(w["id"] == object_id for w in h.workshops):
+            return list(h.ops)
+        return h.ops_of_object(self.store, object_id)
 
     # ------------------------------------------------------------ 现象作用域
     def phenomenon_ops(self, phenomenon: dict[str, Any]) -> list[str]:

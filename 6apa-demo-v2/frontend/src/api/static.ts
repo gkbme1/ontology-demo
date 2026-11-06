@@ -318,6 +318,18 @@ export class StaticBackend {
       }
     }
     // 依赖现象 / 关系的视图
+    if (path === '/scope/conditions') {
+      // 全局工况与根因：范围（工序 / 工艺段 / 全车间）内的现象与导致关系，跨装置的标出
+      const opSeg = this.snap.base.search.opSegment
+      const inScope = (p: Any) => this.ops(p).some((o) => (q.op ? o === q.op : q.seg ? opSeg[o] === q.seg : true))
+      const phen = Object.values(this.phen).filter(inScope)
+      const ids = new Set(phen.map((p) => p.id))
+      const links = this.touching(ids)
+      const pre = this.snap.get[key('/scope/conditions', { seg: q.seg, op: q.op })] ?? this.snap.get['/scope/conditions'] ?? {}
+      const views = links.map((l) => ({ ...this.linkView(l), crossDevice: this.phen[l.cause]?.anchor?.id !== this.phen[l.effect]?.anchor?.id }))
+      return { phenomena: phen.map((p) => this.view(p)), links: views, graph: this.graph(ids, links),
+               anchors: pre.anchors ?? [], crossCount: views.filter((v) => v.crossDevice).length }
+    }
     if ((m = path.match(/^\/ops\/([^/]+)\/conditions$/))) {
       const phen = Object.values(this.phen).filter((p) => this.ops(p).includes(m![1]))
       const ids = new Set(phen.map((p) => p.id))

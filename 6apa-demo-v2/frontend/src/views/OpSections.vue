@@ -66,10 +66,14 @@ const title = computed(() => ({
       <span class="text-[11px] text-fg-mute whitespace-nowrap truncate"><span v-for="p in op.path.slice(0, 2)" :key="p.id">{{ p.name }} › </span>{{ op.name }}</span>
       <span class="flex-1" />
       <button class="ctl" title="在全局图谱中以本工序为中心查看" @click="openGlobalGraph(opId, 2)">◎ 全局图谱定位</button>
-      <button v-for="k in ['drawing', 'section:devices', 'section:calc', 'section:cond', 'section:docs']" :key="k"
-              class="asset-tab !py-0.5" :class="{ 'asset-tab-on': kind === k || (k === 'section:calc' && kind === 'calc') }"
-              @click="select({ type: k as Any, id: opId, opId }, k === 'drawing' ? opId : `${opId}|${k.split(':')[1]}`)">
-        {{ ({ drawing: '图纸', 'section:devices': '装置', 'section:calc': '计算组态', 'section:cond': '工况与根因', 'section:docs': '文档提取' } as Record<string, string>)[k] }}
+      <button v-for="k in ['drawing', 'section:devices']" :key="k" class="asset-tab !py-0.5" :class="{ 'asset-tab-on': kind === k }"
+              @click="select({ type: k as Any, id: opId, opId }, opId)">
+        {{ k === 'drawing' ? '图纸' : '装置' }}
+      </button>
+      <span class="text-[11px] text-fg-mute ml-2">本工序在全局中：</span>
+      <button v-for="k in ['global:calc', 'global:cond', 'global:docs']" :key="k" class="ctl !py-0.5" title="打开全局视图并筛选到本工序"
+              @click="select({ type: k as Any, opId }, k)">
+        {{ ({ 'global:calc': '计算组态', 'global:cond': '工况与根因', 'global:docs': '文档提取' } as Record<string, string>)[k] }} ↗
       </button>
     </div>
     <div class="flex-1 overflow-auto px-4 pb-4 space-y-3 min-h-0">

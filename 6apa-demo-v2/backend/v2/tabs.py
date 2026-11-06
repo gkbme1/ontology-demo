@@ -15,10 +15,10 @@ TABS = [
     ("parameters", "参数"),
     ("topology", "拓扑关系"),
     ("constraints", "参数约束"),
-    ("phenomena", "现象定义"),
+    ("phenomena", "现象/工况定义"),
     ("causal", "根因影响关系"),
     ("influence", "工艺影响关系"),
-    ("calc", "计算/指标"),
+    ("calc", "计算组态"),
     ("procedures", "处置规程"),
 ]
 INFLUENCE_CATEGORIES = {"影响关系", "质量关系"}
@@ -266,6 +266,27 @@ def _constraints(ctx: AppContext, object_id: str, prof: dict[str, Any]) -> dict[
             "note": "工况与版本适用条件都是「工况」类现象，点击可跳到现象定义；判断历史数据时按当时生效的版本"}
 
 
+def calc_view(ctx: AppContext, c: dict[str, Any]) -> dict[str, Any]:
+    """计算组态视图：引用的算法（调用契约）+ 每个算法参数绑定到本体的哪里。"""
+    from backend.v2.calculations import binding_text
+
+    names = {**{g: x["name"] for g, x in ctx.store.dcs.equipment_groups.items()}, **{k: v["name"] for k, v in ctx.calcs.items.items()}}
+    algo = ctx.algos.items.get(c.get("algorithmId") or "") or {}
+    bindings = c.get("bindings") or {}
+    rows = []
+    for inp in algo.get("inputs") or []:
+        b = bindings.get(inp["name"])
+        rows.append({"name": inp["name"], "label": inp["label"], "type": inp["type"], "unit": inp.get("unit") or "",
+                     "required": inp.get("required"), "default": inp.get("default"),
+                     "binding": b, "bindingText": binding_text(b, names) if b else (f"默认 {inp.get('default')}" if inp.get("default") is not None else "未绑定")})
+    anchor = c.get("anchor") or {}
+    scope = {"segment": "工艺段", "group": "设备组", "equipment": "设备"}.get(anchor.get("kind"), anchor.get("kind") or "")
+    cross = anchor.get("kind") == "segment" or any((b or {}).get("kind") == "groupParameter" for b in bindings.values())
+    return {**c, "algorithm": {k: algo.get(k) for k in ("id", "name", "category", "version", "provider", "invoke", "output", "status")},
+            "bindingRows": rows, "scopeText": scope, "crossDevice": cross,
+            "usedBy": [{"id": p["id"], "name": p["name"]} for p in ctx.phen.phenomena.values() if c["id"] in str(p.get("rule"))]}
+
+
 def _calcs_for(ctx: AppContext, object_id: str) -> list[dict[str, Any]]:
     group_id = (ctx.store.dcs.equipment.get(object_id) or {}).get("equipmentGroupId")
     out = []
@@ -326,7 +347,7 @@ def tab(ctx: AppContext, object_id: str, key: str, op_id: str | None = None) -> 
         return {"items": items, "own": own_names, "note": "工艺属性之间的影响关系（正向 / 负向影响、质量关系），来自工业关系表"}
     if key == "calc":
         gname = _group_name(ctx, object_id)
-        calcs = [_inherit({**c, "methodText": c.get("method")}, c["origin"] == "继承自设备组", f"设备组 {gname}")
+        calcs = [_inherit({**calc_view(ctx, c), "origin": c["origin"]}, c["origin"] == "继承自设备组", f"设备组 {gname}")
                  for c in _calcs_for(ctx, object_id)]
         derived = [a for a in prof.get("attributes") or [] if a.get("kind") == "工艺属性" and not a.get("dataLinks")]
         return {"items": calcs, "capabilities": prof.get("capabilities") or [],

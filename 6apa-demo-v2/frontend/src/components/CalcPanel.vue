@@ -9,14 +9,11 @@ import InheritBox from './InheritBox.vue'
 type Any = any
 const props = defineProps<{ items: Any[]; opId?: string; targetId?: string; focusId?: string; showInherit?: boolean }>()
 
-const METHOD: Record<string, string> = { formula: '表达式', level_consumption: '液位差消耗量', rate: '变化速率' }
 const openId = ref(props.focusId ?? '')
 const runs = ref<Record<string, Any>>({})
-const detail = ref<Record<string, Any>>({})
 
 async function run(c: Any): Promise<void> {
   openId.value = c.id
-  if (!detail.value[c.id]) detail.value[c.id] = await api.calculation(c.id)
   runs.value[c.id] = null
   runs.value[c.id] = await api.runCalc(c.id, { hours: 6, opId: props.opId, targetId: props.targetId })
 }
@@ -25,13 +22,6 @@ watch(() => props.focusId, (id) => {
   if (c) run(c)
 }, { immediate: true })
 
-function inputText(c: Any): string {
-  return (c.inputs ?? []).map((i: Any) => {
-    const s = i.subject ?? {}
-    const what = s.kind === 'parameter' ? `本对象.${s.name}${s.index !== undefined ? `[第${s.index + 1}支]` : ''}` : s.kind === 'tag' ? s.tag : s.calcId
-    return `${i.var} = ${what}`
-  }).join('；')
-}
 </script>
 
 <template>
@@ -41,23 +31,47 @@ function inputText(c: Any): string {
       <div class="flex items-center gap-2">
         <span class="text-brand font-mono">ƒ</span>
         <span class="font-medium">{{ c.name }}</span>
-        <span class="text-[11px] text-fg-mute">{{ c.id }} · {{ METHOD[c.method] ?? c.method }} · {{ c.unit }}</span>
+        <span class="text-[11px] text-fg-mute">{{ c.id }} · {{ c.unit }}</span>
+        <span class="pill pill-plain">{{ c.scopeText }}：{{ c.anchor?.name }}</span>
+        <span v-if="c.crossDevice" class="pill pill-info">跨装置统计</span>
         <span v-if="showInherit" class="inline-flex items-center gap-1 text-[11px] text-fg-mute"><InheritBox :checked="c.inherited" :from="c.inheritedFrom" />继承</span>
         <span class="pill pill-warn">{{ c.status === '已确认' ? '已确认' : '草案' }}</span>
         <span class="flex-1" />
         <button class="btn" @click="run(c)">试算（模拟数据）</button>
       </div>
-      <dl class="kv mt-2">
-        <dt>挂载对象</dt><dd>{{ c.anchor?.name }}<span v-if="c.anchor?.kind === 'group'" class="text-fg-mute">（组内每台分别计算）</span></dd>
-        <dt>输入绑定</dt><dd class="font-mono text-xs">{{ inputText(c) }}</dd>
-        <dt v-if="c.expression">表达式</dt><dd v-if="c.expression" class="font-mono text-xs">{{ c.expression }}</dd>
-        <dt v-if="c.params">参数</dt><dd v-if="c.params" class="font-mono text-xs">{{ JSON.stringify(c.params) }}</dd>
-        <dt>说明</dt><dd class="text-fg-dim">{{ c.description }}</dd>
-        <dt>依据</dt><dd class="text-fg-dim">{{ c.basis }}</dd>
-        <template v-if="detail[c.id]?.usedBy?.length">
-          <dt>被引用</dt><dd><span v-for="u in detail[c.id].usedBy" :key="u.id" class="pill pill-plain mr-1">{{ u.name }}</span></dd>
-        </template>
-      </dl>
+      <div class="mt-2 grid grid-cols-[1fr_1.4fr] gap-4">
+        <dl class="kv">
+          <dt>引用算法</dt>
+          <dd>
+            <span class="font-medium">{{ c.algorithm?.name }}</span>
+            <span class="text-[11px] text-fg-mute font-mono ml-1">{{ c.algorithm?.id }} v{{ c.algorithm?.version }}</span>
+            <div class="text-[11px] text-fg-mute font-mono">{{ c.algorithm?.invoke?.protocol }} {{ c.algorithm?.invoke?.method }} {{ c.algorithm?.invoke?.endpoint }}</div>
+          </dd>
+          <dt>输出</dt><dd>{{ c.algorithm?.output?.label }}（{{ c.unit || c.algorithm?.output?.unit }}）</dd>
+          <dt>作用范围</dt><dd>{{ c.anchor?.name }}<span v-if="c.anchor?.kind === 'group' && c.bindingRows?.some((r: Any) => r.binding?.kind === 'parameter')" class="text-fg-mute">（组内每台分别计算）</span></dd>
+          <dt>说明</dt><dd class="text-fg-dim">{{ c.description }}</dd>
+          <dt>依据</dt><dd class="text-fg-dim">{{ c.basis }}</dd>
+          <template v-if="c.usedBy?.length">
+            <dt>被引用</dt><dd><span v-for="u in c.usedBy" :key="u.id" class="pill pill-plain mr-1">{{ u.name }}</span></dd>
+          </template>
+        </dl>
+        <div>
+          <div class="sec-title">参数绑定（算法参数 → 本体）</div>
+          <table class="w-full text-xs border border-line-soft rounded">
+            <thead><tr class="bg-ink-panel2 text-fg-mute">
+              <th class="text-left px-2 py-1 font-medium">算法参数</th><th class="text-left px-2 py-1 font-medium">类型</th>
+              <th class="text-left px-2 py-1 font-medium">绑定到</th>
+            </tr></thead>
+            <tbody>
+              <tr v-for="r in c.bindingRows" :key="r.name" class="border-t border-line-soft">
+                <td class="px-2 py-1"><span class="font-mono">{{ r.name }}</span> {{ r.label }}<span v-if="r.required" class="text-err">*</span></td>
+                <td class="px-2 py-1 text-fg-dim">{{ r.type }}{{ r.unit ? ` · ${r.unit}` : '' }}</td>
+                <td class="px-2 py-1" :class="r.binding ? 'text-fg' : 'text-fg-mute italic'">{{ r.bindingText }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
       <div v-if="openId === c.id && runs[c.id] === null" class="text-fg-mute text-xs mt-2">计算中…</div>
       <div v-if="openId === c.id && runs[c.id]" class="mt-3">
         <div class="flex items-center gap-2 text-xs mb-1">

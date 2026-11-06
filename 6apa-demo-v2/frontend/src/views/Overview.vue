@@ -30,9 +30,9 @@ function enterOp(o: Any): void {
 }
 const SECTIONS = [
   { key: 'section:devices', label: '装置', hint: '设备组与设备', count: 'equipmentCount' },
-  { key: 'section:calc', label: '计算组态', hint: '派生量 / 指标计算定义', count: 'calcCount' },
-  { key: 'section:cond', label: '工况与根因', hint: '现象定义与根因影响关系', count: 'phenomenonCount' },
-  { key: 'section:docs', label: '文档提取', hint: '规程文档与数据源提取', count: '' }
+  { key: 'global:calc', label: '计算组态 ↗', hint: '全局视图，已筛选到本工序', count: 'calcCount' },
+  { key: 'global:cond', label: '工况与根因 ↗', hint: '全局视图，已筛选到本工序', count: 'phenomenonCount' },
+  { key: 'global:docs', label: '文档提取 ↗', hint: '全局视图，已筛选到本工序', count: '' }
 ]
 </script>
 

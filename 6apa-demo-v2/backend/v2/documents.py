@@ -32,10 +32,16 @@ def _doc_meta(doc: dict[str, Any]) -> dict[str, Any]:
 
 
 def for_op(ctx: AppContext, op_id: str) -> dict[str, Any]:
-    op = ctx.hierarchy.ops[op_id]
-    codes = set(op["areaCodes"])
-    equipment = set(ctx.hierarchy.op_equipment(op_id))
-    groups = set(ctx.hierarchy.op_groups.get(op_id, []))
+    return {**for_scope(ctx, [op_id]), "opId": op_id}
+
+
+def for_scope(ctx: AppContext, op_ids: list[str]) -> dict[str, Any]:
+    """一组工序（空 = 全车间）的文档与数据源提取统计。"""
+    h = ctx.hierarchy
+    op_ids = op_ids or list(h.ops)
+    codes = {c for o in op_ids for c in h.ops[o]["areaCodes"]}
+    equipment = {e for o in op_ids for e in h.op_equipment(o)}
+    groups = {g for o in op_ids for g in h.op_groups.get(o, [])}
     docs = []
     for doc in REGISTRY:
         if not codes & set(doc["areaCodes"]):
@@ -67,7 +73,7 @@ def for_op(ctx: AppContext, op_id: str) -> dict[str, Any]:
          "count": sum(1 for c in ctx.store.procedures.cards.values() if (c.get("area") or {}).get("text") in codes),
          "detail": "按工段统计"},
     ]
-    return {"opId": op_id, "documents": docs, "sources": sources}
+    return {"opIds": op_ids, "documents": docs, "sources": sources}
 
 
 def read(doc_id: str) -> dict[str, Any]:

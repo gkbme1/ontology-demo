@@ -159,6 +159,12 @@ def main() -> None:
                 if raw.startswith(("equip-", "egrp-")):
                     col.fetch(f"/objects/{raw}")
 
+    print("收集全局视图（计算组态 / 算法库 / 工况与根因 / 文档提取）…")
+    col.fetch("/algorithms")
+    for q in [{}] + [{"seg": s} for s in h.segments] + [{"op": o} for o in h.ops]:
+        for path in ("/scope/calculations", "/scope/documents", "/scope/conditions"):
+            col.fetch(path, q)
+
     col.fetch("/limits")
     calcs = (col.fetch("/calculations") or {}).get("items") or []
     for c in calcs:

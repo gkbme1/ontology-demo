@@ -37,7 +37,7 @@ def meta() -> dict[str, Any]:
     return {
         "categories": nav.CATEGORIES, "operators": OPERATORS, "limitFields": LIMIT_FIELDS, "aggregates": AGGREGATES,
         "phenomenonCategories": CATEGORIES, "statuses": STATUSES, "confidence": CONFIDENCE,
-        "calcMethods": calculations.METHODS, "tabs": [{"key": k, "label": l} for k, l in tabs.TABS],
+        "bindingKinds": calculations.BINDING_KINDS, "tabs": [{"key": k, "label": l} for k, l in tabs.TABS],
     }
 
 
@@ -184,6 +184,67 @@ def op_calculations(op_id: str) -> dict[str, Any]:
 def op_documents(op_id: str) -> dict[str, Any]:
     _op(op_id)
     return documents.for_op(get_ctx(), op_id)
+
+
+# ------------------------------------------------------------------ 全局（跨装置 / 跨工艺）
+def _scope(seg: Optional[str], op: Optional[str]) -> list[str]:
+    """筛选范围 → 工序列表（都不给 = 全车间）。"""
+    h = get_ctx().hierarchy
+    if op:
+        if op not in h.ops:
+            raise HTTPException(404, op)
+        return [op]
+    if seg:
+        if seg not in h.segments:
+            raise HTTPException(404, seg)
+        return list(h.segments[seg]["opIds"])
+    return list(h.ops)
+
+
+@router.get("/scope/conditions")
+def scope_conditions(seg: Optional[str] = None, op: Optional[str] = None) -> dict[str, Any]:
+    """全局的工况与根因：范围内的现象 / 工况与导致关系；导致关系两端挂在不同对象上的标「跨装置」。"""
+    ctx = get_ctx()
+    ops = set(_scope(seg, op))
+    phen = [p for p in ctx.phen.phenomena.values() if ops & set(ctx.phenomenon_ops(p))]
+    ids = {p["id"] for p in phen}
+    links = [l for l in ctx.phen.links.values() if l["cause"] in ids or l["effect"] in ids]
+    anchor = {pid: (p.get("anchor") or {}).get("id") for pid, p in ctx.phen.phenomena.items()}
+    views = [{**tabs.link_view(ctx, l), "crossDevice": anchor.get(l["cause"]) != anchor.get(l["effect"])} for l in links]
+    dcs = ctx.store.dcs
+    anchors = [{"id": g, "name": dcs.equipment_groups[g]["name"], "kind": "group"}
+               for o in sorted(ops) for g in ctx.hierarchy.op_groups.get(o, [])]
+    seen: set[str] = set()
+    anchors = [a for a in anchors if not (a["id"] in seen or seen.add(a["id"]))]
+    return {"phenomena": [tabs.phenomenon_view(ctx, p) for p in phen], "links": views,
+            "graph": tabs.graph_view(ctx, ids, links), "anchors": anchors,
+            "crossCount": sum(1 for v in views if v["crossDevice"])}
+
+
+@router.get("/scope/calculations")
+def scope_calculations(seg: Optional[str] = None, op: Optional[str] = None) -> dict[str, Any]:
+    ctx = get_ctx()
+    ops = set(_scope(seg, op))
+    items = [tabs.calc_view(ctx, c) for c in ctx.calcs.items.values()
+             if ops & set(ctx.scope_ops((c.get("anchor") or {}).get("id") or ""))]
+    return {"items": items, "total": len(items)}
+
+
+@router.get("/scope/documents")
+def scope_documents(seg: Optional[str] = None, op: Optional[str] = None) -> dict[str, Any]:
+    return documents.for_scope(get_ctx(), _scope(seg, op))
+
+
+@router.get("/algorithms")
+def algorithms() -> dict[str, Any]:
+    """算法库：算法的调用契约与被哪些计算组态引用。"""
+    ctx = get_ctx()
+    items = []
+    for a in ctx.algos.items.values():
+        used = [{"id": c["id"], "name": c["name"], "anchor": (c.get("anchor") or {}).get("name")}
+                for c in ctx.calcs.items.values() if c.get("algorithmId") == a["id"]]
+        items.append({**a, "usedBy": used})
+    return {"items": items, "note": ctx.algos.note}
 
 
 @router.get("/documents/{doc_id}")

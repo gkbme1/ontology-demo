@@ -241,25 +241,34 @@ def hydrolysis_seed(a: Anchors) -> tuple[list[dict], list[dict], list[dict]]:
         link("CL-S11-24", "PH-S11-17", "PH-S11-21", "缓冲罐高位时水解罐无法正常出料", "水解液缓冲罐拓扑", "低"),
     ]
 
+    def B(kind, **kw):
+        return {"kind": kind, **kw}
+
+    SEG = {"kind": "segment", "id": "SEG-04", "name": "6A_水解"}
     calcs = [
-        {"id": "CALC-S11-01", "name": "pH双支偏差", "anchor": TANK, "method": "formula",
-         "expression": "abs(a - b)",
-         "inputs": [{"var": "a", "subject": {"kind": "parameter", "name": "反应体系pH", "index": 0}},
-                    {"var": "b", "subject": {"kind": "parameter", "name": "反应体系pH", "index": 1}}],
+        {"id": "CALC-S11-01", "name": "pH双支偏差", "anchor": TANK, "algorithmId": "ALG-ABS-DIFF",
+         "bindings": {"a": B("parameter", name="反应体系pH", index=0), "b": B("parameter", name="反应体系pH", index=1)},
          "unit": "pH", "description": "同一罐两支 pH 计（AT_1301x1 / x2）读数差的绝对值", "basis": "R-S11-03", "status": DRAFT},
-        {"id": "CALC-S11-02", "name": "加氨速率（液位差法）", "anchor": NH3, "method": "level_consumption",
-         "inputs": [{"var": "level", "subject": {"kind": "parameter", "name": "氨水计量罐液位"}}],
-         "params": {"windowMin": 10, "deadbandRatio": 0.01}, "unit": "L/min",
-         "description": "计量罐液位只累计下降量（上升视为补液），按滑动时间窗折算速率；方法复制自 Agent Demo 的液位差消耗量",
+        {"id": "CALC-S11-02", "name": "加氨速率（液位差法）", "anchor": NH3, "algorithmId": "ALG-LEVEL-CONSUMPTION",
+         "bindings": {"level": B("parameter", name="氨水计量罐液位"), "windowMin": B("const", value=10),
+                      "deadbandRatio": B("const", value=0.01)},
+         "unit": "L/min", "description": "计量罐液位只累计下降量（上升视为补液），按 10 分钟滑动时间窗折算速率",
          "basis": "R-S11-04 / R-S11-05；关系「计量罐液位下降量即加氨量」", "status": DRAFT},
-        {"id": "CALC-S11-03", "name": "缓冲罐液位上升速率", "anchor": BUF, "method": "rate",
-         "inputs": [{"var": "level", "subject": {"kind": "parameter", "name": "水解液缓冲罐液位"}}],
-         "params": {"windowMin": 10}, "unit": "m3/min",
-         "description": "水解液缓冲罐液位在滑动时间窗内的平均变化速率（正为上涨）", "basis": "ARP-S11-10", "status": DRAFT},
-        {"id": "CALC-S11-04", "name": "水解罐平均温度", "anchor": TANK, "method": "formula",
-         "expression": "mean(t)",
-         "inputs": [{"var": "t", "subject": {"kind": "parameter", "name": "釜内反应温度"}}],
-         "unit": "℃", "description": "本台全部温度测点的均值（指标示例）", "basis": "PL001", "status": DRAFT},
+        {"id": "CALC-S11-03", "name": "缓冲罐液位上升速率", "anchor": BUF, "algorithmId": "ALG-RATE",
+         "bindings": {"series": B("parameter", name="水解液缓冲罐液位"), "windowMin": B("const", value=10)},
+         "unit": "m3/min", "description": "水解液缓冲罐液位在 10 分钟时间窗内的平均变化速率（正为上涨）", "basis": "ARP-S11-10", "status": DRAFT},
+        {"id": "CALC-S11-04", "name": "水解罐平均温度", "anchor": TANK, "algorithmId": "ALG-MEAN",
+         "bindings": {"series": B("parameter", name="釜内反应温度")},
+         "unit": "℃", "description": "本台全部温度测点的均值", "basis": "PL001", "status": DRAFT},
+        # 跨装置 / 跨工艺的统计：作用范围是工艺段，输入取设备组全部成员
+        {"id": "CALC-G-01", "name": "水解工段总加氨速率", "anchor": SEG, "algorithmId": "ALG-LEVEL-CONSUMPTION",
+         "bindings": {"level": B("groupParameter", groupId=NH3["id"], name="氨水计量罐液位"), "windowMin": B("const", value=30)},
+         "unit": "L/min", "description": "全部氨水计量罐（A–L）液位下降量合计，按 30 分钟时间窗折算，反映整个水解工段的耗氨强度",
+         "basis": "跨装置统计示例", "status": DRAFT},
+        {"id": "CALC-G-02", "name": "水解罐罐温极差（A–K）", "anchor": SEG, "algorithmId": "ALG-RANGE",
+         "bindings": {"series": B("groupParameter", groupId=TANK["id"], name="釜内反应温度")},
+         "unit": "℃", "description": "11 台水解罐罐温逐时刻 最高 − 最低，看并联罐之间温度是否一致",
+         "basis": "跨装置统计示例", "status": DRAFT},
     ]
     return phen, links, calcs
 

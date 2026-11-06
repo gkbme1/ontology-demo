@@ -10,26 +10,19 @@
     "name": "水解反应釜组(水解罐A–K)",
     "areaCode": "S11"
    },
-   "method": "formula",
-   "expression": "abs(a - b)",
-   "inputs": [
-    {
-     "var": "a",
-     "subject": {
-      "kind": "parameter",
-      "name": "反应体系pH",
-      "index": 0
-     }
+   "algorithmId": "ALG-ABS-DIFF",
+   "bindings": {
+    "a": {
+     "kind": "parameter",
+     "name": "反应体系pH",
+     "index": 0
     },
-    {
-     "var": "b",
-     "subject": {
-      "kind": "parameter",
-      "name": "反应体系pH",
-      "index": 1
-     }
+    "b": {
+     "kind": "parameter",
+     "name": "反应体系pH",
+     "index": 1
     }
-   ],
+   },
    "unit": "pH",
    "description": "同一罐两支 pH 计（AT_1301x1 / x2）读数差的绝对值",
    "basis": "R-S11-03",
@@ -44,22 +37,23 @@
     "name": "水解氨水计量罐组",
     "areaCode": "S11"
    },
-   "method": "level_consumption",
-   "inputs": [
-    {
-     "var": "level",
-     "subject": {
-      "kind": "parameter",
-      "name": "氨水计量罐液位"
-     }
+   "algorithmId": "ALG-LEVEL-CONSUMPTION",
+   "bindings": {
+    "level": {
+     "kind": "parameter",
+     "name": "氨水计量罐液位"
+    },
+    "windowMin": {
+     "kind": "const",
+     "value": 10
+    },
+    "deadbandRatio": {
+     "kind": "const",
+     "value": 0.01
     }
-   ],
-   "params": {
-    "windowMin": 10,
-    "deadbandRatio": 0.01
    },
    "unit": "L/min",
-   "description": "计量罐液位只累计下降量（上升视为补液），按滑动时间窗折算速率；方法复制自 Agent Demo 的液位差消耗量",
+   "description": "计量罐液位只累计下降量（上升视为补液），按 10 分钟滑动时间窗折算速率",
    "basis": "R-S11-04 / R-S11-05；关系「计量罐液位下降量即加氨量」",
    "status": "草案·待工艺确认"
   },
@@ -72,21 +66,19 @@
     "name": "水解缓冲罐",
     "areaCode": "S11"
    },
-   "method": "rate",
-   "inputs": [
-    {
-     "var": "level",
-     "subject": {
-      "kind": "parameter",
-      "name": "水解液缓冲罐液位"
-     }
+   "algorithmId": "ALG-RATE",
+   "bindings": {
+    "series": {
+     "kind": "parameter",
+     "name": "水解液缓冲罐液位"
+    },
+    "windowMin": {
+     "kind": "const",
+     "value": 10
     }
-   ],
-   "params": {
-    "windowMin": 10
    },
    "unit": "m3/min",
-   "description": "水解液缓冲罐液位在滑动时间窗内的平均变化速率（正为上涨）",
+   "description": "水解液缓冲罐液位在 10 分钟时间窗内的平均变化速率（正为上涨）",
    "basis": "ARP-S11-10",
    "status": "草案·待工艺确认"
   },
@@ -99,20 +91,62 @@
     "name": "水解反应釜组(水解罐A–K)",
     "areaCode": "S11"
    },
-   "method": "formula",
-   "expression": "mean(t)",
-   "inputs": [
-    {
-     "var": "t",
-     "subject": {
-      "kind": "parameter",
-      "name": "釜内反应温度"
-     }
+   "algorithmId": "ALG-MEAN",
+   "bindings": {
+    "series": {
+     "kind": "parameter",
+     "name": "釜内反应温度"
     }
-   ],
+   },
    "unit": "℃",
-   "description": "本台全部温度测点的均值（指标示例）",
+   "description": "本台全部温度测点的均值",
    "basis": "PL001",
+   "status": "草案·待工艺确认"
+  },
+  {
+   "id": "CALC-G-01",
+   "name": "水解工段总加氨速率",
+   "anchor": {
+    "kind": "segment",
+    "id": "SEG-04",
+    "name": "6A_水解"
+   },
+   "algorithmId": "ALG-LEVEL-CONSUMPTION",
+   "bindings": {
+    "level": {
+     "kind": "groupParameter",
+     "groupId": "egrp-8e737067",
+     "name": "氨水计量罐液位"
+    },
+    "windowMin": {
+     "kind": "const",
+     "value": 30
+    }
+   },
+   "unit": "L/min",
+   "description": "全部氨水计量罐（A–L）液位下降量合计，按 30 分钟时间窗折算，反映整个水解工段的耗氨强度",
+   "basis": "跨装置统计示例",
+   "status": "草案·待工艺确认"
+  },
+  {
+   "id": "CALC-G-02",
+   "name": "水解罐罐温极差（A–K）",
+   "anchor": {
+    "kind": "segment",
+    "id": "SEG-04",
+    "name": "6A_水解"
+   },
+   "algorithmId": "ALG-RANGE",
+   "bindings": {
+    "series": {
+     "kind": "groupParameter",
+     "groupId": "egrp-fffaa62d",
+     "name": "釜内反应温度"
+    }
+   },
+   "unit": "℃",
+   "description": "11 台水解罐罐温逐时刻 最高 − 最低，看并联罐之间温度是否一致",
+   "basis": "跨装置统计示例",
    "status": "草案·待工艺确认"
   }
  ]

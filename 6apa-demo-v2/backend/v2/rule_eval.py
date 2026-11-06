@@ -47,6 +47,11 @@ class _Evaluator:
             return [(tag["name"], self.tag_series(tag))] if tag else []
         if kind == "parameter":
             return [(t["name"], self.tag_series(t)) for t in self.ctx.parameter_tags(target, subject.get("name") or "")]
+        if kind == "groupParameter":
+            out = []
+            for m in self.ctx.group_members(subject.get("groupId") or ""):
+                out += [(t["name"], self.tag_series(t)) for t in self.ctx.parameter_tags(m, subject.get("name") or "")]
+            return out
         if kind == "calc":
             try:
                 calc = self.ctx.calcs.get(subject.get("calcId") or "")
@@ -54,7 +59,7 @@ class _Evaluator:
                 return []
             anchor = (calc.get("anchor") or {}).get("id")
             calc_target = target if self._covers(anchor, target) else anchor
-            result = calculations.compute(calc, lambda s: self.resolve(s, calc_target), self.times)
+            result = calculations.compute(calc, lambda s: self.resolve(s, calc_target), self.times, self.ctx.algos)
             if result["values"] is None:
                 return []
             return [(f"{calc['name']}", result["values"])]
@@ -186,8 +191,7 @@ def _parameter_names(rule: dict[str, Any] | None, ctx: AppContext) -> list[str]:
                 calc = ctx.calcs.get(subject.get("calcId") or "")
             except LookupError:
                 continue
-            names += [i["subject"].get("name") or "" for i in calc.get("inputs") or []
-                      if (i.get("subject") or {}).get("kind") == "parameter"]
+            names += [b.get("name") or "" for b in (calc.get("bindings") or {}).values() if b.get("kind") == "parameter"]
     return [n for n in names if n]
 
 
@@ -244,16 +248,16 @@ def run_calc(ctx: AppContext, calc: dict[str, Any], *, hours: float = 6, op_id: 
     anchor = (calc.get("anchor") or {}).get("id") or ""
     if target_id:
         targets = [target_id]
-    elif anchor.startswith("egrp-") and any((i.get("subject") or {}).get("kind") == "parameter" for i in calc.get("inputs") or []):
+    elif anchor.startswith("egrp-") and any(b.get("kind") == "parameter" for b in (calc.get("bindings") or {}).values()):
         members = ctx.group_members(anchor, op_id)
-        targets = [m for m in members if all(
-            ev.resolve(i["subject"], m) for i in calc["inputs"])][:MAX_TARGETS] or [anchor]
+        param_bindings = [b for b in (calc.get("bindings") or {}).values() if b.get("kind") == "parameter"]
+        targets = [m for m in members if all(ev.resolve(b, m) for b in param_bindings)][:MAX_TARGETS] or [anchor]
     else:
         targets = [anchor]
     idx = np.linspace(0, len(times) - 1, min(MAX_POINTS, len(times))).astype(int)
     out = []
     for target in targets:
-        r = calculations.compute(calc, lambda s: ev.resolve(s, target), times)
+        r = calculations.compute(calc, lambda s: ev.resolve(s, target), times, ctx.algos)
         item = {"targetId": target, "targetName": ctx.object_name(target), "inputs": r["inputs"], "unresolved": r["unresolved"]}
         if r["values"] is not None:
             v = r["values"]

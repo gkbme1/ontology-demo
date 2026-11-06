@@ -35,7 +35,22 @@ def space_root(ctx: AppContext) -> dict[str, Any]:
             "children": [{"id": s["id"], "label": s["name"], "kind": "segment", "count": len(s["opIds"]),
                           "description": s["description"]} for s in segs],
         })
-    return {"items": items, "notIncluded": h.not_included}
+    return {"items": items, "notIncluded": h.not_included, "globals": global_nodes(ctx)}
+
+
+GLOBAL_SECTIONS = [
+    ("global:calc", "计算组态", "全部计算组态：设备级与跨装置 / 跨工艺的统计，引用算法库并绑定本体参数"),
+    ("global:algo", "算法库", "算法的调用契约（调用方式、输入参数、输出），由算法服务提供"),
+    ("global:cond", "工况与根因", "全车间的现象 / 工况定义与根因影响关系（含跨装置的导致关系）"),
+    ("global:docs", "文档提取", "规程文档与数据源，以及从中提取进本体的对象"),
+]
+
+
+def global_nodes(ctx: AppContext) -> list[dict[str, Any]]:
+    counts = {"global:calc": len(ctx.calcs.items), "global:algo": len(ctx.algos.items),
+              "global:cond": sum(1 for p in ctx.phen.phenomena.values() if ctx.phenomenon_ops(p)),
+              "global:docs": len(documents.REGISTRY)}
+    return [{"id": k, "label": label, "kind": k, "hint": hint, "count": counts[k]} for k, label, hint in GLOBAL_SECTIONS]
 
 
 def _device_nodes(ctx: AppContext, op_id: str) -> list[dict[str, Any]]:
@@ -61,8 +76,7 @@ def op_phenomena(ctx: AppContext, op_id: str) -> list[dict[str, Any]]:
 
 
 def op_calcs(ctx: AppContext, op_id: str) -> list[dict[str, Any]]:
-    return [c for c in ctx.calcs.items.values()
-            if op_id in ctx.hierarchy.ops_of_object(ctx.store, (c.get("anchor") or {}).get("id") or "")]
+    return [c for c in ctx.calcs.items.values() if op_id in ctx.scope_ops((c.get("anchor") or {}).get("id") or "")]
 
 
 def segment_tree(ctx: AppContext, seg_id: str) -> dict[str, Any]:
@@ -73,24 +87,9 @@ def segment_tree(ctx: AppContext, seg_id: str) -> dict[str, Any]:
     ops = []
     for op_id in seg["opIds"]:
         op = h.ops[op_id]
-        sections = []
-        for key, label, hint in OP_SECTIONS:
-            node: dict[str, Any] = {"id": f"{op_id}|{key}", "opId": op_id, "label": label, "kind": f"section:{key}", "hint": hint}
-            if key == "devices":
-                node["children"] = _device_nodes(ctx, op_id)
-                node["count"] = len(h.op_equipment(op_id))
-            elif key == "calc":
-                calcs = op_calcs(ctx, op_id)
-                node["count"] = len(calcs)
-                node["children"] = [{"id": f"{op_id}|calc|{c['id']}", "opId": op_id, "calcId": c["id"],
-                                     "label": c["name"], "kind": "calc"} for c in calcs]
-            elif key == "cond":
-                node["count"] = len(op_phenomena(ctx, op_id))
-            elif key == "docs":
-                node["count"] = len(documents.for_op(ctx, op_id)["documents"])
-            sections.append(node)
+        # 工序下直接是设备组 / 设备；计算组态、工况与根因、文档提取移到全局（跨装置 / 跨工艺）
         ops.append({"id": op_id, "opId": op_id, "label": op["name"], "kind": "op", "screen": op["screen"],
-                    "status": op["status"], "children": sections})
+                    "status": op["status"], "count": len(h.op_equipment(op_id)), "children": _device_nodes(ctx, op_id)})
     return {"segment": {k: seg[k] for k in ("id", "name", "description")}, "items": ops}
 
 

@@ -10,6 +10,7 @@ import OpSections from '@/views/OpSections.vue'
 import AssetPanel from '@/views/AssetPanel.vue'
 import GenericProfile from '@/views/GenericProfile.vue'
 import GlobalGraph from '@/views/GlobalGraph.vue'
+import GlobalSections from '@/views/GlobalSections.vue'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any
@@ -40,7 +41,7 @@ function go(h: Any): void {
   hits.value = []
   keyword.value = ''
   if (h.kind === 'op') enterSegment(h.segmentId, { type: 'op', id: h.opId, opId: h.opId })
-  else if (h.kind === 'phenomenon') enterSegment(h.segmentId, { type: 'section:cond', id: h.opId, opId: h.opId })
+  else if (h.kind === 'phenomenon') select({ type: 'global:cond', opId: h.opId }, 'global:cond')
   else {
     enterSegment(h.segmentId, { type: 'object', id: h.id, opId: h.opId })
     openObject(h.id, h.opId)
@@ -93,6 +94,7 @@ const kind = (): string => nav.selection.type
                     :calc-id="kind() === 'calc' ? nav.selection.id : undefined" />
         <AssetPanel v-else-if="kind() === 'object'" :key="`${nav.selection.id}|${nav.selection.opId}`"
                     :object-id="nav.selection.id!" :op-id="nav.selection.opId" :initial-tab="nav.selection.tab" />
+        <GlobalSections v-else-if="kind().startsWith('global:')" :kind="kind()" :op-id="nav.selection.opId" />
         <GenericProfile v-else-if="kind() === 'domain-object'" :object-id="nav.selection.id!" />
         <div v-else-if="kind() === 'domain-pending'" class="empty m-6">「{{ nav.selection.label }}」待建：暂无数据源</div>
       </main>
