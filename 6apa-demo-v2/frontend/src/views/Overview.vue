@@ -44,7 +44,7 @@ const SECTIONS = [
         <h2 class="text-[20px] font-semibold">{{ ws.label }}</h2>
         <p class="text-fg-dim mt-1">{{ ws.description }}</p>
         <div class="grid grid-cols-3 gap-3 mt-4">
-          <div v-for="s in ws.children" :key="s.id" class="card cursor-pointer hover:border-brand"
+          <div v-for="s in ws.children.filter((c: Any) => c.kind === 'segment')" :key="s.id" class="card cursor-pointer hover:border-brand"
                @click="select({ type: 'segment', id: s.id }, s.id)" @dblclick="enterSegment(s.id)">
             <div class="flex items-center gap-2"><span class="font-semibold text-[15px]">{{ s.label }}</span><span class="text-fg-mute text-xs">{{ s.count }} 道工序</span></div>
             <p class="text-xs text-fg-dim mt-1">{{ s.description }}</p>

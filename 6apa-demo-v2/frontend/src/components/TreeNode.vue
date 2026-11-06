@@ -41,7 +41,8 @@ function onClick(): void {
 const ICON: Record<string, string> = {
   workshop: '▣', segment: '◧', op: '▤', group: '▢', equipment: '•', calc: 'ƒ',
   'section:devices': '⚙', 'section:calc': 'Σ', 'section:cond': '⚠', 'section:docs': '☰',
-  domain: '◆', class: '▢', type: '▢', area: '◧', entity: '•'
+  domain: '◆', class: '▢', type: '▢', area: '◧', entity: '•',
+  'global:calc': 'Σ', 'global:algo': 'ƒ', 'global:cond': '⚠', 'global:docs': '☰'
 }
 const icon = computed(() => ICON[props.node.kind] ?? '·')
 </script>
@@ -59,7 +60,7 @@ const icon = computed(() => ICON[props.node.kind] ?? '·')
       <span class="w-3 text-center text-fg-mute" @click.stop="toggle">
         <template v-if="hasChildren">{{ loading ? '…' : open ? '▾' : '▸' }}</template>
       </span>
-      <span class="w-3 text-center" :class="node.kind === 'op' ? 'text-brand' : 'text-fg-mute'">{{ icon }}</span>
+      <span class="w-3 text-center" :class="node.kind === 'op' || String(node.kind).startsWith('global:') ? 'text-brand' : 'text-fg-mute'">{{ icon }}</span>
       <span class="truncate flex-1" :class="{ 'italic text-fg-mute': node.ungrouped }">{{ node.label }}</span>
       <span v-if="node.status && node.status !== '已确认'" class="pill pill-warn" title="拆分口径待工艺确认">草案</span>
       <span v-if="node.count !== undefined && node.count !== null" class="text-[10.5px] text-fg-mute tabular-nums">{{ node.count }}</span>

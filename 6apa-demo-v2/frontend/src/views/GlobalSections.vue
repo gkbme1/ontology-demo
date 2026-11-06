@@ -32,7 +32,7 @@ const docView = ref<Any>(null)
 const condTab = ref<'phenomena' | 'causal'>('phenomena')
 const onlyCross = ref(false)
 
-const segments = computed(() => space.value?.items?.[0]?.children ?? [])
+const segments = computed(() => (space.value?.items?.[0]?.children ?? []).filter((c: Any) => c.kind === 'segment'))
 const opOptions = computed(() => {
   const out: Any[] = []
   for (const s of segments.value) if (!seg.value || seg.value === s.id) for (const o of segTrees.value[s.id]?.items ?? []) out.push({ ...o, seg: s.id })

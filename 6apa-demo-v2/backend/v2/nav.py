@@ -33,7 +33,7 @@ def space_root(ctx: AppContext) -> dict[str, Any]:
         items.append({
             "id": ws["id"], "label": ws["name"], "kind": "workshop", "description": ws["description"],
             "children": [{"id": s["id"], "label": s["name"], "kind": "segment", "count": len(s["opIds"]),
-                          "description": s["description"]} for s in segs],
+                          "description": s["description"]} for s in segs] + global_nodes(ctx),
         })
     return {"items": items, "notIncluded": h.not_included, "globals": global_nodes(ctx)}
 

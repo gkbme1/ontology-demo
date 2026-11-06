@@ -66,6 +66,7 @@ const keyOf = (n: Any) => n.id as string
 function onSpaceSelect(n: Any): void {
   if (n.kind === 'workshop') select({ type: 'workshop', id: n.id }, n.id)
   else if (n.kind === 'segment') select({ type: 'segment', id: n.id }, n.id)
+  else if (String(n.kind).startsWith('global:')) select({ type: n.kind, opId: undefined }, n.id)
 }
 function onSpaceDbl(n: Any): void {
   if (n.kind === 'segment') enterSegment(n.id)
@@ -125,16 +126,6 @@ const segmentActiveKey = computed(() => {
 
     <div class="flex-1 overflow-auto py-2 min-h-0">
       <div v-if="error" class="empty mx-3">{{ error }}</div>
-
-      <!-- 全局（跨装置 / 跨工艺）：两种模式下都显示 -->
-      <div v-if="nav.category === 'space' && space?.globals" class="mx-2 mb-2 rounded-md border border-line-soft bg-ink-panel2/60 py-1">
-        <div class="px-2 pb-0.5 text-[10.5px] text-fg-mute">全局 · 跨装置 / 跨工艺</div>
-        <div v-for="g in space.globals" :key="g.id" class="tree-row" :class="{ 'tree-on': nav.selection.type === g.kind }" :title="g.hint"
-             @click="select({ type: g.kind, opId: undefined }, g.id)">
-          <span class="w-3 text-center text-brand">{{ ({ 'global:calc': 'Σ', 'global:algo': 'ƒ', 'global:cond': '⚠', 'global:docs': '☰' } as Record<string, string>)[g.kind] }}</span>
-          <span class="flex-1">{{ g.label }}</span><span class="text-[10.5px] text-fg-mute tabular-nums">{{ g.count }}</span>
-        </div>
-      </div>
 
       <!-- 空间层级 · 车间导航 -->
       <template v-if="nav.category === 'space' && nav.mode === 'root' && space">

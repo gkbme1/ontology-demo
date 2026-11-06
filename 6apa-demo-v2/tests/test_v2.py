@@ -37,7 +37,8 @@ class HierarchyTest(unittest.TestCase):
         ws = r["items"][0]
         self.assertEqual(ws["label"], "105车间")
         self.assertEqual([s["label"] for s in ws["children"]],
-                         ["6A_提取", "6A_脱色", "6A_抽提", "6A_水解", "6A_结晶", "6A_干燥"])
+                         ["6A_提取", "6A_脱色", "6A_抽提", "6A_水解", "6A_结晶", "6A_干燥",
+                          "计算组态", "算法库", "工况与根因", "文档提取"])  # 全局节点挂在车间下、工艺段之后
         self.assertTrue(all("children" not in s for s in ws["children"]))  # 第一屏不出现工序 / 设备
 
     def test_segment_ops_list_devices_and_globals(self):
