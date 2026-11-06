@@ -74,33 +74,33 @@ function fmtBand(c: Any): string {
   <div class="flex flex-col h-full min-h-0">
     <div v-if="error" class="empty m-4">{{ error }}</div>
     <template v-if="head">
-      <!-- 头部 -->
-      <div class="px-5 pt-4 pb-0 border-b border-line bg-ink-panel">
-        <div class="text-[11px] text-fg-mute">
-          <span v-for="(p, i) in head.path" :key="p.id">{{ p.name }}<span v-if="i < head.path.length - 1"> › </span></span>
-          <span v-if="head.opIds.length > 1" class="ml-2 text-info">（成员分属 {{ head.opIds.length }} 道工序）</span>
-        </div>
-        <div class="flex items-center gap-3 mt-1">
-          <h2 class="text-[18px] font-semibold">{{ head.name }}</h2>
+      <!-- 头部：一行对象信息 + 醒目的页签按钮 -->
+      <div class="px-4 pt-2 pb-2 border-b border-line bg-ink-panel shrink-0">
+        <div class="flex items-center gap-2 min-w-0">
+          <h2 class="text-[16px] font-semibold whitespace-nowrap">{{ head.name }}</h2>
           <span class="pill pill-info">{{ head.kind === 'group' ? '设备组' : '设备' }}</span>
           <span v-if="head.className" class="pill pill-plain">{{ head.className }}</span>
-          <span v-for="b in head.badges" :key="b" class="pill pill-plain">{{ b }}</span>
+          <span class="text-[11px] text-fg-mute truncate" :title="head.badges.join(' · ')">{{ head.badges.join(' · ') }}</span>
+          <span class="flex-1" />
+          <span class="text-[11px] text-fg-mute whitespace-nowrap truncate max-w-[40%]">
+            <span v-for="(p, i) in head.path" :key="p.id">{{ p.name }}<span v-if="i < head.path.length - 1"> › </span></span>
+            <span v-if="head.opIds.length > 1" class="ml-1 text-info">（成员分属 {{ head.opIds.length }} 道工序）</span>
+          </span>
         </div>
-        <div class="flex gap-0.5 mt-3 overflow-x-auto">
-          <button v-for="t in head.tabs" :key="t.key" class="tab-btn" :class="{ 'tab-on': tab === t.key }" @click="tab = t.key">
-            {{ t.label }}<span v-if="counts[t.key]" class="ml-1 text-[10.5px] text-fg-mute">{{ counts[t.key] }}</span>
+        <div class="flex flex-wrap gap-1.5 mt-2">
+          <button v-for="t in head.tabs" :key="t.key" class="asset-tab" :class="{ 'asset-tab-on': tab === t.key }" @click="tab = t.key">
+            {{ t.label }}<span v-if="counts[t.key]" class="asset-tab-count">{{ counts[t.key] }}</span>
           </button>
         </div>
       </div>
 
       <!-- 页签内容 -->
-      <div class="flex-1 overflow-auto p-5 min-h-0">
+      <div class="flex-1 overflow-auto px-4 py-3 min-h-0">
         <div v-if="loading && !data" class="text-fg-mute">加载中…</div>
         <template v-else-if="data">
           <!-- 图纸位置与外观 -->
-          <div v-if="tab === 'drawing'" class="space-y-4">
-            <div v-if="drawing" class="text-xs text-fg-mute">所在图纸：{{ drawing.name }}（流程画面 {{ drawing.screen }}）</div>
-            <DrawingView v-if="drawing" :drawing="drawing" :highlight="data.highlight" @pick="pick" />
+          <div v-if="tab === 'drawing'" class="space-y-3">
+            <DrawingView v-if="drawing" :drawing="drawing" :highlight="data.highlight" :caption="`所在图纸：${drawing.name}`" @pick="pick" />
             <div v-else class="empty">该对象不在导航树的工序内，没有图纸位置</div>
             <div class="grid grid-cols-2 gap-4">
               <div class="card">
