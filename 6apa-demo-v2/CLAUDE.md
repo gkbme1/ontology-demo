@@ -74,6 +74,13 @@
 - 现象挂在设备组上时对组内每台分别判定；`parameter` 主体通过 `asset_model.profile` 的属性 dataLinks 落到本台测点。
 - 同一位号落到多条限值时（如 TI_1303），模拟器优先取与位号同工段的限值。
 
+## 场景切换：北I-2 深冷装置（进行中）
+
+- 用户要把场景换成油气深冷装置。第一步只梳理本体，成果 `data/cryo/北I-2深冷_本体.xlsx`，说明见 `docs/深冷装置本体梳理.md`；
+- 源文件在 `data/cryo/source/`（DCS 点表、操作规程 docx），流程画面截图在仓库根目录 `深冷装置工艺流程图/`（只读）；
+- 生成：`python3 -m backend.tools.build_cryo_ontology`（人工知识在 `backend/tools/cryo_knowledge.py`，依赖 python-docx，仅离线用）；
+- 设备编号以 DCS 画面编号为主，规程编号作别名；前后端代码尚未切换到深冷数据。
+
 ## 回归测试
 
 ```bash
