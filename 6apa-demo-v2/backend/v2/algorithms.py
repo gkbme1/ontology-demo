@@ -1,4 +1,4 @@
-"""算法库：读 data/config/6APA_算法库.json（调用契约），并提供本 Demo 的内置实现（代替外部算法服务）。
+"""算法库：读 data/config/算法库.json（调用契约），并提供本 Demo 的内置实现（代替外部算法服务）。
 
 本体里的计算组态只引用算法编号并绑定参数，不包含算法本身。真实部署时 invoke() 换成调用算法服务
 （按契约里的 protocol / method / endpoint），计算组态不用改。
@@ -12,7 +12,7 @@ from typing import Any, Callable
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
-FILE = ROOT / "data" / "config" / "6APA_算法库.json"
+FILE = ROOT / "data" / "config" / "算法库.json"
 
 
 class AlgorithmError(ValueError):

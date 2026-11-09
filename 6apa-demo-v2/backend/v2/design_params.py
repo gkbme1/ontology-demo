@@ -1,4 +1,4 @@
-"""设备设计参数（材质、容积、高度等固定参数）：读 data/config/6APA_设备设计参数.xlsx。
+"""设备设计参数（材质、容积、高度等固定参数）：读 data/config/设备设计参数.xlsx。
 
 设备先按设备名称、再按设备组声明的设备类型命中第一个模板；值按 设备 > 所属设备组 取，未填显示「待补充」。
 """
@@ -10,7 +10,7 @@ from typing import Any
 from openpyxl import load_workbook
 
 ROOT = Path(__file__).resolve().parents[2]
-FILE = ROOT / "data" / "config" / "6APA_设备设计参数.xlsx"
+FILE = ROOT / "data" / "config" / "设备设计参数.xlsx"
 
 
 class DesignParams:
@@ -57,6 +57,6 @@ class DesignParams:
                 "description": p["note"],
                 "note": (f"{v['basis']}（{v['status']}）" if v and (v["basis"] or v["status"]) else "") +
                         ("" if not v or (name, p["name"]) in self.values else f" 取自设备组 {group_name}"),
-                "source": f"6APA_设备设计参数.xlsx · 模板「{t['name']}」",
+                "source": f"设备设计参数.xlsx · 模板「{t['name']}」",
             })
         return out

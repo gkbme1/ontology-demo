@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/** 工序图纸与工序下 4 个节点：装置、计算组态、工况与根因、文档提取。 */
+/** 画面图纸与画面下 4 个节点：装置、计算组态、工况与根因、文档提取。 */
 import { computed, ref, watch } from 'vue'
 import { marked } from 'marked'
 import { api } from '@/api/client'
@@ -31,7 +31,7 @@ async function load(): Promise<void> {
 }
 watch(() => [props.kind, props.opId, nav.version], load, { immediate: true })
 
-// 新增现象时的挂载对象候选：本工序的设备组 + 设备
+// 新增现象时的挂载对象候选：本画面的设备组 + 设备
 const anchorOptions = computed(() => {
   const d = drawing.value
   const out: Any[] = []
@@ -53,7 +53,7 @@ async function openDoc(id: string): Promise<void> {
 }
 const docHtml = computed(() => (docView.value ? marked.parse(docView.value.content) as string : ''))
 const title = computed(() => ({
-  drawing: '图纸', 'section:devices': '装置', 'section:calc': '计算组态', calc: '计算组态',
+  drawing: '图纸', 'section:devices': '设备', 'section:calc': '计算组态', calc: '计算组态',
   'section:cond': '工况与根因', 'section:docs': '文档提取'
 } as Record<string, string>)[props.kind] ?? '')
 </script>
@@ -65,13 +65,13 @@ const title = computed(() => ({
       <h2 class="text-[16px] font-semibold whitespace-nowrap">{{ op.name }} · {{ title }}</h2>
       <span class="text-[11px] text-fg-mute whitespace-nowrap truncate"><span v-for="p in op.path.slice(0, 2)" :key="p.id">{{ p.name }} › </span>{{ op.name }}</span>
       <span class="flex-1" />
-      <button class="ctl" title="在全局图谱中以本工序为中心查看" @click="openGlobalGraph(opId, 2)">◎ 全局图谱定位</button>
+      <button class="ctl" title="在全局图谱中以本画面为中心查看" @click="openGlobalGraph(opId, 2)">◎ 全局图谱定位</button>
       <button v-for="k in ['drawing', 'section:devices']" :key="k" class="asset-tab !py-0.5" :class="{ 'asset-tab-on': kind === k }"
               @click="select({ type: k as Any, id: opId, opId }, opId)">
-        {{ k === 'drawing' ? '图纸' : '装置' }}
+        {{ k === 'drawing' ? '图纸' : '设备' }}
       </button>
-      <span class="text-[11px] text-fg-mute ml-2">本工序在全局中：</span>
-      <button v-for="k in ['global:calc', 'global:cond', 'global:docs']" :key="k" class="ctl !py-0.5" title="打开全局视图并筛选到本工序"
+      <span class="text-[11px] text-fg-mute ml-2">本画面在全局中：</span>
+      <button v-for="k in ['global:calc', 'global:cond', 'global:docs']" :key="k" class="ctl !py-0.5" title="打开全局视图并筛选到本画面"
               @click="select({ type: k as Any, opId }, k)">
         {{ ({ 'global:calc': '计算组态', 'global:cond': '工况与根因', 'global:docs': '文档提取' } as Record<string, string>)[k] }} ↗
       </button>
@@ -82,7 +82,7 @@ const title = computed(() => ({
     <!-- 图纸 -->
     <template v-if="kind === 'drawing' && drawing">
       <DrawingView :drawing="drawing" :caption="drawing.image ? '单击图上的设备查看设备信息' : drawing.note" @pick="pick" />
-      <div v-if="drawing.internalStreams?.length" class="text-xs text-fg-mute">本工序内部物料：{{ drawing.internalStreams.join('、') }}</div>
+      <div v-if="drawing.internalStreams?.length" class="text-xs text-fg-mute">本画面内部物料：{{ drawing.internalStreams.join('、') }}</div>
     </template>
 
     <!-- 装置 -->
@@ -115,7 +115,7 @@ const title = computed(() => ({
     <!-- 文档提取 -->
     <template v-if="kind === 'section:docs' && docs">
       <div class="sec-title">规程类文档</div>
-      <div v-if="!docs.documents.length" class="empty">本工序暂无登记的规程文档</div>
+      <div v-if="!docs.documents.length" class="empty">本画面暂无登记的规程文档</div>
       <div v-for="d in docs.documents" :key="d.id" class="card space-y-2">
         <div class="flex items-center gap-2">
           <span class="font-mono text-xs text-fg-mute">{{ d.id }}</span><span class="font-semibold">{{ d.title }}</span>
@@ -133,7 +133,7 @@ const title = computed(() => ({
             </tbody></table>
           </div>
           <div>
-            <div class="sec-title">据此整理的现象（本工序，{{ d.extracted.phenomena.length }}）</div>
+            <div class="sec-title">据此整理的现象（本画面，{{ d.extracted.phenomena.length }}）</div>
             <div class="flex flex-wrap gap-1.5">
               <span v-for="p in d.extracted.phenomena" :key="p.id" class="pill pill-plain" :title="p.anchor">{{ p.name }}</span>
             </div>

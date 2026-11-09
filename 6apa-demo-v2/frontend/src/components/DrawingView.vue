@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * 工序图纸：有现场图纸（P&ID 截图 + 热区）时默认显示原图，可切换到本体示意图。
- * 热区单击 → pick（对象 id、类型、对象所在工序）；highlight 中的对象（或其所属设备组）高亮。
+ * 画面图纸：有现场图纸（P&ID 截图 + 热区）时默认显示原图，可切换到本体示意图。
+ * 热区单击 → pick（对象 id、类型、对象所在画面）；highlight 中的对象（或其所属设备组）高亮。
  */
 import { computed, ref, watch } from 'vue'
 import PidCanvas from './PidCanvas.vue'
@@ -50,7 +50,7 @@ function pick(h: Any): void {
           <span class="inline-block w-2.5 h-2.5 border-2 border-dashed border-[#a855f7] align-middle ml-2" /> 待确认
         </span>
       </template>
-      <span v-else class="text-fg-mute">{{ img ? '' : '本工序暂无现场图纸，显示本体示意图' }}</span>
+      <span v-else class="text-fg-mute">{{ img ? '' : '本画面暂无现场图纸，显示本体示意图' }}</span>
     </div>
 
     <div v-if="mode === 'image' && img" class="relative overflow-auto rounded-[10px] border border-line bg-black max-h-[calc(100vh-170px)]">
@@ -62,14 +62,14 @@ function pick(h: Any): void {
                   :fill="lit(h) ? 'rgba(53,196,215,0.35)' : hover === h ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0)'"
                   :stroke="lit(h) ? '#35c4d7' : showSpots || hover === h ? (h.confirmed ? '#f2c744' : '#d17bff') : 'transparent'"
                   :stroke-width="lit(h) ? 4 : 2" :stroke-dasharray="h.confirmed ? '' : '6 4'" />
-            <title>{{ h.name }}{{ h.otherOp ? '（属于其他工序）' : '' }}：{{ h.note }}</title>
+            <title>{{ h.name }}{{ h.otherOp ? '（属于其他画面）' : '' }}：{{ h.note }}</title>
           </g>
         </svg>
       </div>
       <div v-if="hover" class="sticky bottom-0 left-0 bg-ink-panel2/95 border-t border-line px-3 py-1.5 text-xs">
         <span class="font-medium">{{ hover.name }}</span>
         <span v-if="!hover.objectId" class="text-err ml-2">未对应到本体对象</span>
-        <span v-else-if="hover.otherOp" class="text-info ml-2">点表归属其他工序</span>
+        <span v-else-if="hover.otherOp" class="text-info ml-2">点表归属其他画面</span>
         <span class="text-fg-mute ml-2">{{ hover.note }}</span>
       </div>
     </div>

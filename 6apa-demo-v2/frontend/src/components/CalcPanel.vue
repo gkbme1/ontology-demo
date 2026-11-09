@@ -33,7 +33,7 @@ watch(() => props.focusId, (id) => {
         <span class="font-medium">{{ c.name }}</span>
         <span class="text-[11px] text-fg-mute">{{ c.id }} · {{ c.unit }}</span>
         <span class="pill pill-plain">{{ c.scopeText }}：{{ c.anchor?.name }}</span>
-        <span v-if="c.crossDevice" class="pill pill-info">跨装置统计</span>
+        <span v-if="c.crossDevice" class="pill pill-info">跨设备统计</span>
         <span v-if="showInherit" class="inline-flex items-center gap-1 text-[11px] text-fg-mute"><InheritBox :checked="c.inherited" :from="c.inheritedFrom" />继承</span>
         <span class="pill pill-warn">{{ c.status === '已确认' ? '已确认' : '草案' }}</span>
         <span class="flex-1" />

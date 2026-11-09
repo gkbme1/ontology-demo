@@ -1,0 +1,87 @@
+{
+  "note": "算法库：只登记算法的调用契约（调用方式、输入参数、输出），算法本身由算法服务提供；本 Demo 用 backend/v2/algorithms.py 的内置实现代替算法服务。计算组态引用这里的算法，并把每个输入参数绑定到本体参数。",
+  "items": [
+    {
+      "id": "ALG-LEVEL-CONSUMPTION",
+      "name": "液位差消耗量 / 加料速率",
+      "category": "物料衡算",
+      "version": "1.0",
+      "status": "草案·待确认",
+      "provider": "算法服务（本 Demo 内置实现）",
+      "invoke": {"protocol": "REST", "method": "POST", "endpoint": "/algo/v1/level-consumption"},
+      "description": "只累计液位下降量（上升视为补液，不抵扣），用死区过滤仪表抖动，按滑动时间窗折算速率；多个液位序列时结果相加（如多台计量罐合计）。方法来自 Agent Demo 的液位差消耗量。",
+      "inputs": [
+        {"name": "level", "label": "液位序列", "type": "时序", "multi": true, "required": true, "unit": "L 或 m³", "desc": "一个或多个液位测点的历史序列"},
+        {"name": "windowMin", "label": "时间窗", "type": "常量", "required": false, "unit": "min", "default": 10, "desc": "折算速率用的滑动时间窗"},
+        {"name": "deadbandRatio", "label": "死区比例", "type": "常量", "required": false, "unit": "", "default": 0.01, "desc": "死区 = 时间窗内量程 × 该比例"}
+      ],
+      "output": {"name": "rate", "label": "消耗速率", "unit": "输入单位 / min"}
+    },
+    {
+      "id": "ALG-RATE",
+      "name": "变化速率",
+      "category": "趋势",
+      "version": "1.0",
+      "status": "草案·待确认",
+      "provider": "算法服务（本 Demo 内置实现）",
+      "invoke": {"protocol": "REST", "method": "POST", "endpoint": "/algo/v1/rate"},
+      "description": "滑动时间窗内的平均变化速率，正为上涨；多个序列时先取均值。",
+      "inputs": [
+        {"name": "series", "label": "测量序列", "type": "时序", "multi": true, "required": true, "unit": "", "desc": ""},
+        {"name": "windowMin", "label": "时间窗", "type": "常量", "required": false, "unit": "min", "default": 10, "desc": ""}
+      ],
+      "output": {"name": "rate", "label": "变化速率", "unit": "输入单位 / min"}
+    },
+    {
+      "id": "ALG-ABS-DIFF",
+      "name": "双测点偏差",
+      "category": "仪表诊断",
+      "version": "1.0",
+      "status": "草案·待确认",
+      "provider": "算法服务（本 Demo 内置实现）",
+      "invoke": {"protocol": "REST", "method": "POST", "endpoint": "/algo/v1/abs-diff"},
+      "description": "两路冗余测点读数差的绝对值，用于判断电极漂移 / 污染。",
+      "inputs": [
+        {"name": "a", "label": "测点 A", "type": "时序", "multi": false, "required": true, "unit": "", "desc": ""},
+        {"name": "b", "label": "测点 B", "type": "时序", "multi": false, "required": true, "unit": "", "desc": ""}
+      ],
+      "output": {"name": "diff", "label": "偏差", "unit": "同输入"}
+    },
+    {
+      "id": "ALG-MEAN",
+      "name": "多测点均值",
+      "category": "统计",
+      "version": "1.0",
+      "status": "草案·待确认",
+      "provider": "算法服务（本 Demo 内置实现）",
+      "invoke": {"protocol": "REST", "method": "POST", "endpoint": "/algo/v1/mean"},
+      "description": "多个测点逐时刻取均值；可跨设备（如设备组全部成员）。",
+      "inputs": [{"name": "series", "label": "测量序列", "type": "时序", "multi": true, "required": true, "unit": "", "desc": ""}],
+      "output": {"name": "mean", "label": "均值", "unit": "同输入"}
+    },
+    {
+      "id": "ALG-RANGE",
+      "name": "多测点极差",
+      "category": "统计",
+      "version": "1.0",
+      "status": "草案·待确认",
+      "provider": "算法服务（本 Demo 内置实现）",
+      "invoke": {"protocol": "REST", "method": "POST", "endpoint": "/algo/v1/range"},
+      "description": "多个测点逐时刻取 最大值 − 最小值，用于看并联设备之间的一致性（跨装置统计）。",
+      "inputs": [{"name": "series", "label": "测量序列", "type": "时序", "multi": true, "required": true, "unit": "", "desc": "至少两个测点"}],
+      "output": {"name": "range", "label": "极差", "unit": "同输入"}
+    },
+    {
+      "id": "ALG-SUM",
+      "name": "多测点求和",
+      "category": "统计",
+      "version": "1.0",
+      "status": "草案·待确认",
+      "provider": "算法服务（本 Demo 内置实现）",
+      "invoke": {"protocol": "REST", "method": "POST", "endpoint": "/algo/v1/sum"},
+      "description": "多个测点逐时刻求和，如多路流量合计（跨装置统计）。",
+      "inputs": [{"name": "series", "label": "测量序列", "type": "时序", "multi": true, "required": true, "unit": "", "desc": ""}],
+      "output": {"name": "sum", "label": "合计", "unit": "同输入"}
+    }
+  ]
+}

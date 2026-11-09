@@ -46,11 +46,11 @@ from backend.services.rule_loader import load_rules
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE_DIR = ROOT / "data" / "source"
 
-DCS_FILE = SOURCE_DIR / "6APA_DCS.xlsx"
-RELATION_FILE = SOURCE_DIR / "6APA_工业关系.xlsx"
-MAPPING_FILE = SOURCE_DIR / "6APA_对象映射.xlsx"
-RULE_FILE = SOURCE_DIR / "6APA_规则.xlsx"
-MERGE_FILE = SOURCE_DIR / "6APA_设备归并.xlsx"
+DCS_FILE = SOURCE_DIR / "DCS.xlsx"
+RELATION_FILE = SOURCE_DIR / "工业关系.xlsx"
+MAPPING_FILE = SOURCE_DIR / "对象映射.xlsx"
+RULE_FILE = SOURCE_DIR / "规则.xlsx"
+MERGE_FILE = SOURCE_DIR / "设备归并.xlsx"
 CAPABILITY_FILE = SOURCE_DIR / CAPABILITY_FILE_NAME
 PROCEDURE_FILE = SOURCE_DIR / PROCEDURE_FILE_NAME
 LINK_FILE = SOURCE_DIR / _instance_links.LINK_FILE_NAME
@@ -1047,7 +1047,7 @@ class OntologyStore:
             if self.rules.available
             else (
                 "当前暂无规则数据源。规则必须来自独立规则 Excel / 规则文件，"
-                "不从参数名称自动生成。将 6APA_规则.xlsx 放入 data/source 后自动生效。"
+                "不从参数名称自动生成。将 规则.xlsx 放入 data/source 后自动生效。"
             ),
             "expectedSource": RULE_FILE.name,
             "templateColumns": [

@@ -319,7 +319,7 @@ export class StaticBackend {
     }
     // 依赖现象 / 关系的视图
     if (path === '/scope/conditions') {
-      // 全局工况与根因：范围（工序 / 工艺段 / 全车间）内的现象与导致关系，跨装置的标出
+      // 全局工况与根因：范围（画面 / 单元 / 全装置）内的现象与导致关系，跨设备的标出
       const opSeg = this.snap.base.search.opSegment
       const inScope = (p: Any) => this.ops(p).some((o) => (q.op ? o === q.op : q.seg ? opSeg[o] === q.seg : true))
       const phen = Object.values(this.phen).filter(inScope)

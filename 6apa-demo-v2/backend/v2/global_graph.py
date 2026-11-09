@@ -1,15 +1,15 @@
 """全局图谱：把层级、设备、工艺参数、物料、现象和它们之间的关系拍平成一张图，供前端按视图 / 布局 / 跳数筛选。
 
-节点类型：车间、工艺段、工序、设备组、设备、工艺参数、质量指标、物料流股、公用介质、现象、工况
+节点类型：装置、单元、画面、设备组、设备、工艺参数、质量指标、物料流股、公用介质、现象、工况
 关系类型：
-- 包含      车间 → 工艺段 → 工序 → 设备组 → 设备（未入组设备直接挂工序）
-- 工序衔接  由设备组之间跨工序的物理拓扑推出（工艺流程布局用）
+- 包含      装置 → 单元 → 画面 → 设备组 → 设备（未入组设备直接挂画面）
+- 画面衔接  由设备组之间跨画面的物理拓扑推出（工艺流程布局用）
 - 物理拓扑  设备组 ⇄ 设备组、物料 / 介质 → 设备组、设备组 → 产出物料（工业关系表）
 - 具有属性  设备组 / 物料 → 工艺参数 / 质量指标（工业关系表）
 - 工艺影响  工艺参数 / 质量指标之间的正向 / 负向影响（工业关系表影响关系、质量关系）
 - 挂载      现象 → 设备组 / 设备
 - 导致      现象 → 现象（根因影响关系，在线编辑实时生效）
-每个节点带 opIndex（工序在全车间的顺序），前端按此做「工艺流程」从左到右的布局。
+每个节点带 opIndex（画面在全装置的顺序），前端按此做「工艺流程」从左到右的布局。
 """
 from __future__ import annotations
 
@@ -42,16 +42,16 @@ def build(ctx: AppContext) -> dict[str, Any]:
     # ---------------- 层级与设备
     op_index: dict[str, int] = {}
     for ws in h.workshops:
-        node(ws["id"], ws["name"], "车间", opIndex=-1)
+        node(ws["id"], ws["name"], "装置", opIndex=-1)
     for seg in h.segments.values():
         first = len(op_index)
         for op_id in seg["opIds"]:
             op_index[op_id] = len(op_index)
-        node(seg["id"], seg["name"], "工艺段", segId=seg["id"], opIndex=first, order=seg["order"])
+        node(seg["id"], seg["name"], "单元", segId=seg["id"], opIndex=first, order=seg["order"])
         edge(seg["workshopId"], seg["id"], "包含")
         for op_id in seg["opIds"]:
             op = h.ops[op_id]
-            node(op_id, op["name"], "工序", segId=seg["id"], opId=op_id, opIndex=op_index[op_id], screen=op["screen"])
+            node(op_id, op["name"], "画面", segId=seg["id"], opId=op_id, opIndex=op_index[op_id], screen=op["screen"])
             edge(seg["id"], op_id, "包含")
     group_by_name: dict[str, str] = {}
     for op_id, gids in h.op_groups.items():
@@ -90,7 +90,7 @@ def build(ctx: AppContext) -> dict[str, Any]:
         return None
 
     rels = ctx.store.relations.relations
-    # 先建流股与属性节点（需要一个已在图中的邻居来确定所在工序）
+    # 先建流股与属性节点（需要一个已在图中的邻居来确定所在画面）
     for r in rels:
         cat, s, o = r["category"], r["subject"], r["object"]
         if cat == "物理拓扑关系":
@@ -115,13 +115,13 @@ def build(ctx: AppContext) -> dict[str, Any]:
         elif cat in INFLUENCE_CATEGORIES and s["type"] in ATTR_TYPES and o["type"] in ATTR_TYPES:
             edge(a, b, "工艺影响", r["predicate"], mechanism=r.get("domainDescription") or "")
 
-    # 工序衔接：设备组之间跨工序的物理拓扑
+    # 画面衔接：设备组之间跨画面的物理拓扑
     for e in list(edges):
         if e["type"] != "物理拓扑":
             continue
         sa, sb = nodes[e["s"]], nodes[e["t"]]
         if sa["type"] == "设备组" and sb["type"] == "设备组" and sa.get("opId") != sb.get("opId"):
-            edge(sa["opId"], sb["opId"], "工序衔接", f"{sa['name']} → {sb['name']}")
+            edge(sa["opId"], sb["opId"], "画面衔接", f"{sa['name']} → {sb['name']}")
 
     # ---------------- 现象与导致关系
     for p in ctx.phen.phenomena.values():

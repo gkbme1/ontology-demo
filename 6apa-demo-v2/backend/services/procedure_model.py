@@ -9,7 +9,7 @@
       ├─ 禁止操作
       └─ 后果、解除条件、汇报要点、记录要求
 
-数据源 data/source/6APA_处置规程.xlsx（四个工作表：处置卡 / 可能原因 / 处置步骤 / 禁止操作）。
+数据源 data/source/处置规程.xlsx（四个工作表：处置卡 / 可能原因 / 处置步骤 / 禁止操作）。
 提到的对象对应不上本体时标「待确认」，不猜。验证位号已对应的原因、动作为 确认 / 查询 / 对比 且位号
 已对应的步骤，标为「可自动判断」——这部分以后可由固定程序直接用本体的实时 / 历史值执行，其余是给人的指引。
 """
@@ -23,7 +23,7 @@ from typing import Any
 from backend.ontology import identifiers as ids
 from backend.ontology.models import Provenance
 
-PROCEDURE_FILE_NAME = "6APA_处置规程.xlsx"
+PROCEDURE_FILE_NAME = "处置规程.xlsx"
 SHEET_CARDS = "处置卡"
 SHEET_CAUSES = "可能原因"
 SHEET_STEPS = "处置步骤"

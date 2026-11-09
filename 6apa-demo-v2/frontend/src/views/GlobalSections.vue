@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * 全局（跨装置 / 跨工艺）：计算组态、算法库、工况与根因、文档提取。
- * 不挂在某道工序下；顶部按 工艺段 / 工序 筛选范围（从工序页跳过来时带上该工序）。
+ * 全局（跨设备 / 跨工艺）：计算组态、算法库、工况与根因、文档提取。
+ * 不挂在某道画面下；顶部按 单元 / 画面 筛选范围（从画面页跳过来时带上该画面）。
  */
 import { computed, ref, watch } from 'vue'
 import { marked } from 'marked'
@@ -58,7 +58,7 @@ watch([seg, op], load)
 function onSeg(): void { op.value = '' }
 
 const scopeText = computed(() => op.value ? opOptions.value.find((o: Any) => o.opId === op.value)?.label
-  : seg.value ? segments.value.find((s: Any) => s.id === seg.value)?.label : '全车间')
+  : seg.value ? segments.value.find((s: Any) => s.id === seg.value)?.label : '全装置')
 const links = computed(() => (cond.value?.links ?? []).filter((l: Any) => !onlyCross.value || l.crossDevice))
 async function openDoc(id: string): Promise<void> { docView.value = await api.document(id) }
 const docHtml = computed(() => (docView.value ? (marked.parse(docView.value.content) as string) : ''))
@@ -68,11 +68,11 @@ const docHtml = computed(() => (docView.value ? (marked.parse(docView.value.cont
   <div class="h-full flex flex-col min-h-0">
     <div class="flex flex-wrap items-center gap-2 px-4 py-2 border-b border-line bg-ink-panel shrink-0">
       <h2 class="text-[16px] font-semibold whitespace-nowrap">{{ SECTIONS.find((s) => s.key === kind)?.label }}</h2>
-      <span class="pill pill-info">全局 · 跨装置 / 跨工艺</span>
+      <span class="pill pill-info">全局 · 跨设备 / 跨工艺</span>
       <template v-if="kind !== 'global:algo'">
         <span class="text-xs text-fg-mute ml-2">范围</span>
-        <select v-model="seg" class="inp" @change="onSeg"><option value="">全车间</option><option v-for="s in segments" :key="s.id" :value="s.id">{{ s.label }}</option></select>
-        <select v-model="op" class="inp"><option value="">全部工序</option><option v-for="o in opOptions" :key="o.opId" :value="o.opId">{{ o.label }}</option></select>
+        <select v-model="seg" class="inp" @change="onSeg"><option value="">全装置</option><option v-for="s in segments" :key="s.id" :value="s.id">{{ s.label }}</option></select>
+        <select v-model="op" class="inp"><option value="">全部画面</option><option v-for="o in opOptions" :key="o.opId" :value="o.opId">{{ o.label }}</option></select>
       </template>
       <span class="flex-1" />
       <button v-for="s in SECTIONS" :key="s.key" class="asset-tab !py-0.5" :class="{ 'asset-tab-on': kind === s.key }"
@@ -86,7 +86,7 @@ const docHtml = computed(() => (docView.value ? (marked.parse(docView.value.cont
       <template v-if="kind === 'global:calc'">
         <div class="text-xs text-fg-mute">
           {{ scopeText }}：{{ calcs.length }} 条计算组态。计算组态只引用算法库里的算法，并把算法的每个参数绑定到本体（本对象参数 / 设备组全部成员的参数 / 位号 / 常量）；
-          作用范围是工艺段、输入取设备组全部成员的，属于跨装置 / 跨工艺统计。
+          作用范围是单元、输入取设备组全部成员的，属于跨设备 / 跨工艺统计。
         </div>
         <CalcPanel :items="calcs" :op-id="op || undefined" />
       </template>
@@ -127,8 +127,8 @@ const docHtml = computed(() => (docView.value ? (marked.parse(docView.value.cont
           <button class="tab-btn" :class="{ 'tab-on': condTab === 'phenomena' }" @click="condTab = 'phenomena'">现象/工况定义 <span class="text-fg-mute text-[10.5px]">{{ cond.phenomena.length }}</span></button>
           <button class="tab-btn" :class="{ 'tab-on': condTab === 'causal' }" @click="condTab = 'causal'">根因影响关系 <span class="text-fg-mute text-[10.5px]">{{ cond.links.length }}</span></button>
           <span class="flex-1" />
-          <span class="text-xs text-fg-mute">{{ scopeText }} · 跨装置的导致关系 {{ cond.crossCount }} 条</span>
-          <label v-if="condTab === 'causal'" class="text-xs flex items-center gap-1 text-fg-dim ml-3"><input v-model="onlyCross" type="checkbox" /> 只看跨装置</label>
+          <span class="text-xs text-fg-mute">{{ scopeText }} · 跨设备的导致关系 {{ cond.crossCount }} 条</span>
+          <label v-if="condTab === 'causal'" class="text-xs flex items-center gap-1 text-fg-dim ml-3"><input v-model="onlyCross" type="checkbox" /> 只看跨设备</label>
         </div>
         <PhenomenaPanel v-if="condTab === 'phenomena'" :items="cond.phenomena" :anchor-options="cond.anchors" :op-id="op || undefined" @changed="load" />
         <CausalPanel v-else :links="links" :graph="{ ...cond.graph, links: links }" :op-id="op || undefined" @changed="load" />

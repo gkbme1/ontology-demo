@@ -1,7 +1,7 @@
 """工艺限值：上下限 / 四档报警限。
 
 数据边界（与规则、对象映射同一条线）：
-- 本体**不生成**任何限值，只加载独立数据源 `data/source/6APA_工艺限值.xlsx`；
+- 本体**不生成**任何限值，只加载独立数据源 `data/source/工艺限值.xlsx`；
 - 文件不存在时接口返回 `available: false` 与 `emptyReason`，并给出模板列，绝不编造；
 - 每条限值都带「限值依据」「置信度」「确认状态」，只有状态为「已确认」的才算正式工艺依据。
 
@@ -18,8 +18,8 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
-LIMIT_FILE = ROOT / "data" / "source" / "6APA_工艺限值.xlsx"
-TEMPLATE_FILE = ROOT / "data" / "source" / "6APA_工艺限值.模板.xlsx"
+LIMIT_FILE = ROOT / "data" / "source" / "工艺限值.xlsx"
+TEMPLATE_FILE = ROOT / "data" / "source" / "工艺限值.模板.xlsx"
 SHEET = "工艺限值"
 SOURCE_TYPE = "LIMIT_FILE"
 

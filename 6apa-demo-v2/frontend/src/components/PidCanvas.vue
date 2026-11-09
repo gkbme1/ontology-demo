@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * 工序图纸（示意）：设备组为框、成员为框内设备块，按拓扑分层从左到右排布；
- * 左侧为进入本工序的物料 / 公用介质，右侧为产出；顶部写子工序。
+ * 画面图纸（示意）：设备组为框、成员为框内设备块，按拓扑分层从左到右排布；
+ * 左侧为进入本画面的物料 / 公用介质，右侧为产出；顶部写子流程。
  * 单击设备块 / 设备组标题 → pick；highlight 中的对象高亮。
  */
 import { computed } from 'vue'
@@ -103,11 +103,11 @@ function short(s: string, n = 13): string {
         </pattern>
       </defs>
       <rect x="0" y="0" :width="layout.width" :height="layout.height" fill="url(#grid)" />
-      <!-- 标题与子工序 -->
+      <!-- 标题与子流程 -->
       <text x="16" y="24" fill="#1f2937" font-size="14" font-weight="600">{{ drawing.name }}</text>
       <text x="16" y="24" :dx="drawing.name.length * 14 + 12" fill="#7b8798" font-size="11">流程画面：{{ drawing.screen }}</text>
       <g v-if="drawing.subSteps?.length">
-        <text x="16" y="46" fill="#7b8798" font-size="11">子工序</text>
+        <text x="16" y="46" fill="#7b8798" font-size="11">子流程</text>
         <g v-for="(s, i) in drawing.subSteps" :key="s">
           <rect :x="60 + i * 112" y="34" width="104" height="18" rx="9" fill="#eef3f8" stroke="#c9d4e0" />
           <text :x="112 + i * 112" y="47" fill="#4b5563" font-size="10.5" text-anchor="middle">{{ short(s, 9) }}</text>

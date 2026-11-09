@@ -1,7 +1,7 @@
 """DCS 点表 Excel 导入层。
 
 回答"现场有什么"：生产工段 / 控制站 / 标准设备组 / 设备 / 参数语义 / DCS 点。
-本模块只读取 6APA_DCS.xlsx，不产生任何关系数据。
+本模块只读取 DCS.xlsx，不产生任何关系数据。
 
 v2 起的口径变化（重要）
 ----------------------
@@ -69,6 +69,9 @@ TAG_SPEC: dict[str, tuple[str, ...]] = {
     "processScreen": ("所在流程画面",),
     "attributionBasis": ("归属依据",),
     "confidence": ("归属置信度",),
+    # 深冷点表新增（可选）：量程，模拟器在没有限值时按量程取值范围
+    "rangeLow": ("量程下限",),
+    "rangeHigh": ("量程上限",),
 }
 
 STATS_SPEC: dict[str, tuple[str, ...]] = {
@@ -563,6 +566,8 @@ def _load_tags(ds: DcsDataset, path: Path) -> None:
             "processScreen": hm.text(row, "processScreen"),
             "attributionBasis": hm.text(row, "attributionBasis"),
             "confidence": confidence,
+            "rangeLow": _num(hm.get(row, "rangeLow")),
+            "rangeHigh": _num(hm.get(row, "rangeHigh")),
             "legacyAreaName": hm.text(row, "legacyAreaName"),
             "sourceType": SOURCE_DCS,
             "source": src,
@@ -590,6 +595,14 @@ _STAT_KEYS = {
     "状态反馈(DI)": "dido",
     "开关控制(DO)": "dido",
 }
+
+
+def _num(value: Any) -> float | None:
+    try:
+        v = None if value is None or value == "" else float(value)
+    except (TypeError, ValueError):
+        return None
+    return None if v is None or v != v else v  # NaN → None
 
 
 def _bump_stats(stats: dict[str, int], parameter_type: str | None) -> None:
@@ -655,6 +668,20 @@ def _load_stats(ds: DcsDataset, path: Path) -> None:
                 if e["name"] == equipment_name and e["station"] == station
             ]
             equip = candidates[0] if len(candidates) == 1 else None
+        if equip is None and owl_candidate and code and entry["totalPoints"] == 0:
+            # 设备统计里声明、点表里没有测点的设备（画面上有、无 DCS 点）：按声明建一台 0 点设备
+            aid0 = ids.area_id(code)
+            area0 = ds.areas.get(aid0) or _ensure_area(ds, code, entry["areaName"], i)
+            equip = {
+                "id": ids.equipment_id(owl_candidate), "owlSubject": owl_candidate, "name": equipment_name,
+                "areaId": area0["id"], "areaName": area0["name"], "areaCode": code, "areaIds": [area0["id"]],
+                "areaCodes": [code], "station": station, "parameterIds": [], "tagIds": [],
+                "stats": {"total": 0, "pv": 0, "op": 0, "mot": 0, "val": 0, "dido": 0},
+                "statsFromSheet1": None, "overview": None, "equipmentGroup": None, "equipmentGroupId": None,
+                "confidence": None, "sourceType": SOURCE_DCS, "source": entry["source"],
+            }
+            ds.equipment[equip["id"]] = equip
+            area0["equipmentIds"].append(equip["id"])
         if equip is None:
             continue
 

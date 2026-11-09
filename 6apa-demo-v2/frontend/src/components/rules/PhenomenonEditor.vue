@@ -110,7 +110,7 @@ async function save(): Promise<void> {
     </datalist>
     <div class="grid grid-cols-[90px_1fr_90px_1fr] gap-x-3 gap-y-2 items-center text-xs">
       <label class="text-fg-mute">现象名称</label>
-      <input v-model="form.name" class="inp" placeholder="如 水解罐pH偏高" />
+      <input v-model="form.name" class="inp" placeholder="如 膨胀机振动高" />
       <label class="text-fg-mute">挂载对象</label>
       <select v-model="form.anchorId" class="inp">
         <option v-for="a in anchors" :key="a.id" :value="a.id">{{ a.kind === 'group' ? '［设备组］' : '' }}{{ a.name }}</option>

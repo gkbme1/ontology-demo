@@ -23,7 +23,7 @@ const error = ref('')
 onMounted(async () => {
   try {
     await loadMeta()
-    select({ type: 'workshop', id: 'WS-105' }, 'WS-105')
+    select({ type: 'workshop', id: 'PLANT-B12' }, 'PLANT-B12')
     ready.value = true
   } catch (e) {
     error.value = `连接后端失败：${(e as Error).message}。请先启动后端（python3 -m backend.main，端口 8710）。`
@@ -59,16 +59,16 @@ const kind = (): string => nav.selection.type
 <template>
   <div class="h-full flex flex-col">
     <header class="flex items-center gap-4 px-4 h-12 border-b border-line bg-ink-panel2 shrink-0">
-      <div class="font-semibold tracking-wide"><span class="text-brand">◆</span> 6APA 本体 <span class="text-fg-mute text-xs font-normal">v2 · 105 车间</span></div>
+      <div class="font-semibold tracking-wide"><span class="text-brand">◆</span> 深冷装置本体 <span class="text-fg-mute text-xs font-normal">v2 · 北I-2深冷装置</span></div>
       <div class="flex rounded-md border border-line overflow-hidden text-xs font-medium">
         <button class="px-3 py-1.5" :class="nav.page === 'browse' ? 'bg-brand text-white' : 'bg-white text-fg-dim hover:text-brand'" @click="nav.page = 'browse'">本体浏览</button>
         <button class="px-3 py-1.5 border-l border-line" :class="nav.page === 'graph' ? 'bg-brand text-white' : 'bg-white text-fg-dim hover:text-brand'" @click="nav.page = 'graph'">◎ 全局图谱</button>
       </div>
       <div v-show="nav.page === 'browse'" class="relative w-[360px]">
-        <input v-model="keyword" class="inp w-full !py-1.5" placeholder="搜索工序 / 设备组 / 设备 / 位号 / 现象" @input="onSearch" @keydown.esc="hits = []" />
+        <input v-model="keyword" class="inp w-full !py-1.5" placeholder="搜索画面 / 设备组 / 设备 / 位号 / 现象" @input="onSearch" @keydown.esc="hits = []" />
         <div v-if="hits.length" class="absolute z-40 mt-1 w-full panel max-h-[420px] overflow-auto shadow-xl">
           <div v-for="(h, i) in hits" :key="i" class="tree-row !py-1.5" @click="go(h)">
-            <span class="pill pill-plain">{{ ({ op: '工序', group: '设备组', equipment: '设备', tag: '位号', phenomenon: '现象' } as Record<string, string>)[h.kind] }}</span>
+            <span class="pill pill-plain">{{ ({ op: '画面', group: '设备组', equipment: '设备', tag: '位号', phenomenon: '现象' } as Record<string, string>)[h.kind] }}</span>
             <span class="truncate flex-1">{{ h.label }}</span>
             <span class="text-[11px] text-fg-mute truncate max-w-[140px]">{{ h.hint }}</span>
           </div>

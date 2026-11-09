@@ -3,7 +3,7 @@
     python3 -m backend.tools.export_static            # 用已构建的 frontend/dist-single
     python3 -m backend.tools.export_static --build    # 先 npm run build:single（需要 Node.js）
 
-输出 release/6APA本体Demo_v2.html。做法：
+输出 release/深冷装置本体Demo_v2.html。做法：
 - 用种子数据（不含 data/store 里的在线编辑）跑一遍后端，把前端会请求的只读接口应答全部收集起来；
 - 现象 / 根因关系只导出原始记录，由前端在浏览器里现算（src/api/static.ts），因此单文件版里也能增删改；
 - 判定规则与计算组态的试算结果预先算好（模拟数据，时间窗截至导出时刻）；
@@ -26,7 +26,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 FRONT = ROOT / "frontend"
 SINGLE = FRONT / "dist-single" / "index.html"
-OUT = ROOT / "release" / "6APA本体Demo_v2.html"
+OUT = ROOT / "release" / "深冷装置本体Demo_v2.html"
 
 # 用种子数据导出，避免把本机的在线编辑带进去
 os.environ["V2_STORE_DIR"] = tempfile.mkdtemp(prefix="v2-export-")
@@ -127,7 +127,8 @@ def main() -> None:
         d = col.fetch(f"/ops/{op}/drawing")
         if d and d.get("image"):
             path = drawing_mod.image_path(op)
-            image_b64[op] = "data:image/png;base64," + base64.b64encode(path.read_bytes()).decode()
+            mime = "image/jpeg" if path.suffix.lower() in (".jpg", ".jpeg") else "image/png"
+            image_b64[op] = f"data:{mime};base64," + base64.b64encode(path.read_bytes()).decode()
             d["image"]["url"] = image_b64[op]
         col.fetch(f"/ops/{op}/calculations")
         docs = col.fetch(f"/ops/{op}/documents") or {}
@@ -234,7 +235,7 @@ def main() -> None:
     packed = base64.b64encode(gzip.compress(raw, 9)).decode("ascii")
 
     html = SINGLE.read_text("utf-8")
-    html = html.replace("<title>6APA 本体 v2</title>", "<title>6APA 本体 v2（单文件版）</title>")
+    html = html.replace("<title>深冷装置本体 v2</title>", "<title>深冷装置本体 v2（单文件版）</title>")
     inject = f'<script id="v2-data" type="application/octet-stream">{packed}</script>'
     html = html.replace("<div id=\"app\"></div>", f"<div id=\"app\"></div>\n    {inject}", 1)
     OUT.parent.mkdir(parents=True, exist_ok=True)

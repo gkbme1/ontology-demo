@@ -339,6 +339,9 @@ def bind_points(pts, matcher, valves):
     by_tag = {p["tag"]: p for p in pts}
     eq_names = {e["id"]: e["name"] for e in K.EQUIPMENT}
     eq_names.update({v["id"]: v["name"] for v in valves})
+    primary = {e["id"]: (e["kw"].split("|")[0] if e["kw"] else e["name"]) for e in K.EQUIPMENT}
+    primary.update({v["id"]: v["name"] for v in valves})
+    kws_of = {e["id"]: [k for k in e["kw"].split("|") if k] for e in K.EQUIPMENT}
     for p in pts:
         p["unit_code"] = tag_unit(p["tag"], p["desc"])
         p["role"] = role_of(p)
@@ -370,12 +373,20 @@ def bind_points(pts, matcher, valves):
         p["eq_name"] = eq_names.get(eid, "") if eid else ""
         d = p["desc"]
         param = d
-        if kw and d.startswith(kw):
-            param = d[len(kw):]
-        elif eid and p["eq_name"] and d.startswith(p["eq_name"]):
-            param = d[len(p["eq_name"]):]
+        # 只去掉设备「本名」（第一个匹配关键字或设备名称）；部件类关键字（润滑油冷却器…）保留在参数名里
+        head = next((h for h in (primary.get(eid), p["eq_name"]) if h and d.startswith(h)), None) if eid else None
+        if head:
+            param = d[len(head):]
         param = param.strip(" _-:：")
-        p["param"] = param if len(param) > 2 or param == d else d
+        if len(param) <= 2 and param != d:
+            # 去掉台号后只剩「液位」「转速」时，用去台号的完整描述，保证同组各台参数同名（如 轻烃储罐液位）
+            param = re.sub(r"^\d+#", "", d)
+        for k in kws_of.get(eid, ()):  # 「1#膨胀端X轴震动」→「膨胀端X轴震动」（台号属于设备本身时去掉）
+            m = re.match(r"^\d+#", k)
+            if m and param.startswith(k):
+                param = param[len(m.group(0)):]
+                break
+        p["param"] = param
         p["qty"] = quantity(d, p["unit"])
         p["conf"] = "高" if how in ("人工指定", "控制回路表") or how.startswith("随主位号") else ("中" if eid else "")
         if how.startswith("按位号前缀"):
@@ -836,7 +847,7 @@ def main():
         ("", "③ DCS 流程画面截图：仓库根目录 深冷装置工艺流程图/（44 张）"),
         ("生成", "python3 -m backend.tools.build_cryo_ontology（人工梳理部分在 backend/tools/cryo_knowledge.py，改那里再重新生成）"),
         ("层级口径", "厂 → 装置（= v2 的车间）→ 工艺单元（6 个，= 工艺段）→ DCS 流程画面（= 工序）→ 设备组 / 设备 / 阀门"),
-        ("编号口径", "设备编号以 DCS 流程画面编号为主（Demo 按画面落热区），规程编号列在「规程编号」；冲突见「待确认」"),
+        ("口径", K.AUTHORITY + "；设备编号、台数、位号含义冲突时取画面 / 点表，规程编号只作别名（处理记录见「待确认」）"),
         ("状态口径", "规程 / 点表原文 = 「原文」；按画面、位号或机理推断 = 「草案·待工艺确认」，依据列写明推断方式"),
         ("统计", f"单元 {len(K.UNITS)}；画面 {len(K.SCREENS)}；设备类 {len(K.CLASSES)}；设备组 {len(K.GROUPS)}；"
                  f"设备 / 管线 {len(K.EQUIPMENT)}；阀门 {len(valves)}；物料 {len(K.MATERIALS)}"),
@@ -870,12 +881,12 @@ def main():
     # 4 设备实例
     rows = []
     for e in K.EQUIPMENT:
-        basis = "规程" if e["sop_id"] else ("画面" if e["screen"] else "点表")
+        basis = "画面" if e["screen"] else ("点表" if count.get(e["id"]) else "规程（旧版）")
         rows.append((e["id"], e["name"], e["cls"], nm(e["group"]) if e["group"] else "", unit_name.get(e["unit"], ""),
                      ", ".join(screen_name.get(x, x) for x in (e["screen"] or "").split("/") if x), e["sop_id"], e["spec"],
                      count.get(e["id"], 0), e["kw"], e["note"], basis,
-                     K.DRAFT if ("推断" in e["note"] or not e["sop_id"]) else "原文"))
-    sheet(wb, "设备实例", ["编号", "名称", "设备类", "设备组", "工艺单元", "画面", "规程编号", "型号 / 规格（规程）", "关联位号数",
+                     K.DRAFT if ("推断" in e["note"] or basis.startswith("规程")) else "画面 / 点表"))
+    sheet(wb, "设备实例", ["编号", "名称", "设备类", "设备组", "工艺单元", "画面", "规程编号（旧版，别名）", "型号 / 规格（规程）", "关联位号数",
                        "位号匹配关键字", "备注", "依据", "状态"], rows, {"型号 / 规格（规程）": 50, "位号匹配关键字": 40, "备注": 50})
 
     # 5 阀门
@@ -923,7 +934,7 @@ def main():
     # 10 工艺限值
     rows = [(x["id"], nm(x["eq"]), unit_name.get(eq_all.get(x["eq"], {}).get("unit"), ""), x["mode"], x["name"], x["unit"],
              x["sop_tag"], x["dcs"], x["how"], x["LL"], x["L"], x["NL"], x["NH"], x["H"], x["HH"], x["op"], x["raw"], x["src"],
-             x["note"], "原文" if x["dcs"] or not x["sop_tag"] else "原文·位号待映射") for x in limits]
+             x["note"], "规程旧版参考·待现场确认") for x in limits]
     sheet(wb, "工艺限值", ["限值编号", "适用对象", "工艺单元", "适用工况", "参数含义", "单位", "规程位号", "DCS 位号", "位号映射方式",
                        "低低限 LL", "低限 L", "正常下限", "正常上限", "高限 H", "高高限 HH", "操作点 / 设定值", "原文", "依据", "备注", "状态"],
           rows, {"原文": 36, "依据": 36, "备注": 40})
@@ -1024,12 +1035,13 @@ def main():
     issues = list(K.OPEN_ISSUES)
     for m in mapping:
         if m[5] and "名称" in m[5]:
-            issues.append(("位号映射", f"规程 {m[0]}「{m[1]}」：{m[5]}", m[0], "工艺 / 仪表确认"))
+            issues.append(("位号映射", f"规程 {m[0]}「{m[1]}」：{m[5]}", m[0], "限值不挂到该位号", "已按点表"))
     unb = [p for p in proc_pts if not p["eq"] and p["role"] not in ("信号质量", "逻辑量")]
     if unb:
         issues.append(("位号归属", f"{len(unb)} 个位号未归属对象：" + "、".join(p["tag"] for p in unb[:40]) + ("…" if len(unb) > 40 else ""),
-                       "位号表", "补关键字或人工指定"))
-    sheet(wb, "待确认", ["类别", "内容", "涉及对象", "处理建议"], issues, {"内容": 100, "处理建议": 30})
+                       "位号表", "暂不归属（多为无描述的通讯点）", "待补录点表描述"))
+    sheet(wb, "待确认", ["类别", "内容", "涉及对象", "处理（按画面 / 点表口径）", "状态"], issues,
+          {"内容": 90, "处理（按画面 / 点表口径）": 50}, note="口径：" + K.AUTHORITY)
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     wb.save(OUT)

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
  * 左侧导航：分类切换 + 树。
- * 空间层级第一屏只有车间与工艺段；双击工艺段进入工艺段内的层级树，「返回车间导航」退回。
- * 工艺段内：单击工序选中，双击工序打开图纸。
+ * 空间层级第一屏只有装置与单元；双击单元进入单元内的层级树，「返回装置导航」退回。
+ * 单元内：单击画面选中，双击画面打开图纸。
  */
 import { computed, onMounted, ref, watch } from 'vue'
 import { api } from '@/api/client'
@@ -127,9 +127,9 @@ const segmentActiveKey = computed(() => {
     <div class="flex-1 overflow-auto py-2 min-h-0">
       <div v-if="error" class="empty mx-3">{{ error }}</div>
 
-      <!-- 空间层级 · 车间导航 -->
+      <!-- 空间层级 · 装置导航 -->
       <template v-if="nav.category === 'space' && nav.mode === 'root' && space">
-        <div class="px-3 pb-1 text-[11px] text-fg-mute">双击工艺段进入工艺段内的层级树</div>
+        <div class="px-3 pb-1 text-[11px] text-fg-mute">双击单元进入单元内的层级树</div>
         <TreeNode
           v-for="ws in space.items"
           :key="ws.id"
@@ -142,13 +142,13 @@ const segmentActiveKey = computed(() => {
         />
       </template>
 
-      <!-- 空间层级 · 工艺段内 -->
+      <!-- 空间层级 · 单元内 -->
       <template v-if="nav.category === 'space' && nav.mode === 'segment'">
         <div class="px-3 pb-2 flex items-center gap-2">
-          <button class="btn !py-1" @click="backToWorkshop">← 返回车间导航</button>
+          <button class="btn !py-1" @click="backToWorkshop">← 返回装置导航</button>
           <span class="font-semibold truncate">{{ segTree?.segment?.name }}</span>
         </div>
-        <div class="px-3 pb-1 text-[11px] text-fg-mute">单击工序选中，双击工序打开图纸</div>
+        <div class="px-3 pb-1 text-[11px] text-fg-mute">单击画面选中，双击画面打开图纸</div>
         <div v-if="loading && !segTree" class="px-3 text-fg-mute">加载中…</div>
         <TreeNode
           v-for="op in segTree?.items ?? []"

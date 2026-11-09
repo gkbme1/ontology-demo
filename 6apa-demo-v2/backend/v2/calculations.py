@@ -1,13 +1,13 @@
 """计算组态：引用算法库里的算法，把算法的每个输入参数绑定到本体。
 
-一条计算组态 = 作用范围（设备 / 设备组 / 工艺段）+ 引用的算法（algorithmId）+ 参数绑定（bindings）+ 输出单位。
-计算组态里不写算法本身：算法的调用方式与参数定义登记在算法库（data/config/6APA_算法库.json，
+一条计算组态 = 作用范围（设备 / 设备组 / 单元）+ 引用的算法（algorithmId）+ 参数绑定（bindings）+ 输出单位。
+计算组态里不写算法本身：算法的调用方式与参数定义登记在算法库（data/config/算法库.json，
 backend/v2/algorithms.py），本体只定义「传哪个参数」。
 
 参数绑定 bindings = {算法输入名: 绑定}，绑定形式：
 - {"kind": "parameter", "name": "反应体系pH", "index": 0}   本对象的属性（设备组上的组态对组内每台分别计算）；
                                                             index 取该属性的第 n 个测点
-- {"kind": "groupParameter", "groupId": "egrp-…", "name": "釜内反应温度"}  设备组全部成员的该属性（跨装置统计）
+- {"kind": "groupParameter", "groupId": "egrp-…", "name": "釜内反应温度"}  设备组全部成员的该属性（跨设备统计）
 - {"kind": "tag", "tag": "TI_1303"}                        直接指定 DCS 位号
 - {"kind": "calc", "calcId": "CALC-…"}                     另一条计算组态的输出
 - {"kind": "const", "value": 10}                           常量（算法的配置参数，如时间窗）
@@ -135,7 +135,7 @@ class CalcStore:
         if not (data.get("name") or "").strip():
             raise CalcError("名称不能为空")
         if not (data.get("anchor") or {}).get("id"):
-            raise CalcError("计算组态必须有作用范围（设备 / 设备组 / 工艺段）")
+            raise CalcError("计算组态必须有作用范围（设备 / 设备组 / 单元）")
         try:
             algo = self.algos.get(data.get("algorithmId") or "")
         except AlgorithmError as exc:

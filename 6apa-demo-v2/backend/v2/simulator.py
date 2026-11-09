@@ -6,6 +6,7 @@
 - 模拟量：以该测点工艺限值的正常区间为中心做慢周期 + 快周期波动 + 噪声；按 3 小时时间片
   随机出现「偏离片段」，把值推到正常区间外，使现象有机会成立；
 - 液位：锯齿形（逐步下降 → 补液），计量罐类下降速率随时间片变化，缓冲罐有持续上涨片段；
+- 无限值的模拟量按点表量程取值（深冷点表带量程）；
 - 开关量：同一台设备（位号去掉 _RUN/_DO/_FL/_RM 等后缀）共享状态：偶发跳闸（指令 1、运行 0、故障 1）、
   停机（指令 0、运行 0）、就地（远程 0）；阀门开关周期变化，偶发指令与反馈不一致；
 - 同一罐的两支 pH 计（AT_1301C1 / C2）共用一条曲线，偶发单支漂移。
@@ -21,6 +22,13 @@ from typing import Any
 import numpy as np
 
 SEED = "6apa-demo-v2"
+# 模拟基准（只给模拟器用，不是工艺限值）：没有正常区间的位号按这里的典型运行区间生成模拟值
+_BAND_FILE = __import__("pathlib").Path(__file__).resolve().parents[2] / "data" / "config" / "模拟基准.json"
+SIM_BANDS: dict[str, tuple[float, float]] = {}
+if _BAND_FILE.exists():
+    import json as _json
+
+    SIM_BANDS = {k: (float(v[0]), float(v[1])) for k, v in _json.loads(_BAND_FILE.read_text("utf-8"))["bands"].items()}
 SLOT_MIN = 180  # 偏离片段的时间片
 DEV_SLOT_MIN = 120  # 开关量状态片段
 TIME_FMT = "%Y-%m-%d %H:%M"
@@ -71,12 +79,22 @@ def is_digital(tag: dict[str, Any]) -> bool:
 def _band(tag: dict[str, Any], limit: dict[str, Any] | None) -> tuple[float, float]:
     if limit:
         lo, hi = limit.get("normalLow"), limit.get("normalHigh")
-        if lo is None and hi is not None:
-            lo = hi * 0.85 if hi > 0 else hi - 1
-        if hi is None and lo is not None:
-            hi = lo * 1.15 if lo > 0 else lo + 1
+        if lo is None and hi is not None:  # 只有「< 上限」：正常运行在上限的 20%～55%
+            lo, hi = (hi * 0.2, hi * 0.55) if hi > 0 else (hi - 1, hi)
+        if hi is None and lo is not None:  # 只有「≥ 下限」
+            lo, hi = (lo * 1.1, lo * 1.5) if lo > 0 else (lo, lo + 1)
         if lo is not None and hi is not None and hi > lo:
             return float(lo), float(hi)
+        h = limit.get("high")
+        if h is not None and h > 0 and tag["name"] not in SIM_BANDS:  # 只有报警高限：正常运行在高限的 45%～75%
+            return h * 0.45, h * 0.75
+    if tag["name"] in SIM_BANDS:
+        return SIM_BANDS[tag["name"]]
+    rlo, rhi = tag.get("rangeLow"), tag.get("rangeHigh")
+    if rlo is not None and rhi is not None and rhi > rlo:
+        # 没有限值时按量程的 35%～60% 取值（深冷点表带量程，如 -150～50 ℃）
+        span = rhi - rlo
+        return rlo + 0.35 * span, rlo + 0.6 * span
     unit = str(tag.get("unit") or tag.get("standardUnit") or "").strip().lower()
     return UNIT_RANGES.get(unit, (40.0, 60.0))
 
@@ -115,6 +133,11 @@ def _level(tag: dict[str, Any], limit: dict[str, Any] | None, t: np.ndarray) -> 
     name = tag["name"]
     unit = str(tag.get("unit") or "").lower()
     lo, hi = (100.0, 900.0) if unit == "l" else (3.0, 28.0)
+    if limit or (tag.get("rangeLow") is not None and tag.get("rangeHigh") is not None):
+        # 有限值或量程时：锯齿在正常区间附近上下摆动（略超出两端，便于液位高 / 低现象试算）
+        blo, bhi = _band(tag, limit)
+        pad = (bhi - blo) * 0.25
+        lo, hi = blo - pad, bhi + pad
     minutes = t / 60.0
     if name == "LT_1303":  # 水解液缓冲罐：大部分时间平稳，偶有持续上涨（下游不接收）
         slots = (minutes // SLOT_MIN).astype(np.int64)
@@ -163,6 +186,10 @@ def _digital(tag: dict[str, Any], t: np.ndarray) -> np.ndarray:
         if suffix == "FT":
             return cmd * (_slot_u(dev, "ft", slots) < 0.5)
         return cmd
+    text = f"{tag.get('parameterName') or ''}{tag.get('variableCategory') or ''}{tag.get('rawDescription') or ''}"
+    if not suffix and re.search(r"报警|故障|停机|超温|跳闸|首出", text):
+        # 报警 / 故障 / 停机类开关量平时为 0，跳闸片段为 1（深冷点表的 DI、ESD 通讯点）
+        return np.where(trip, 1.0, 0.0)
     if suffix == "DO":
         return np.where(stop, 0.0, 1.0)
     if suffix == "FL":

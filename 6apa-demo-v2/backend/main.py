@@ -1,4 +1,4 @@
-"""6APA 本体 Demo v2 服务入口。
+"""深冷装置本体 Demo v2 服务入口（北I-2 深冷装置；6APA 版数据在 data/archive/6apa）。
 
     python3 -m backend.main                 # 默认 0.0.0.0:8710
     V2_PORT=9000 python3 -m backend.main
@@ -39,7 +39,7 @@ async def _lifespan(_app: FastAPI):  # noqa: ANN202
     yield
 
 
-app = FastAPI(title="6APA 本体 Demo v2", version="0.1.0", lifespan=_lifespan)
+app = FastAPI(title="深冷装置本体 Demo v2", version="0.1.0", lifespan=_lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.include_router(router)
 

@@ -103,7 +103,7 @@ class AppContext:
         return out
 
     def scope_ops(self, object_id: str) -> list[str]:
-        """对象落在哪些工序：设备 / 设备组按层级归属，工序是自己，工艺段是它的全部工序，车间是全部。"""
+        """对象落在哪些画面：设备 / 设备组按层级归属，画面是自己，单元是它的全部画面，装置是全部。"""
         h = self.hierarchy
         if object_id in h.ops:
             return [object_id]

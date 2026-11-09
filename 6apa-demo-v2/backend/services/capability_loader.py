@@ -4,7 +4,7 @@
 只登记「这类对象能做什么、由谁提供、怎么调用、需要哪些参数」，并在具体对象上把参数绑定好
 （例如实时值查询的 nodeIds 绑定为水解罐A 的 17 个位号）。调用时仍去调提供方。
 
-数据源 data/source/6APA_能力.xlsx（backend/tools/build_capability_table.py 生成预填版）：
+数据源 data/source/能力.xlsx（backend/tools/build_capability_table.py 生成预填版）：
 - 「能力」工作表：能力ID、能力名称、能力类型、能力描述、适用对象、适用设备类型、提供方、调用方式、
   端点、本体代调入口、输出、前置条件、登记状态、说明；
 - 「能力参数」工作表：能力ID、参数名、类型、必填、说明、绑定。
@@ -26,7 +26,7 @@ from typing import Any
 
 from backend.ontology.models import Provenance
 
-CAPABILITY_FILE_NAME = "6APA_能力.xlsx"
+CAPABILITY_FILE_NAME = "能力.xlsx"
 SHEET_CAPS = "能力"
 SHEET_PARAMS = "能力参数"
 

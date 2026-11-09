@@ -1,7 +1,7 @@
 """设备 / 设备组的 10 个页签。
 
 页签数据大多取自复制来的对象档案（asset_model.profile），按本 Demo 的页签口径重新组织；
-现象定义、根因影响关系、计算/指标来自本 Demo 新增的仓库。设备组在某道工序下只列本工序认领的成员。
+现象定义、根因影响关系、计算/指标来自本 Demo 新增的仓库。设备组在某道画面下只列本画面认领的成员。
 """
 from __future__ import annotations
 
@@ -122,7 +122,7 @@ def _parameters(ctx: AppContext, object_id: str, prof: dict[str, Any], op_id: st
     dcs = ctx.store.dcs
     allowed: set[str] | None = None
     if object_id.startswith("egrp-"):
-        # 设备组在某道工序下只列本工序成员的测点（不属于任何成员的组级测点保留）
+        # 设备组在某道画面下只列本画面成员的测点（不属于任何成员的组级测点保留）
         members = set(_scope_members(ctx, object_id, op_id)) if op_id else set()
         if members:
             everyone = set(ctx.group_members(object_id))
@@ -144,7 +144,7 @@ def _parameters(ctx: AppContext, object_id: str, prof: dict[str, Any], op_id: st
                           # 共用设备 / 组级属性会关联到其他设备上的测点，前端淡化显示并标出所在设备
                           "own": object_id.startswith("egrp-") or tag.get("equipmentId") == object_id})
         if allowed is not None and a.get("dataLinks") and not links and group in ("测量", "状态", "控制"):
-            continue  # 该测点只在其他工序的成员上
+            continue  # 该测点只在其他画面的成员上
         items.append({"group": group, "name": a.get("name"), "valueType": a.get("valueType") or "",
                       "value": a.get("value"), "description": a.get("description") or "",
                       "note": a.get("note") or "", "links": links, "inheritedFrom": a.get("inheritedFrom"),
@@ -280,7 +280,7 @@ def calc_view(ctx: AppContext, c: dict[str, Any]) -> dict[str, Any]:
                      "required": inp.get("required"), "default": inp.get("default"),
                      "binding": b, "bindingText": binding_text(b, names) if b else (f"默认 {inp.get('default')}" if inp.get("default") is not None else "未绑定")})
     anchor = c.get("anchor") or {}
-    scope = {"segment": "工艺段", "group": "设备组", "equipment": "设备"}.get(anchor.get("kind"), anchor.get("kind") or "")
+    scope = {"segment": "单元", "group": "设备组", "equipment": "设备"}.get(anchor.get("kind"), anchor.get("kind") or "")
     cross = anchor.get("kind") == "segment" or any((b or {}).get("kind") == "groupParameter" for b in bindings.values())
     return {**c, "algorithm": {k: algo.get(k) for k in ("id", "name", "category", "version", "provider", "invoke", "output", "status")},
             "bindingRows": rows, "scopeText": scope, "crossDevice": cross,

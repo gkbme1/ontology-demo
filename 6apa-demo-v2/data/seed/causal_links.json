@@ -1,1343 +1,329 @@
 {
- "note": "种子数据：由 backend/tools/build_seed.py 生成，全部为草案·待工艺确认",
+ "note": "种子数据：由 backend/tools/build_cryo_seed.py 生成，全部为草案·待工艺确认（规程为旧版，阈值仅作参考）",
  "items": [
   {
-   "id": "CL-S11-01",
-   "cause": "PH-S11-07",
-   "effect": "PH-S11-06",
-   "mechanism": "运行中跳闸或保护动作导致搅拌停止",
-   "basis": "R-G-02；ARP-S11-07",
+   "id": "CL-01",
+   "cause": "PH-01",
+   "effect": "PH-06",
+   "mechanism": "塔顶温度低于 -81 ℃ 时 CO2 析出冻塔",
+   "basis": "北I-2装置操作规程（旧版） 4.1.2.1",
    "confidence": "高",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "规则 / 处置卡",
-    "ref": "R-G-02；ARP-S11-07"
+    "kind": "规程（旧版）/ 机理",
+    "ref": "北I-2装置操作规程（旧版） 4.1.2.1"
    }
   },
   {
-   "id": "CL-S11-02",
-   "cause": "PH-S11-08",
-   "effect": "PH-S11-06",
-   "mechanism": "电机故障或过载保护动作",
-   "basis": "ARP-S11-07 可能原因 1",
+   "id": "CL-02",
+   "cause": "PH-06",
+   "effect": "PH-02",
+   "mechanism": "冻堵使一级贫富气换热器差压升高",
+   "basis": "北I-2装置操作规程（旧版） 1.2.7.3",
    "confidence": "高",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "规则 / 处置卡",
-    "ref": "ARP-S11-07 可能原因 1"
+    "kind": "规程（旧版）/ 机理",
+    "ref": "北I-2装置操作规程（旧版） 1.2.7.3"
    }
   },
   {
-   "id": "CL-S11-03",
-   "cause": "PH-S11-09",
-   "effect": "PH-S11-06",
-   "mechanism": "处于就地状态，DCS 启动指令无效",
-   "basis": "ARP-S11-07 可能原因 2",
-   "confidence": "中",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规则 / 处置卡",
-    "ref": "ARP-S11-07 可能原因 2"
-   }
-  },
-  {
-   "id": "CL-S11-04",
-   "cause": "PH-S11-06",
-   "effect": "PH-S11-01",
-   "mechanism": "搅拌停止导致罐内温度分布不均，局部超温",
-   "basis": "ARP-S11-01 可能原因 6",
-   "confidence": "中",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规则 / 处置卡",
-    "ref": "ARP-S11-01 可能原因 6"
-   }
-  },
-  {
-   "id": "CL-S11-05",
-   "cause": "PH-S11-06",
-   "effect": "PH-S11-23",
-   "mechanism": "反应期搅拌停机，固液传质变差，转化不足",
-   "basis": "ARP-S11-08 可能原因 4",
-   "confidence": "中",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规则 / 处置卡",
-    "ref": "ARP-S11-08 可能原因 4"
-   }
-  },
-  {
-   "id": "CL-S11-06",
-   "cause": "PH-S11-13",
-   "effect": "PH-S11-01",
-   "mechanism": "热水持续进入夹套",
-   "basis": "ARP-S11-01 可能原因 4",
+   "id": "CL-03",
+   "cause": "PH-06",
+   "effect": "PH-03",
+   "mechanism": "冻堵使二级贫富气换热器差压升高",
+   "basis": "北I-2装置操作规程（旧版） 1.2.7.3",
    "confidence": "高",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "规则 / 处置卡",
-    "ref": "ARP-S11-01 可能原因 4"
+    "kind": "规程（旧版）/ 机理",
+    "ref": "北I-2装置操作规程（旧版） 1.2.7.3"
    }
   },
   {
-   "id": "CL-S11-07",
-   "cause": "PH-S11-14",
-   "effect": "PH-S11-01",
-   "mechanism": "高温 RB 进料带入热量，早于罐温上升",
-   "basis": "R-S11-10；ARP-S11-01 可能原因 5",
-   "confidence": "中",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规则 / 处置卡",
-    "ref": "R-S11-10；ARP-S11-01 可能原因 5"
-   }
-  },
-  {
-   "id": "CL-S11-08",
-   "cause": "PH-S11-01",
-   "effect": "PH-S11-22",
-   "mechanism": "反应超温（>35 ℃）导致酰化酶蛋白热变性失活",
-   "basis": "工业关系表；PL001 依据",
+   "id": "CL-04",
+   "cause": "PH-06",
+   "effect": "PH-04",
+   "mechanism": "冻堵使冷箱Ⅰ差压升高",
+   "basis": "北I-2装置操作规程（旧版） 1.2.7.3",
    "confidence": "高",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "规则 / 处置卡",
-    "ref": "工业关系表；PL001 依据"
+    "kind": "规程（旧版）/ 机理",
+    "ref": "北I-2装置操作规程（旧版） 1.2.7.3"
    }
   },
   {
-   "id": "CL-S11-09",
-   "cause": "PH-S11-10",
-   "effect": "PH-S11-03",
-   "mechanism": "加氨过量使体系 pH 升高",
-   "basis": "ARP-S11-03 可能原因 2",
+   "id": "CL-05",
+   "cause": "PH-06",
+   "effect": "PH-05",
+   "mechanism": "冻堵使填料段差压升高",
+   "basis": "北I-2装置操作规程（旧版） 4.2.4.3（塔段加注点）",
    "confidence": "中",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "规则 / 处置卡",
-    "ref": "ARP-S11-03 可能原因 2"
+    "kind": "规程（旧版）/ 机理",
+    "ref": "北I-2装置操作规程（旧版） 4.2.4.3（塔段加注点）"
    }
   },
   {
-   "id": "CL-S11-10",
-   "cause": "PH-S11-05",
-   "effect": "PH-S11-03",
-   "mechanism": "电极漂移造成 pH 读数偏高（测量偏差而非工艺偏离）",
-   "basis": "R-S11-03；ARP-S11-03 可能原因 1",
+   "id": "CL-06",
+   "cause": "PH-09",
+   "effect": "PH-06",
+   "mechanism": "原料气含水高在深冷段冻堵（按机理推断）",
+   "basis": "按机理推断",
    "confidence": "中",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "规则 / 处置卡",
-    "ref": "R-S11-03；ARP-S11-03 可能原因 1"
+    "kind": "规程（旧版）/ 机理",
+    "ref": "按机理推断"
    }
   },
   {
-   "id": "CL-S11-11",
-   "cause": "PH-S11-05",
-   "effect": "PH-S11-04",
-   "mechanism": "电极漂移造成 pH 读数偏低（测量偏差而非工艺偏离）",
-   "basis": "R-S11-03；ARP-S11-04 可能原因 1",
+   "id": "CL-07",
+   "cause": "PH-10",
+   "effect": "PH-09",
+   "mechanism": "再生不合格导致吸附能力下降、露点升高（按机理推断）",
+   "basis": "按机理推断",
    "confidence": "中",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "规则 / 处置卡",
-    "ref": "R-S11-03；ARP-S11-04 可能原因 1"
+    "kind": "规程（旧版）/ 机理",
+    "ref": "按机理推断"
    }
   },
   {
-   "id": "CL-S11-12",
-   "cause": "PH-S11-12",
-   "effect": "PH-S11-11",
-   "mechanism": "阀门未按指令动作，氨水实际未加入",
-   "basis": "ARP-S11-04 可能原因 3",
+   "id": "CL-08",
+   "cause": "PH-30",
+   "effect": "PH-10",
+   "mechanism": "导热油温度异常影响再生气加热温度（按机理推断）",
+   "basis": "按机理推断",
+   "confidence": "低",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "规程（旧版）/ 机理",
+    "ref": "按机理推断"
+   }
+  },
+  {
+   "id": "CL-09",
+   "cause": "PH-08",
+   "effect": "PH-07",
+   "mechanism": "J-T 阀打开，部分气量不做功，制冷温度升高",
+   "basis": "北I-2装置操作规程（旧版） 4.1.3.2",
    "confidence": "高",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "规则 / 处置卡",
-    "ref": "ARP-S11-04 可能原因 3"
+    "kind": "规程（旧版）/ 机理",
+    "ref": "北I-2装置操作规程（旧版） 4.1.3.2"
    }
   },
   {
-   "id": "CL-S11-13",
-   "cause": "PH-S11-11",
-   "effect": "PH-S11-04",
-   "mechanism": "加氨不足无法中和反应产生的苯乙酸",
-   "basis": "R-S11-04；ARP-S11-04 可能原因 2",
+   "id": "CL-10",
+   "cause": "PH-21",
+   "effect": "PH-07",
+   "mechanism": "膨胀机停机失去膨胀制冷",
+   "basis": "北I-2装置操作规程（旧版） 3.3.5.2",
    "confidence": "高",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "规则 / 处置卡",
-    "ref": "R-S11-04；ARP-S11-04 可能原因 2"
+    "kind": "规程（旧版）/ 机理",
+    "ref": "北I-2装置操作规程（旧版） 3.3.5.2"
    }
   },
   {
-   "id": "CL-S11-14",
-   "cause": "PH-S11-03",
-   "effect": "PH-S11-23",
-   "mechanism": "pH 偏离最适区间，酶活降低、6-APA 降解加剧",
-   "basis": "ARP-S11-08 可能原因 2",
-   "confidence": "中",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规则 / 处置卡",
-    "ref": "ARP-S11-08 可能原因 2"
-   }
-  },
-  {
-   "id": "CL-S11-15",
-   "cause": "PH-S11-04",
-   "effect": "PH-S11-23",
-   "mechanism": "偏酸降低酶活",
-   "basis": "ARP-S11-08 可能原因 2",
-   "confidence": "中",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规则 / 处置卡",
-    "ref": "ARP-S11-08 可能原因 2"
-   }
-  },
-  {
-   "id": "CL-S11-16",
-   "cause": "PH-S11-01",
-   "effect": "PH-S11-23",
-   "mechanism": "超温加速 6-APA 母环开环水解",
-   "basis": "ARP-S11-08 可能原因 2",
-   "confidence": "中",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规则 / 处置卡",
-    "ref": "ARP-S11-08 可能原因 2"
-   }
-  },
-  {
-   "id": "CL-S11-17",
-   "cause": "PH-S11-02",
-   "effect": "PH-S11-23",
-   "mechanism": "温度低反应速率慢，转化不足",
-   "basis": "ARP-S11-08 可能原因 2",
-   "confidence": "中",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规则 / 处置卡",
-    "ref": "ARP-S11-08 可能原因 2"
-   }
-  },
-  {
-   "id": "CL-S11-18",
-   "cause": "PH-S11-22",
-   "effect": "PH-S11-23",
-   "mechanism": "酶活下降导致氨耗偏低、终点异常",
-   "basis": "ARP-S11-08 可能原因 1",
+   "id": "CL-11",
+   "cause": "PH-21",
+   "effect": "PH-13",
+   "mechanism": "膨胀机停机后三级出口憋压",
+   "basis": "北I-2装置操作规程（旧版） 3.3.5.2",
    "confidence": "高",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "规则 / 处置卡",
-    "ref": "ARP-S11-08 可能原因 1"
+    "kind": "规程（旧版）/ 机理",
+    "ref": "北I-2装置操作规程（旧版） 3.3.5.2"
    }
   },
   {
-   "id": "CL-S11-19",
-   "cause": "PH-S11-15",
-   "effect": "PH-S11-16",
-   "mechanism": "RB 储罐供料不足",
-   "basis": "ARP-S11-06 可能原因 1",
-   "confidence": "中",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规则 / 处置卡",
-    "ref": "ARP-S11-06 可能原因 1"
-   }
-  },
-  {
-   "id": "CL-S11-20",
-   "cause": "PH-S11-16",
-   "effect": "PH-S11-23",
-   "mechanism": "RB 实际投料量与设定不符，终点判定偏差",
-   "basis": "ARP-S11-08 可能原因 3",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规则 / 处置卡",
-    "ref": "ARP-S11-08 可能原因 3"
-   }
-  },
-  {
-   "id": "CL-S11-21",
-   "cause": "PH-S11-20",
-   "effect": "PH-S11-21",
-   "mechanism": "压料气源压力不足，多罐出料同时偏慢",
-   "basis": "ARP-S11-09 可能原因 1",
+   "id": "CL-12",
+   "cause": "PH-22",
+   "effect": "PH-21",
+   "mechanism": "压缩机联锁停机导致膨胀机联锁停机",
+   "basis": "北I-2装置操作规程（旧版） 3.3.5.1",
    "confidence": "高",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "规则 / 处置卡",
-    "ref": "ARP-S11-09 可能原因 1"
+    "kind": "规程（旧版）/ 机理",
+    "ref": "北I-2装置操作规程（旧版） 3.3.5.1"
    }
   },
   {
-   "id": "CL-S11-22",
-   "cause": "PH-S11-18",
-   "effect": "PH-S11-17",
-   "mechanism": "萃取不接收，缓冲罐液位持续上升",
-   "basis": "ARP-S11-10 可能原因 1",
+   "id": "CL-13",
+   "cause": "PH-14",
+   "effect": "PH-22",
+   "mechanism": "轴振动达 HH 联锁停压缩机",
+   "basis": "北I-2装置操作规程（旧版） 附录四",
    "confidence": "高",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "规则 / 处置卡",
-    "ref": "ARP-S11-10 可能原因 1"
+    "kind": "规程（旧版）/ 机理",
+    "ref": "北I-2装置操作规程（旧版） 附录四"
    }
   },
   {
-   "id": "CL-S11-23",
-   "cause": "PH-S11-19",
-   "effect": "PH-S11-17",
-   "mechanism": "水解液泵停机，缓冲罐无法外送",
-   "basis": "R-G-02；水解液缓冲罐拓扑",
+   "id": "CL-14",
+   "cause": "PH-15",
+   "effect": "PH-22",
+   "mechanism": "轴承温度达 HH 联锁停压缩机",
+   "basis": "北I-2装置操作规程（旧版） 附录四",
+   "confidence": "高",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "规程（旧版）/ 机理",
+    "ref": "北I-2装置操作规程（旧版） 附录四"
+   }
+  },
+  {
+   "id": "CL-15",
+   "cause": "PH-16",
+   "effect": "PH-15",
+   "mechanism": "润滑油压力低导致轴承润滑不良温度升高（按机理推断）",
+   "basis": "按机理推断",
    "confidence": "中",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "规则 / 处置卡",
-    "ref": "R-G-02；水解液缓冲罐拓扑"
+    "kind": "规程（旧版）/ 机理",
+    "ref": "按机理推断"
    }
   },
   {
-   "id": "CL-S11-24",
-   "cause": "PH-S11-17",
-   "effect": "PH-S11-21",
-   "mechanism": "缓冲罐高位时水解罐无法正常出料",
-   "basis": "水解液缓冲罐拓扑",
-   "confidence": "低",
+   "id": "CL-16",
+   "cause": "PH-17",
+   "effect": "PH-21",
+   "mechanism": "振动 > 48 μm 联锁停膨胀机",
+   "basis": "北I-2装置操作规程（旧版） 附录四",
+   "confidence": "高",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "规则 / 处置卡",
-    "ref": "水解液缓冲罐拓扑"
+    "kind": "规程（旧版）/ 机理",
+    "ref": "北I-2装置操作规程（旧版） 附录四"
    }
   },
   {
-   "id": "CL-A001",
-   "cause": "PH-A002",
-   "effect": "PH-A001",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S12-01 #1"
-   }
-  },
-  {
-   "id": "CL-A002",
-   "cause": "PH-A003",
-   "effect": "PH-A001",
-   "mechanism": "回流换热器出口温度偏高，且变化早于或同步于 水解进料换热温度",
-   "basis": "工业关系 R1456 回流换热器出口温度 正向影响 水解进料换热温度",
+   "id": "CL-17",
+   "cause": "PH-18",
+   "effect": "PH-21",
+   "mechanism": "轴承温度达联锁值停膨胀机",
+   "basis": "北I-2装置操作规程（旧版） 附录四",
    "confidence": "中",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S12-01 #2"
+    "kind": "规程（旧版）/ 机理",
+    "ref": "北I-2装置操作规程（旧版） 附录四"
    }
   },
   {
-   "id": "CL-A003",
-   "cause": "PH-A004",
-   "effect": "PH-A001",
-   "mechanism": "冷盐水流量(水解液换热器) 偏离正常并早于或同步于 水解进料换热温度 变化",
-   "basis": "工业关系 R1472 冷盐水流量(水解液换热器) 负向影响 水解进料换热温度",
+   "id": "CL-18",
+   "cause": "PH-19",
+   "effect": "PH-18",
+   "mechanism": "供油压差低导致轴承温度升高（按机理推断）",
+   "basis": "按机理推断",
    "confidence": "中",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S12-01 #3"
+    "kind": "规程（旧版）/ 机理",
+    "ref": "按机理推断"
    }
   },
   {
-   "id": "CL-A004",
-   "cause": "PH-A005",
-   "effect": "PH-A001",
-   "mechanism": "冰盐水流量 偏离正常并早于或同步于 水解进料换热温度 变化",
-   "basis": "工业关系 R2214 冰盐水流量 负向影响 水解进料换热温度",
+   "id": "CL-19",
+   "cause": "PH-20",
+   "effect": "PH-21",
+   "mechanism": "增压端流量低于 8600 m³/h 联锁（防喘振）",
+   "basis": "北I-2装置操作规程（旧版） 附录四",
    "confidence": "中",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S12-01 #4"
+    "kind": "规程（旧版）/ 机理",
+    "ref": "北I-2装置操作规程（旧版） 附录四"
    }
   },
   {
-   "id": "CL-A005",
-   "cause": "PH-A006",
-   "effect": "PH-A001",
-   "mechanism": "指令与反馈不一致，或已到限位仍无法拉回",
-   "basis": "工业关系 R1390 控制关系",
-   "confidence": "低",
+   "id": "CL-20",
+   "cause": "PH-32",
+   "effect": "PH-34",
+   "mechanism": "循环水中断，润滑油温度升高较快",
+   "basis": "北I-2装置操作规程（旧版） 3.3.3",
+   "confidence": "高",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S12-01 #5"
+    "kind": "规程（旧版）/ 机理",
+    "ref": "北I-2装置操作规程（旧版） 3.3.3"
    }
   },
   {
-   "id": "CL-A006",
-   "cause": "PH-A007",
-   "effect": "PH-A001",
-   "mechanism": "",
-   "basis": "工业关系 R1389 水解进料换热温度 反馈给 水解液去萃取温度控制器(TIC-1006)",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S12-01 #6"
-   }
-  },
-  {
-   "id": "CL-A007",
-   "cause": "PH-A002",
-   "effect": "PH-A008",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S12-02 #1"
-   }
-  },
-  {
-   "id": "CL-A008",
-   "cause": "PH-A009",
-   "effect": "PH-A008",
-   "mechanism": "回流换热器出口温度偏低，且变化早于或同步于 水解进料换热温度",
-   "basis": "工业关系 R1456 回流换热器出口温度 正向影响 水解进料换热温度",
+   "id": "CL-21",
+   "cause": "PH-34",
+   "effect": "PH-18",
+   "mechanism": "润滑油温度高导致轴承温度升高（按机理推断）",
+   "basis": "按机理推断",
    "confidence": "中",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S12-02 #2"
+    "kind": "规程（旧版）/ 机理",
+    "ref": "按机理推断"
    }
   },
   {
-   "id": "CL-A009",
-   "cause": "PH-A004",
-   "effect": "PH-A008",
-   "mechanism": "冷盐水流量(水解液换热器) 偏离正常并早于或同步于 水解进料换热温度 变化",
-   "basis": "工业关系 R1472 冷盐水流量(水解液换热器) 负向影响 水解进料换热温度",
+   "id": "CL-22",
+   "cause": "PH-31",
+   "effect": "PH-34",
+   "mechanism": "冷却水温度高，油冷器冷却不足（按机理推断）",
+   "basis": "北I-2装置操作规程（旧版） 4.3.11.2",
    "confidence": "中",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S12-02 #3"
+    "kind": "规程（旧版）/ 机理",
+    "ref": "北I-2装置操作规程（旧版） 4.3.11.2"
    }
   },
   {
-   "id": "CL-A010",
-   "cause": "PH-A005",
-   "effect": "PH-A008",
-   "mechanism": "冰盐水流量 偏离正常并早于或同步于 水解进料换热温度 变化",
-   "basis": "工业关系 R2214 冰盐水流量 负向影响 水解进料换热温度",
+   "id": "CL-23",
+   "cause": "PH-33",
+   "effect": "PH-22",
+   "mechanism": "仪表风中断约 20 min 后需停车",
+   "basis": "北I-2装置操作规程（旧版） 3.3.2",
    "confidence": "中",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S12-02 #4"
+    "kind": "规程（旧版）/ 机理",
+    "ref": "北I-2装置操作规程（旧版） 3.3.2"
    }
   },
   {
-   "id": "CL-A011",
-   "cause": "PH-A006",
-   "effect": "PH-A008",
-   "mechanism": "指令与反馈不一致，或已到限位仍无法拉回",
-   "basis": "工业关系 R1390 控制关系",
+   "id": "CL-24",
+   "cause": "PH-23",
+   "effect": "PH-07",
+   "mechanism": "丙烷机停机，蒸发器预冷消失，膨胀机入口及制冷温度升高",
+   "basis": "北I-2装置操作规程（旧版） 4.1.3.2",
+   "confidence": "高",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "规程（旧版）/ 机理",
+    "ref": "北I-2装置操作规程（旧版） 4.1.3.2"
+   }
+  },
+  {
+   "id": "CL-25",
+   "cause": "PH-35",
+   "effect": "PH-09",
+   "mechanism": "再生气冷却不足，分水效果差（按机理推断）",
+   "basis": "按机理推断",
    "confidence": "低",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S12-02 #5"
-   }
-  },
-  {
-   "id": "CL-A012",
-   "cause": "PH-A007",
-   "effect": "PH-A008",
-   "mechanism": "",
-   "basis": "工业关系 R1389 水解进料换热温度 反馈给 水解液去萃取温度控制器(TIC-1006)",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S12-02 #6"
-   }
-  },
-  {
-   "id": "CL-A013",
-   "cause": "PH-A011",
-   "effect": "PH-A010",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S13-01 #1"
-   }
-  },
-  {
-   "id": "CL-A014",
-   "cause": "PH-A011",
-   "effect": "PH-A012",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S13-02 #1"
-   }
-  },
-  {
-   "id": "CL-A015",
-   "cause": "PH-A011",
-   "effect": "PH-A013",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S13-03 #1"
-   }
-  },
-  {
-   "id": "CL-A016",
-   "cause": "PH-A011",
-   "effect": "PH-A014",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S13-04 #1"
-   }
-  },
-  {
-   "id": "CL-A017",
-   "cause": "PH-A016",
-   "effect": "PH-A015",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S12-03 #1"
-   }
-  },
-  {
-   "id": "CL-A018",
-   "cause": "PH-A017",
-   "effect": "PH-A015",
-   "mechanism": "盐酸进料流量 偏离正常并早于或同步于 酸化体系pH 变化",
-   "basis": "工业关系 R1459 盐酸进料流量 负向影响 酸化体系pH",
-   "confidence": "中",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S12-03 #2"
-   }
-  },
-  {
-   "id": "CL-A019",
-   "cause": "PH-A018",
-   "effect": "PH-A015",
-   "mechanism": "指令与反馈不一致，或已到限位仍无法拉回",
-   "basis": "工业关系 R1399 控制关系",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S12-03 #3"
-   }
-  },
-  {
-   "id": "CL-A020",
-   "cause": "PH-A019",
-   "effect": "PH-A015",
-   "mechanism": "",
-   "basis": "工业关系 R1398 酸化体系pH 反馈给 萃取酸化pH控制器(AIC-1302)",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S12-03 #4"
-   }
-  },
-  {
-   "id": "CL-A021",
-   "cause": "PH-A016",
-   "effect": "PH-A020",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S12-04 #1"
-   }
-  },
-  {
-   "id": "CL-A022",
-   "cause": "PH-A017",
-   "effect": "PH-A020",
-   "mechanism": "盐酸进料流量 偏离正常并早于或同步于 酸化体系pH 变化",
-   "basis": "工业关系 R1459 盐酸进料流量 负向影响 酸化体系pH",
-   "confidence": "中",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S12-04 #2"
-   }
-  },
-  {
-   "id": "CL-A023",
-   "cause": "PH-A018",
-   "effect": "PH-A020",
-   "mechanism": "指令与反馈不一致，或已到限位仍无法拉回",
-   "basis": "工业关系 R1399 控制关系",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S12-04 #3"
-   }
-  },
-  {
-   "id": "CL-A024",
-   "cause": "PH-A019",
-   "effect": "PH-A020",
-   "mechanism": "",
-   "basis": "工业关系 R1398 酸化体系pH 反馈给 萃取酸化pH控制器(AIC-1302)",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S12-04 #4"
-   }
-  },
-  {
-   "id": "CL-A025",
-   "cause": "PH-A022",
-   "effect": "PH-A021",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S01-01 #1"
-   }
-  },
-  {
-   "id": "CL-A026",
-   "cause": "PH-A022",
-   "effect": "PH-A023",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S01-02 #1"
-   }
-  },
-  {
-   "id": "CL-A027",
-   "cause": "PH-A025",
-   "effect": "PH-A024",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S09-01 #1"
-   }
-  },
-  {
-   "id": "CL-A028",
-   "cause": "PH-A025",
-   "effect": "PH-A026",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S09-02 #1"
-   }
-  },
-  {
-   "id": "CL-A029",
-   "cause": "PH-A028",
-   "effect": "PH-A027",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S12-05 #1"
-   }
-  },
-  {
-   "id": "CL-A030",
-   "cause": "PH-A029",
-   "effect": "PH-A027",
-   "mechanism": "指令与反馈不一致，或已到限位仍无法拉回",
-   "basis": "工业关系 R1388 控制关系",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S12-05 #2"
-   }
-  },
-  {
-   "id": "CL-A031",
-   "cause": "PH-A031",
-   "effect": "PH-A030",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S01-03 #1"
-   }
-  },
-  {
-   "id": "CL-A032",
-   "cause": "PH-A032",
-   "effect": "PH-A030",
-   "mechanism": "稀硫酸注入流量 偏离正常并早于或同步于 一阶段酸化pH 变化",
-   "basis": "工业关系 R0141 稀硫酸注入流量 负向影响 一阶段酸化pH",
-   "confidence": "中",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S01-03 #2"
-   }
-  },
-  {
-   "id": "CL-A033",
-   "cause": "PH-A033",
-   "effect": "PH-A030",
-   "mechanism": "稀硫酸浓度 偏离正常并早于或同步于 一阶段酸化pH 变化",
-   "basis": "工业关系 R0142 稀硫酸浓度 负向影响 一阶段酸化pH",
-   "confidence": "中",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S01-03 #3"
-   }
-  },
-  {
-   "id": "CL-A034",
-   "cause": "PH-A034",
-   "effect": "PH-A030",
-   "mechanism": "指令与反馈不一致，或已到限位仍无法拉回",
-   "basis": "工业关系 R0112 控制关系",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S01-03 #4"
-   }
-  },
-  {
-   "id": "CL-A035",
-   "cause": "PH-A035",
-   "effect": "PH-A030",
-   "mechanism": "",
-   "basis": "工业关系 R0111 一阶段酸化pH 反馈给 提取酸化pH控制器(AIC-1105)",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S01-03 #5"
-   }
-  },
-  {
-   "id": "CL-A036",
-   "cause": "PH-A031",
-   "effect": "PH-A036",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S01-04 #1"
-   }
-  },
-  {
-   "id": "CL-A037",
-   "cause": "PH-A032",
-   "effect": "PH-A036",
-   "mechanism": "稀硫酸注入流量 偏离正常并早于或同步于 一阶段酸化pH 变化",
-   "basis": "工业关系 R0141 稀硫酸注入流量 负向影响 一阶段酸化pH",
-   "confidence": "中",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S01-04 #2"
-   }
-  },
-  {
-   "id": "CL-A038",
-   "cause": "PH-A033",
-   "effect": "PH-A036",
-   "mechanism": "稀硫酸浓度 偏离正常并早于或同步于 一阶段酸化pH 变化",
-   "basis": "工业关系 R0142 稀硫酸浓度 负向影响 一阶段酸化pH",
-   "confidence": "中",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S01-04 #3"
-   }
-  },
-  {
-   "id": "CL-A039",
-   "cause": "PH-A034",
-   "effect": "PH-A036",
-   "mechanism": "指令与反馈不一致，或已到限位仍无法拉回",
-   "basis": "工业关系 R0112 控制关系",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S01-04 #4"
-   }
-  },
-  {
-   "id": "CL-A040",
-   "cause": "PH-A035",
-   "effect": "PH-A036",
-   "mechanism": "",
-   "basis": "工业关系 R0111 一阶段酸化pH 反馈给 提取酸化pH控制器(AIC-1105)",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S01-04 #5"
-   }
-  },
-  {
-   "id": "CL-A041",
-   "cause": "PH-A038",
-   "effect": "PH-A037",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S01-05 #1"
-   }
-  },
-  {
-   "id": "CL-A042",
-   "cause": "PH-A038",
-   "effect": "PH-A039",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S01-06 #1"
-   }
-  },
-  {
-   "id": "CL-A043",
-   "cause": "PH-A041",
-   "effect": "PH-A040",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S02-01 #1"
-   }
-  },
-  {
-   "id": "CL-A044",
-   "cause": "PH-A041",
-   "effect": "PH-A042",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S02-02 #1"
-   }
-  },
-  {
-   "id": "CL-A045",
-   "cause": "PH-A044",
-   "effect": "PH-A043",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S01-07 #1"
-   }
-  },
-  {
-   "id": "CL-A046",
-   "cause": "PH-A044",
-   "effect": "PH-A045",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S01-08 #1"
-   }
-  },
-  {
-   "id": "CL-A047",
-   "cause": "PH-A047",
-   "effect": "PH-A046",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S01-09 #1"
-   }
-  },
-  {
-   "id": "CL-A048",
-   "cause": "PH-A048",
-   "effect": "PH-A046",
-   "mechanism": "指令与反馈不一致，或已到限位仍无法拉回",
-   "basis": "工业关系 R0118 控制关系",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S01-09 #2"
-   }
-  },
-  {
-   "id": "CL-A049",
-   "cause": "PH-A049",
-   "effect": "PH-A046",
-   "mechanism": "",
-   "basis": "工业关系 R0117 废酸水中和pH 反馈给 废酸水中和pH控制器(AIC-1111)",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S01-09 #3"
-   }
-  },
-  {
-   "id": "CL-A050",
-   "cause": "PH-A047",
-   "effect": "PH-A050",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S01-10 #1"
-   }
-  },
-  {
-   "id": "CL-A051",
-   "cause": "PH-A048",
-   "effect": "PH-A050",
-   "mechanism": "指令与反馈不一致，或已到限位仍无法拉回",
-   "basis": "工业关系 R0118 控制关系",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S01-10 #2"
-   }
-  },
-  {
-   "id": "CL-A052",
-   "cause": "PH-A049",
-   "effect": "PH-A050",
-   "mechanism": "",
-   "basis": "工业关系 R0117 废酸水中和pH 反馈给 废酸水中和pH控制器(AIC-1111)",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S01-10 #3"
-   }
-  },
-  {
-   "id": "CL-A053",
-   "cause": "PH-A052",
-   "effect": "PH-A051",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S07-01 #1"
-   }
-  },
-  {
-   "id": "CL-A054",
-   "cause": "PH-A053",
-   "effect": "PH-A051",
-   "mechanism": "一离碳酸钾流量偏高，且变化早于或同步于 一离出口pH(RB液pH)",
-   "basis": "工业关系 R0728 一离碳酸钾流量 正向影响 一离出口pH(RB液pH)",
-   "confidence": "中",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S07-01 #2"
-   }
-  },
-  {
-   "id": "CL-A055",
-   "cause": "PH-A054",
-   "effect": "PH-A051",
-   "mechanism": "指令与反馈不一致，或已到限位仍无法拉回",
-   "basis": "工业关系 R0697 控制关系",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S07-01 #3"
-   }
-  },
-  {
-   "id": "CL-A056",
-   "cause": "PH-A055",
-   "effect": "PH-A051",
-   "mechanism": "",
-   "basis": "工业关系 R0696 一离出口pH(RB液pH) 反馈给 一次离心机pH控制器(AIC-1206)",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S07-01 #4"
-   }
-  },
-  {
-   "id": "CL-A057",
-   "cause": "PH-A052",
-   "effect": "PH-A056",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S07-02 #1"
-   }
-  },
-  {
-   "id": "CL-A058",
-   "cause": "PH-A057",
-   "effect": "PH-A056",
-   "mechanism": "一离碳酸钾流量偏低，且变化早于或同步于 一离出口pH(RB液pH)",
-   "basis": "工业关系 R0728 一离碳酸钾流量 正向影响 一离出口pH(RB液pH)",
-   "confidence": "中",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S07-02 #2"
-   }
-  },
-  {
-   "id": "CL-A059",
-   "cause": "PH-A054",
-   "effect": "PH-A056",
-   "mechanism": "指令与反馈不一致，或已到限位仍无法拉回",
-   "basis": "工业关系 R0697 控制关系",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S07-02 #3"
-   }
-  },
-  {
-   "id": "CL-A060",
-   "cause": "PH-A055",
-   "effect": "PH-A056",
-   "mechanism": "",
-   "basis": "工业关系 R0696 一离出口pH(RB液pH) 反馈给 一次离心机pH控制器(AIC-1206)",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S07-02 #4"
-   }
-  },
-  {
-   "id": "CL-A061",
-   "cause": "PH-A059",
-   "effect": "PH-A058",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S14-01 #1"
-   }
-  },
-  {
-   "id": "CL-A062",
-   "cause": "PH-A060",
-   "effect": "PH-A058",
-   "mechanism": "指令与反馈不一致，或已到限位仍无法拉回",
-   "basis": "工业关系 R1747 控制关系",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S14-01 #2"
-   }
-  },
-  {
-   "id": "CL-A063",
-   "cause": "PH-A061",
-   "effect": "PH-A058",
-   "mechanism": "",
-   "basis": "工业关系 R1746 二级结晶pH 反馈给 二级结晶pH控制器",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S14-01 #3"
-   }
-  },
-  {
-   "id": "CL-A064",
-   "cause": "PH-A059",
-   "effect": "PH-A062",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S14-02 #1"
-   }
-  },
-  {
-   "id": "CL-A065",
-   "cause": "PH-A060",
-   "effect": "PH-A062",
-   "mechanism": "指令与反馈不一致，或已到限位仍无法拉回",
-   "basis": "工业关系 R1747 控制关系",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S14-02 #2"
-   }
-  },
-  {
-   "id": "CL-A066",
-   "cause": "PH-A061",
-   "effect": "PH-A062",
-   "mechanism": "",
-   "basis": "工业关系 R1746 二级结晶pH 反馈给 二级结晶pH控制器",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S14-02 #3"
-   }
-  },
-  {
-   "id": "CL-A067",
-   "cause": "PH-A064",
-   "effect": "PH-A063",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S03-01 #1"
-   }
-  },
-  {
-   "id": "CL-A068",
-   "cause": "PH-A066",
-   "effect": "PH-A065",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S04-01 #1"
-   }
-  },
-  {
-   "id": "CL-A069",
-   "cause": "PH-A068",
-   "effect": "PH-A067",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S05-01 #1"
-   }
-  },
-  {
-   "id": "CL-A070",
-   "cause": "PH-A069",
-   "effect": "PH-A067",
-   "mechanism": "指令与反馈不一致，或已到限位仍无法拉回",
-   "basis": "工业关系 R0423 控制关系",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S05-01 #2"
-   }
-  },
-  {
-   "id": "CL-A071",
-   "cause": "PH-A070",
-   "effect": "PH-A067",
-   "mechanism": "",
-   "basis": "工业关系 R0422 水洗重相罐液位 反馈给 水洗重相外送控制器(LIC-SXZ)",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S05-01 #3"
-   }
-  },
-  {
-   "id": "CL-A072",
-   "cause": "PH-A072",
-   "effect": "PH-A071",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S06-01 #1"
-   }
-  },
-  {
-   "id": "CL-A073",
-   "cause": "PH-A074",
-   "effect": "PH-A073",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S06-02 #1"
-   }
-  },
-  {
-   "id": "CL-A074",
-   "cause": "PH-A076",
-   "effect": "PH-A075",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S06-03 #1"
-   }
-  },
-  {
-   "id": "CL-A075",
-   "cause": "PH-A078",
-   "effect": "PH-A077",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S09-03 #1"
-   }
-  },
-  {
-   "id": "CL-A076",
-   "cause": "PH-A080",
-   "effect": "PH-A079",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S13-05 #1"
-   }
-  },
-  {
-   "id": "CL-A077",
-   "cause": "PH-A081",
-   "effect": "PH-A079",
-   "mechanism": "指令与反馈不一致，或已到限位仍无法拉回",
-   "basis": "工业关系 R1645 控制关系",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S13-05 #2"
-   }
-  },
-  {
-   "id": "CL-A078",
-   "cause": "PH-A082",
-   "effect": "PH-A079",
-   "mechanism": "",
-   "basis": "工业关系 R1644 重液进料流量 反馈给 结晶重液进料流量控制器(FIC-1005)",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S13-05 #3"
-   }
-  },
-  {
-   "id": "CL-A079",
-   "cause": "PH-A084",
-   "effect": "PH-A083",
-   "mechanism": "质量码为坏 / 长时间不变 / 与其他测点偏差明显",
-   "basis": "通用测点核查",
-   "confidence": "低",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "处置卡·可能原因",
-    "ref": "ARP-S15-01 #1"
+    "kind": "规程（旧版）/ 机理",
+    "ref": "按机理推断"
    }
   }
  ]

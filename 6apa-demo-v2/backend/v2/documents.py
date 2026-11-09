@@ -1,8 +1,8 @@
-"""文档提取：工序相关的文档，以及从文档中提取进本体的对象（留痕可追溯）。
+"""文档提取：画面相关的文档，以及从文档中提取进本体的对象（留痕可追溯）。
 
 两类文档：
-- 规程类文档（docs/source-docs/*.md）：如 SOP-S11-ALARM-001（模拟规程），提取出处置卡、可能原因、处置步骤；
-- 数据源文档（data/source/*.xlsx）：点表、工业关系、工艺限值、规则、处置规程，统计本工序从中提取了多少条。
+- 规程类文档（docs/source-docs/*.md）：北I-2装置操作规程（旧版），提取出处置卡、处置步骤、工艺限值；
+- 数据源文档（data/source/*.xlsx）：点表、工业关系、工艺限值、规则、处置规程，统计本画面从中提取了多少条。
 """
 from __future__ import annotations
 
@@ -16,10 +16,11 @@ ROOT = Path(__file__).resolve().parents[2]
 DOC_DIR = ROOT / "docs" / "source-docs"
 
 # 文档登记：文档编号 → 适用工段、说明
+ALL_AREAS = ["S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S10", "S11", "S12", "S13", "S14", "S15", "S16", "S17", "S18"]
 REGISTRY = [
-    {"id": "SOP-S11-ALARM-001", "file": "SOP-S11-ALARM-001.md", "title": "6-APA 酶法水解工段异常报警及处置操作规程",
-     "type": "报警处置规程", "areaCodes": ["S11"], "status": "模拟规程·待企业SOP确认",
-     "note": "依据 6-APA 本体编制的模拟规程，非企业正式 SOP"},
+    {"id": "WJ-TRQ-03-09-04", "file": "WJ-TRQ-03-09-04.md", "title": "北I-2装置操作规程（2024.11 发布）",
+     "type": "装置操作规程", "areaCodes": ALL_AREAS, "status": "旧版规程·仅作参考",
+     "note": "画面与点表为准；本规程用于补充限值数值、PID 设定、开停车与故障处置步骤（已提取为工艺限值、控制回路、处置卡）"},
 ]
 
 
@@ -36,7 +37,7 @@ def for_op(ctx: AppContext, op_id: str) -> dict[str, Any]:
 
 
 def for_scope(ctx: AppContext, op_ids: list[str]) -> dict[str, Any]:
-    """一组工序（空 = 全车间）的文档与数据源提取统计。"""
+    """一组画面（空 = 全装置）的文档与数据源提取统计。"""
     h = ctx.hierarchy
     op_ids = op_ids or list(h.ops)
     codes = {c for o in op_ids for c in h.ops[o]["areaCodes"]}
@@ -47,7 +48,8 @@ def for_scope(ctx: AppContext, op_ids: list[str]) -> dict[str, Any]:
         if not codes & set(doc["areaCodes"]):
             continue
         meta = _doc_meta(doc)
-        cards = [c for c in ctx.store.procedures.cards.values() if (c.get("area") or {}).get("text") in doc["areaCodes"]]
+        cards = [c for c in ctx.store.procedures.cards.values()
+                 if (c.get("area") or {}).get("text") in set(doc["areaCodes"]) & codes]
         card_ids = {c["id"] for c in cards}
         phen = [p for p in ctx.phen.phenomena.values()
                 if any(cid in str((p.get("source") or {}).get("ref", "")) for cid in card_ids)
@@ -64,12 +66,12 @@ def for_scope(ctx: AppContext, op_ids: list[str]) -> dict[str, Any]:
                 any(ctx.store.dcs.areas.get(f"area-{c}", {}).get("name") == r.get("area") for c in codes)]
     limits = [l for l in ctx.limits.values() if any(ctx.store.dcs.areas.get(f"area-{c}", {}).get("name") == l.get("area") for c in codes)]
     sources = [
-        {"file": "6APA_DCS.xlsx", "sheet": "DCS点位明细", "what": "设备与测点", "count": len(tags),
+        {"file": "DCS.xlsx", "sheet": "DCS点位明细", "what": "设备与测点", "count": len(tags),
          "detail": f"{len(equipment)} 台设备、{len(tags)} 个测点"},
-        {"file": "6APA_工业关系.xlsx", "sheet": "关系明细", "what": "本体关系", "count": len(rel_rows),
-         "detail": "按工段统计（同工段的其他工序共享）"},
-        {"file": "6APA_工艺限值.xlsx", "sheet": "工艺限值", "what": "参数约束", "count": len(limits), "detail": "按工段统计"},
-        {"file": "6APA_处置规程.xlsx", "sheet": "处置卡", "what": "处置卡",
+        {"file": "工业关系.xlsx", "sheet": "关系明细", "what": "本体关系", "count": len(rel_rows),
+         "detail": "按工段统计（同工段的其他画面共享）"},
+        {"file": "工艺限值.xlsx", "sheet": "工艺限值", "what": "参数约束", "count": len(limits), "detail": "按工段统计"},
+        {"file": "处置规程.xlsx", "sheet": "处置卡", "what": "处置卡",
          "count": sum(1 for c in ctx.store.procedures.cards.values() if (c.get("area") or {}).get("text") in codes),
          "detail": "按工段统计"},
     ]

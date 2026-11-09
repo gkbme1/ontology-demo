@@ -214,7 +214,7 @@ class PhenomenonStore:
                 if not target.exists():
                     seed = self.seed_dir / name
                     if not seed.exists():
-                        raise FileNotFoundError(f"缺少种子数据 {seed}，先运行 python3 -m backend.tools.build_seed")
+                        raise FileNotFoundError(f"缺少种子数据 {seed}，先运行 python3 -m backend.tools.build_cryo_seed")
                     shutil.copyfile(seed, target)
             self.phenomena: dict[str, dict[str, Any]] = {
                 p["id"]: p for p in json.loads(self._path("phenomena").read_text("utf-8"))["items"]

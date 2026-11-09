@@ -1,7 +1,7 @@
 """左侧导航树。
 
-- 空间层级：第一屏只有车间 → 工艺段；进入工艺段后是工艺段内的层级树：
-  工序 → 装置 / 计算组态 / 工况与根因 / 文档提取，装置下是设备组（文件夹）→ 设备、未入组设备；
+- 空间层级：第一屏只有装置 → 单元；进入单元后是单元内的层级树：
+  画面 → 设备 / 计算组态 / 工况与根因 / 文档提取，装置下是设备组（文件夹）→ 设备、未入组设备；
 - 其余分类复用复制来的资产导航（asset_model.tree）的对应本体域；无数据源的分类标「待建」。
 """
 from __future__ import annotations
@@ -14,7 +14,7 @@ from backend.v2.context import AppContext
 from backend.v2.hierarchy import OP_SECTIONS
 
 CATEGORIES = [
-    {"key": "space", "label": "空间层级", "hint": "车间 → 工艺段 → 工序 → 装置"},
+    {"key": "space", "label": "空间层级", "hint": "装置 → 单元 → 画面 → 设备"},
     {"key": "assets", "label": "工业资产", "domain": "dom:assets", "hint": "资产大类 → 设备类型 → 设备组 → 设备"},
     {"key": "process", "label": "工艺参数", "domain": "dom:process", "hint": "各工段的工艺属性"},
     {"key": "material", "label": "物料与产品", "domain": "dom:material", "hint": "物料流股、公用介质"},
@@ -39,9 +39,9 @@ def space_root(ctx: AppContext) -> dict[str, Any]:
 
 
 GLOBAL_SECTIONS = [
-    ("global:calc", "计算组态", "全部计算组态：设备级与跨装置 / 跨工艺的统计，引用算法库并绑定本体参数"),
+    ("global:calc", "计算组态", "全部计算组态：设备级与跨设备 / 跨工艺的统计，引用算法库并绑定本体参数"),
     ("global:algo", "算法库", "算法的调用契约（调用方式、输入参数、输出），由算法服务提供"),
-    ("global:cond", "工况与根因", "全车间的现象 / 工况定义与根因影响关系（含跨装置的导致关系）"),
+    ("global:cond", "工况与根因", "全装置的现象 / 工况定义与根因影响关系（含跨设备的导致关系）"),
     ("global:docs", "文档提取", "规程文档与数据源，以及从中提取进本体的对象"),
 ]
 
@@ -87,7 +87,7 @@ def segment_tree(ctx: AppContext, seg_id: str) -> dict[str, Any]:
     ops = []
     for op_id in seg["opIds"]:
         op = h.ops[op_id]
-        # 工序下直接是设备组 / 设备；计算组态、工况与根因、文档提取移到全局（跨装置 / 跨工艺）
+        # 画面下直接是设备组 / 设备；计算组态、工况与根因、文档提取移到全局（跨设备 / 跨工艺）
         ops.append({"id": op_id, "opId": op_id, "label": op["name"], "kind": "op", "screen": op["screen"],
                     "status": op["status"], "count": len(h.op_equipment(op_id)), "children": _device_nodes(ctx, op_id)})
     return {"segment": {k: seg[k] for k in ("id", "name", "description")}, "items": ops}

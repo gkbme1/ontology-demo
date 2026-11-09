@@ -115,7 +115,7 @@ def search(keyword: str = "", limit: int = 30) -> dict[str, Any]:
     return {"items": items[:limit], "total": len(items)}
 
 
-# ------------------------------------------------------------------ 工艺段 / 工序
+# ------------------------------------------------------------------ 单元 / 画面
 @router.get("/segments/{seg_id}")
 def segment(seg_id: str) -> dict[str, Any]:
     ctx = get_ctx()
@@ -159,7 +159,7 @@ def drawing_image(op_id: str):  # noqa: ANN201
     from fastapi.responses import FileResponse
     path = drawing.image_path(op_id)
     if not path:
-        raise HTTPException(404, f"工序 {op_id} 没有现场图纸")
+        raise HTTPException(404, f"画面 {op_id} 没有现场图纸")
     return FileResponse(path)
 
 
@@ -186,9 +186,9 @@ def op_documents(op_id: str) -> dict[str, Any]:
     return documents.for_op(get_ctx(), op_id)
 
 
-# ------------------------------------------------------------------ 全局（跨装置 / 跨工艺）
+# ------------------------------------------------------------------ 全局（跨设备 / 跨工艺）
 def _scope(seg: Optional[str], op: Optional[str]) -> list[str]:
-    """筛选范围 → 工序列表（都不给 = 全车间）。"""
+    """筛选范围 → 画面列表（都不给 = 全装置）。"""
     h = get_ctx().hierarchy
     if op:
         if op not in h.ops:
@@ -203,7 +203,7 @@ def _scope(seg: Optional[str], op: Optional[str]) -> list[str]:
 
 @router.get("/scope/conditions")
 def scope_conditions(seg: Optional[str] = None, op: Optional[str] = None) -> dict[str, Any]:
-    """全局的工况与根因：范围内的现象 / 工况与导致关系；导致关系两端挂在不同对象上的标「跨装置」。"""
+    """全局的工况与根因：范围内的现象 / 工况与导致关系；导致关系两端挂在不同对象上的标「跨设备」。"""
     ctx = get_ctx()
     ops = set(_scope(seg, op))
     phen = [p for p in ctx.phen.phenomena.values() if ops & set(ctx.phenomenon_ops(p))]
