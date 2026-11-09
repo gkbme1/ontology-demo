@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** 通用树节点：单击选中、双击（由父级决定含义）、展开收起、可选懒加载子节点。 */
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { nav } from '@/composables/useNav'
 import NodeIcon from './NodeIcon.vue'
 
@@ -36,6 +36,20 @@ async function toggle(): Promise<void> {
   open.value = !open.value
 }
 
+// 被选中时滚到可见区域（从图纸 / 图谱打开对象，树展开后定位到该行）
+const row = ref<HTMLElement | null>(null)
+watch(() => props.activeKey === key.value, async (on) => {
+  if (!on) return
+  await nextTick()
+  // 只滚动树自己的滚动容器（scrollIntoView 会连带滚动外层面板，把顶部的分类与「返回」按钮推出去）
+  const el = row.value
+  const box = el?.closest('.overflow-auto') as HTMLElement | null
+  if (!el || !box) return
+  const r = el.getBoundingClientRect(), b = box.getBoundingClientRect()
+  if (r.top < b.top) box.scrollTop -= b.top - r.top + 8
+  else if (r.bottom > b.bottom) box.scrollTop += r.bottom - b.bottom + 8
+}, { immediate: true })
+
 function onClick(): void {
   emit('select', props.node)
 }
@@ -46,6 +60,7 @@ function onClick(): void {
 <template>
   <div>
     <div
+      ref="row"
       class="tree-row"
       :class="{ 'tree-on': activeKey === key }"
       :style="{ paddingLeft: `${8 + depth * 14}px` }"

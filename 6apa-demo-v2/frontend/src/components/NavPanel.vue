@@ -22,21 +22,19 @@ const error = ref('')
 const categories = computed(() => nav.meta?.categories ?? [])
 const expandKeys = computed(() => {
   const s = new Set<string>()
-  if (nav.selection.opId) {
-    s.add(nav.selection.opId)
-    s.add(`${nav.selection.opId}|devices`)
-    const id = nav.selection.id
-    if (id && nav.selection.type === 'object') {
-      // 展开设备所在的设备组
-      for (const op of segTree.value?.items ?? []) {
-        for (const sec of op.children ?? []) {
-          for (const g of sec.children ?? []) {
-            if ((g.children ?? []).some((c: Any) => c.objectId === id)) s.add(g.id)
-          }
-        }
-      }
+  const opId = nav.selection.opId
+  if (!opId) return s
+  s.add(opId)
+  // 选中设备 / 设备组时，沿树找到它的节点，把全部祖先节点展开（树的层数不写死）
+  const target = nav.selection.type === 'object' && nav.selection.id ? `${opId}|${nav.selection.id}` : ''
+  const walk = (nodes: Any[], path: string[]): boolean => {
+    for (const n of nodes ?? []) {
+      if (n.id === target) { path.forEach((k) => s.add(k)); return true }
+      if (n.children && walk(n.children, [...path, n.id])) return true
     }
+    return false
   }
+  if (target) walk(segTree.value?.items ?? [], [])
   return s
 })
 
@@ -144,7 +142,7 @@ const segmentActiveKey = computed(() => {
 
       <!-- 空间层级 · 单元内 -->
       <template v-if="nav.category === 'space' && nav.mode === 'segment'">
-        <div class="px-3 pb-2 flex items-center gap-2">
+        <div class="px-3 pt-1 pb-2 -mt-2 flex items-center gap-2 sticky top-0 z-10 bg-ink-panel">
           <button class="btn !py-1" @click="backToWorkshop">← 返回装置导航</button>
           <span class="font-semibold truncate">{{ segTree?.segment?.name }}</span>
         </div>

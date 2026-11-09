@@ -82,6 +82,9 @@
 - 画面上有、点表无测点的设备在 `设备统计` 里声明（总点位数 0），`dcs_loader` 会建成 0 点设备。
 - 工艺限值都挂点表位号（`DCS点`），同位号的运行区间与报警值合并成 `PL-<位号>`；开车 `-S`、控制设定 `-C`、热吹 / 冷吹 `-R`。
 - 热区对应靠推断的标 `confirmed: false`（虚线框），见 `build_cryo_drawings.INFERRED`。
+- 现场异常排查表（现象 → 排查方式 → 处置方式）的转法：现象建在点位所属设备上；每条排查 = 原因现象（规则落到要看的位号）+ 「导致」关系；
+  处置方式进处置卡（阶段 排查 / 处置 / 汇报）。示例 PH-36～42、CALC-07/08、ARP-09（`cryo_knowledge.PHENOMENA/CAUSAL`、`build_cryo_seed`、`build_cryo_sources.write_procedures`）。
+- 从图纸 / 图谱打开对象：`openObject` 按 `meta.opSegment` 把左侧树切到对象所在单元，`NavPanel.expandKeys` 沿树找祖先节点展开，`TreeNode` 滚到选中行。
 
 ## 回归测试
 

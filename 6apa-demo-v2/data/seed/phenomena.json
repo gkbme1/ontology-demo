@@ -1644,6 +1644,336 @@
     "kind": "规程（旧版）/ 点表",
     "ref": "北I-2装置操作规程（旧版） 附录四"
    }
+  },
+  {
+   "id": "PH-36",
+   "name": "重烃收集罐烃室液位持续上涨",
+   "anchor": {
+    "kind": "equipment",
+    "id": "equip-d8ac1bb7",
+    "name": "重烃收集罐",
+    "areaCode": "S02"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "烃室液位 102LT102 上升速率 > 0.1 %/min 持续 10 分钟，且液位高于运行值 30%",
+   "rule": {
+    "type": "group",
+    "op": "AND",
+    "children": [
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "calc",
+       "calcId": "CALC-07"
+      },
+      "operator": ">",
+      "aggregate": "any",
+      "durationSec": 600,
+      "threshold": {
+       "kind": "value",
+       "value": 0.1
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "parameter",
+       "name": "烃室液位"
+      },
+      "operator": ">",
+      "aggregate": "any",
+      "durationSec": 600,
+      "threshold": {
+       "kind": "value",
+       "value": 30
+      }
+     }
+    ]
+   },
+   "note": "运行值 30% 取自排查表；上升速率 0.1 %/min 为占位阈值，待现场提供",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "现场异常排查表",
+    "ref": "现场异常排查表（用户提供，重烃收集罐烃室液位）"
+   }
+  },
+  {
+   "id": "PH-37",
+   "name": "重烃泵均未运行",
+   "anchor": {
+    "kind": "equipment",
+    "id": "equip-d8ac1bb7",
+    "name": "重烃收集罐",
+    "areaCode": "S02"
+   },
+   "category": "设备",
+   "severity": "警告",
+   "description": "1#、2# 重烃泵运行状态 102_Z_101、102_Z_102 均为 0 持续 2 分钟",
+   "rule": {
+    "type": "group",
+    "op": "AND",
+    "children": [
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "102_Z_101"
+      },
+      "operator": "=",
+      "aggregate": "any",
+      "durationSec": 120,
+      "threshold": {
+       "kind": "value",
+       "value": 0
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "102_Z_102"
+      },
+      "operator": "=",
+      "aggregate": "any",
+      "durationSec": 120,
+      "threshold": {
+       "kind": "value",
+       "value": 0
+      }
+     }
+    ]
+   },
+   "note": "排查 1：两台泵都不在运行（一用一备时只有一台停属正常）",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "现场异常排查表",
+    "ref": "现场异常排查表（用户提供，重烃收集罐烃室液位） 排查 1"
+   }
+  },
+  {
+   "id": "PH-38",
+   "name": "变频重烃泵输出与反馈不匹配或已全开",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-89eb688c",
+    "name": "重烃泵组",
+    "areaCode": "S02"
+   },
+   "category": "设备",
+   "severity": "警告",
+   "description": "本台 变频控制（输出）与 变频反馈 偏差 > 10% 持续 5 分钟，或输出 ≥ 95%（已全开 / 正在开大）",
+   "rule": {
+    "type": "group",
+    "op": "OR",
+    "children": [
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "calc",
+       "calcId": "CALC-08"
+      },
+      "operator": ">",
+      "aggregate": "any",
+      "durationSec": 300,
+      "threshold": {
+       "kind": "value",
+       "value": 10
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "parameter",
+       "name": "变频控制"
+      },
+      "operator": ">=",
+      "aggregate": "any",
+      "durationSec": 300,
+      "threshold": {
+       "kind": "value",
+       "value": 95
+      }
+     }
+    ]
+   },
+   "note": "排查 2：偏差 10%、全开 95% 为占位阈值，待现场提供",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "现场异常排查表",
+    "ref": "现场异常排查表（用户提供，重烃收集罐烃室液位） 排查 2"
+   }
+  },
+  {
+   "id": "PH-39",
+   "name": "重烃储罐入口阀均未开启",
+   "anchor": {
+    "kind": "equipment",
+    "id": "equip-66990edb",
+    "name": "重烃储罐组·公共测点",
+    "areaCode": "S11"
+   },
+   "category": "工况",
+   "severity": "警告",
+   "description": "1#、2# 重烃储罐倒罐（入口）阀开反馈 HZO_106、HZO_111A 均为 0 持续 1 分钟",
+   "rule": {
+    "type": "group",
+    "op": "AND",
+    "children": [
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "HZO_106"
+      },
+      "operator": "=",
+      "aggregate": "any",
+      "durationSec": 60,
+      "threshold": {
+       "kind": "value",
+       "value": 0
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "HZO_111A"
+      },
+      "operator": "=",
+      "aggregate": "any",
+      "durationSec": 60,
+      "threshold": {
+       "kind": "value",
+       "value": 0
+      }
+     }
+    ]
+   },
+   "note": "排查 3：入口阀即画面上的倒罐阀 105HV106A / 105HV111A，按开反馈判断",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "现场异常排查表",
+    "ref": "现场异常排查表（用户提供，重烃收集罐烃室液位） 排查 3"
+   }
+  },
+  {
+   "id": "PH-40",
+   "name": "重烃进罐总阀未开启",
+   "anchor": {
+    "kind": "equipment",
+    "id": "equip-fa6856f4",
+    "name": "重烃进罐管线总阀",
+    "areaCode": "S11"
+   },
+   "category": "工况",
+   "severity": "警告",
+   "description": "重烃进罐管线总阀开反馈 105_LZO_104 为 0 持续 1 分钟",
+   "rule": {
+    "type": "group",
+    "op": "OR",
+    "children": [
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "parameter",
+       "name": "开反馈"
+      },
+      "operator": "=",
+      "aggregate": "any",
+      "durationSec": 60,
+      "threshold": {
+       "kind": "value",
+       "value": 0
+      }
+     }
+    ]
+   },
+   "note": "排查 4：按开反馈判断",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "现场异常排查表",
+    "ref": "现场异常排查表（用户提供，重烃收集罐烃室液位） 排查 4"
+   }
+  },
+  {
+   "id": "PH-41",
+   "name": "重烃储罐压力异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-14c678a7",
+    "name": "重烃储罐组",
+    "areaCode": "S11"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "本台重烃储罐压力 > 1.4 MPa 持续 2 分钟（入口阀开启的那台有意义；1.4 MPa 取规程附录四重烃储罐压力高报警）",
+   "rule": {
+    "type": "group",
+    "op": "OR",
+    "children": [
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "parameter",
+       "name": "重烃储罐压力"
+      },
+      "operator": ">",
+      "aggregate": "any",
+      "durationSec": 120,
+      "threshold": {
+       "kind": "value",
+       "value": 1.4
+      }
+     }
+    ]
+   },
+   "note": "排查 5：1.4 MPa 取规程（旧版）附录四重烃储罐压力高报警；只有入口阀开启的那台有意义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "现场异常排查表",
+    "ref": "现场异常排查表（用户提供，重烃收集罐烃室液位） 排查 5"
+   }
+  },
+  {
+   "id": "PH-42",
+   "name": "重烃收集罐压力过低",
+   "anchor": {
+    "kind": "equipment",
+    "id": "equip-d8ac1bb7",
+    "name": "重烃收集罐",
+    "areaCode": "S02"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "重烃收集罐压力 102PT102 低于正常下限（正常 0.3 MPa 左右）持续 5 分钟",
+   "rule": {
+    "type": "group",
+    "op": "OR",
+    "children": [
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "parameter",
+       "name": "重烃收集罐压力"
+      },
+      "operator": "<",
+      "aggregate": "any",
+      "durationSec": 300,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL-102PT102",
+       "field": "normalLow"
+      }
+     }
+    ]
+   },
+   "note": "排查 6：排查表写「正常 0.3 左右」",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "现场异常排查表",
+    "ref": "现场异常排查表（用户提供，重烃收集罐烃室液位） 排查 6"
+   }
   }
  ]
 }

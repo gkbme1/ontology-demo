@@ -377,6 +377,8 @@ def bind_points(pts, matcher, valves):
         head = next((h for h in (primary.get(eid), p["eq_name"]) if h and d.startswith(h)), None) if eid else None
         if head:
             param = d[len(head):]
+            if head.endswith("阀") and param.startswith("门"):  # 「倒罐阀门开反馈」→「开反馈」
+                param = param[1:]
         param = param.strip(" _-:：")
         if len(param) <= 2 and param != d:
             # 去掉台号后只剩「液位」「转速」时，用去台号的完整描述，保证同组各台参数同名（如 轻烃储罐液位）

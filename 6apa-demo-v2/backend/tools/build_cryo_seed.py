@@ -57,6 +57,11 @@ def cond(param, op, threshold, dur=0, agg="any"):
             "aggregate": agg, "durationSec": dur, "threshold": threshold}
 
 
+def tag_cond(tag, op, threshold, dur=0):
+    return {"type": "condition", "subject": {"kind": "tag", "tag": tag}, "operator": op, "aggregate": "any",
+            "durationSec": dur, "threshold": threshold}
+
+
 def calc_cond(calc_id, op, value, dur=0):
     return {"type": "condition", "subject": {"kind": "calc", "calcId": calc_id}, "operator": op, "aggregate": "any",
             "durationSec": dur, "threshold": {"kind": "value", "value": value}}
@@ -129,15 +134,31 @@ def build(c: Ctx):
         "PH-33": ("净化风储罐", OR(cond(P("108PT101"), "<", V(0.5), 60)), "规程 1.2.7.1：仪表风进站 0.50～0.60 MPa"),
         "PH-34": ("膨胀压缩机组", OR(cond(P("104TE183A"), ">", V(60), 300)), "规程附录四：油箱温度 > 60 ℃ 报警"),
         "PH-35": ("再生气空冷器", OR(cond(P("103TT104"), ">", T("PL-103TT104", "high", 45), 300)), ""),
+        # 现场异常排查表：重烃收集罐烃室液位持续上涨（PH-36）及 6 项排查（PH-37～42 → PH-36）
+        "PH-36": ("重烃收集罐", AND(calc_cond("CALC-07", ">", 0.1, 600), cond(P("102LT102"), ">", V(30), 600)),
+                  "运行值 30% 取自排查表；上升速率 0.1 %/min 为占位阈值，待现场提供"),
+        "PH-37": ("重烃收集罐", AND(tag_cond("102_Z_101", "=", V(0), 120), tag_cond("102_Z_102", "=", V(0), 120)),
+                  "排查 1：两台泵都不在运行（一用一备时只有一台停属正常）"),
+        "PH-38": ("重烃泵组", OR(calc_cond("CALC-08", ">", 10, 300), cond(P("102LRC101"), ">=", V(95), 300)),
+                  "排查 2：偏差 10%、全开 95% 为占位阈值，待现场提供"),
+        "PH-39": ("重烃储罐组·公共测点", AND(tag_cond("HZO_106", "=", V(0), 60), tag_cond("HZO_111A", "=", V(0), 60)),
+                  "排查 3：入口阀即画面上的倒罐阀 105HV106A / 105HV111A，按开反馈判断"),
+        "PH-40": ("重烃进罐管线总阀", OR(cond(P("105_LZO_104"), "=", V(0), 60)), "排查 4：按开反馈判断"),
+        "PH-41": ("重烃储罐组", OR(cond(P("105PT104"), ">", V(1.4), 120)),
+                  "排查 5：1.4 MPa 取规程（旧版）附录四重烃储罐压力高报警；只有入口阀开启的那台有意义"),
+        "PH-42": ("重烃收集罐", OR(cond(P("102PT102"), "<", T("PL-102PT102", "normalLow", 0.2), 300)),
+                  "排查 6：排查表写「正常 0.3 左右」"),
     }
     phen = []
     for pid, (anchor, rule, note) in rules.items():
         _, name, _, cat, sev, text, tags, basis = meta[pid]
         phen.append({"id": pid, "name": name, "anchor": c.anchor(anchor), "category": cat, "severity": sev,
                      "description": text, "rule": rule, "note": note, "status": DRAFT,
-                     "source": {"kind": "规程（旧版）/ 点表", "ref": basis.replace(K.SOP, OLD)}})
+                     "source": {"kind": "现场异常排查表" if "排查表" in basis else "规程（旧版）/ 点表",
+                                "ref": basis.replace(K.SOP, OLD)}})
     links = [{"id": f"CL-{i:02d}", "cause": a, "effect": b, "mechanism": m, "basis": s.replace(K.SOP, OLD), "confidence": conf,
-              "status": DRAFT, "source": {"kind": "规程（旧版）/ 机理", "ref": s.replace(K.SOP, OLD)}}
+              "status": DRAFT, "source": {"kind": "现场异常排查表" if "排查表" in s else "规程（旧版）/ 机理",
+                                         "ref": s.replace(K.SOP, OLD)}}
              for i, (a, b, m, s, conf) in enumerate([x for x in K.CAUSAL if not (x[0] == "PH-25" and x[1] == "PH-26")], 1)]
     segs = {u[1]: f"SEG-{u[0][1:]}" for u in K.UNITS}
 
@@ -165,6 +186,13 @@ def build(c: Ctx):
         {"id": "CALC-06", "name": "膨胀机膨胀端 / 增压端振动差", "anchor": c.anchor("膨胀压缩机组"), "algorithmId": "ALG-ABS-DIFF",
          "bindings": {"a": {"kind": "parameter", "name": P("104XE180AX")}, "b": {"kind": "parameter", "name": P("104XE181AX")}},
          "unit": "μm", "description": "逐台计算膨胀端与增压端 X 轴振动之差", "basis": "点表", "status": DRAFT},
+        {"id": "CALC-07", "name": "重烃收集罐烃室液位上升速率", "anchor": c.anchor("重烃收集罐"), "algorithmId": "ALG-RATE",
+         "bindings": {"series": {"kind": "parameter", "name": P("102LT102")}, "windowMin": {"kind": "const", "value": 10}},
+         "unit": "%/min", "description": "烃室液位 102LT102 在 10 分钟时间窗内的平均变化速率（正为上涨），判「持续上涨」用",
+         "basis": "现场异常排查表", "status": DRAFT},
+        {"id": "CALC-08", "name": "变频重烃泵输出与反馈偏差", "anchor": c.anchor("重烃泵组"), "algorithmId": "ALG-ABS-DIFF",
+         "bindings": {"a": {"kind": "parameter", "name": P("102LRC101")}, "b": {"kind": "parameter", "name": P("102SI101")}},
+         "unit": "%", "description": "逐台：变频控制（输出）与变频反馈之差的绝对值", "basis": "现场异常排查表 排查 2", "status": DRAFT},
     ]
     return phen, links, calcs
 

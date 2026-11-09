@@ -237,6 +237,32 @@ class CausalTest(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(_TMP, "phenomena.json")))
 
 
+class TroubleshootingTableTest(unittest.TestCase):
+    """现场异常排查表：重烃收集罐烃室液位持续上涨 → 6 项排查（原因现象 + 验证位号）→ 处置卡。"""
+
+    def test_causes_and_chain(self):
+        r = client.get("/api/v2/phenomena/PH-36/chain?direction=up").json()
+        self.assertEqual({k for k, v in r["levels"].items() if v == 1}, {"PH-37", "PH-38", "PH-39", "PH-40", "PH-41", "PH-42"})
+        self.assertEqual(CTX.phen.get("PH-36")["source"]["kind"], "现场异常排查表")
+
+    def test_every_check_is_judged_on_its_own_points(self):
+        expect = {"PH-37": ["102_Z_101", "102_Z_102"], "PH-39": ["HZO_106", "HZO_111A"], "PH-40": ["105_LZO_104"],
+                  "PH-42": ["102PT102"]}
+        for pid, tags in expect.items():
+            r = client.post(f"/api/v2/phenomena/{pid}/evaluate", json={"hours": 2}).json()
+            got = [t for c in r["results"][0]["conditions"] for t in c["tags"]]
+            self.assertEqual(got, tags, pid)
+        r = client.post("/api/v2/phenomena/PH-38/evaluate", json={"hours": 2}).json()
+        self.assertEqual([x["targetName"] for x in r["results"]], ["1#重烃泵", "2#重烃泵"])  # 逐台判定
+
+    def test_card(self):
+        card = CTX.store.procedures.cards["ARP-09"]
+        self.assertEqual(len(card["causes"]), 6)
+        self.assertEqual([s["phase"] for s in card["steps"]].count("排查"), 6)
+        cards = client.get(f"/api/v2/objects/{_equip('重烃收集罐')}/tabs/procedures").json()
+        self.assertIn("ARP-09", str(cards))
+
+
 class CalcTest(unittest.TestCase):
     def test_run_rate(self):
         r = client.post("/api/v2/calculations/CALC-02/run", json={"hours": 2}).json()
@@ -279,6 +305,13 @@ class DocsAndSearchTest(unittest.TestCase):
     def test_search_tag(self):
         r = client.get("/api/v2/search", params={"keyword": "104XE180BX"}).json()
         self.assertEqual(r["items"][0]["opId"], "OP-09")
+
+    def test_meta_maps_screen_to_unit(self):
+        """从图纸点到别的单元的设备时，前端按它切换左侧树。"""
+        m = client.get("/api/v2/meta").json()["opSegment"]
+        self.assertEqual((m["OP-07"], m["OP-12"]), ("SEG-04", "SEG-05"))
+        j = {h["name"]: h for h in client.get("/api/v2/ops/OP-01/drawing").json()["image"]["hotspots"]}
+        self.assertEqual(j["装置污水至采油厂管线阀"]["opId"], "OP-12")
 
     def test_pending_category(self):
         self.assertTrue(client.get("/api/v2/nav/domain/energy").json()["pending"])

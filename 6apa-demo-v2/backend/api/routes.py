@@ -38,6 +38,8 @@ def meta() -> dict[str, Any]:
         "categories": nav.CATEGORIES, "operators": OPERATORS, "limitFields": LIMIT_FIELDS, "aggregates": AGGREGATES,
         "phenomenonCategories": CATEGORIES, "statuses": STATUSES, "confidence": CONFIDENCE,
         "bindingKinds": calculations.BINDING_KINDS, "tabs": [{"key": k, "label": l} for k, l in tabs.TABS],
+        # 画面 → 所属单元：从图纸 / 图谱打开对象时，左侧树切到该单元并展开定位
+        "opSegment": {o["id"]: o["segmentId"] for o in get_ctx().hierarchy.ops.values()},
     }
 
 

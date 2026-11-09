@@ -69,6 +69,15 @@ export function openDrawing(opId: string, segmentId?: string): void {
 }
 
 export function openObject(objectId: string, opId?: string, tab?: string): void {
+  // 对象可能属于别的单元（如画面上画了其他画面的设备）：左侧树切到它所在的单元，NavPanel 再展开定位
+  const seg = opId ? nav.meta?.opSegment?.[opId] : undefined
+  if (seg) {
+    nav.category = 'space'
+    if (nav.mode !== 'segment' || nav.segmentId !== seg) {
+      nav.mode = 'segment'
+      nav.segmentId = seg
+    }
+  }
   select({ type: 'object', id: objectId, opId, tab }, opId ? `${opId}|${objectId}` : objectId)
 }
 

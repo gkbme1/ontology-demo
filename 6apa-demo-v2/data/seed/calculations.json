@@ -142,6 +142,56 @@
    "description": "逐台计算膨胀端与增压端 X 轴振动之差",
    "basis": "点表",
    "status": "草案·待工艺确认"
+  },
+  {
+   "id": "CALC-07",
+   "name": "重烃收集罐烃室液位上升速率",
+   "anchor": {
+    "kind": "equipment",
+    "id": "equip-d8ac1bb7",
+    "name": "重烃收集罐",
+    "areaCode": "S02"
+   },
+   "algorithmId": "ALG-RATE",
+   "bindings": {
+    "series": {
+     "kind": "parameter",
+     "name": "烃室液位"
+    },
+    "windowMin": {
+     "kind": "const",
+     "value": 10
+    }
+   },
+   "unit": "%/min",
+   "description": "烃室液位 102LT102 在 10 分钟时间窗内的平均变化速率（正为上涨），判「持续上涨」用",
+   "basis": "现场异常排查表",
+   "status": "草案·待工艺确认"
+  },
+  {
+   "id": "CALC-08",
+   "name": "变频重烃泵输出与反馈偏差",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-89eb688c",
+    "name": "重烃泵组",
+    "areaCode": "S02"
+   },
+   "algorithmId": "ALG-ABS-DIFF",
+   "bindings": {
+    "a": {
+     "kind": "parameter",
+     "name": "变频控制"
+    },
+    "b": {
+     "kind": "parameter",
+     "name": "变频反馈"
+    }
+   },
+   "unit": "%",
+   "description": "逐台：变频控制（输出）与变频反馈之差的绝对值",
+   "basis": "现场异常排查表 排查 2",
+   "status": "草案·待工艺确认"
   }
  ]
 }
