@@ -262,6 +262,74 @@ class StatusAndCycleTest(unittest.TestCase):
         self.assertFalse(any(l["inCycle"] for l in client.get("/api/v2/causal-links").json()["items"]))
 
 
+class Batch2Test(unittest.TestCase):
+    """第 2 批：参数类别与绑定状态、继承覆盖、人工关系、基础信息与变更记录。"""
+
+    def test_parameter_categories_and_binding(self):
+        r = client.get(f"/api/v2/objects/{_equip('水解罐C')}/tabs/parameters").json()
+        self.assertEqual(r["attrGroups"], ["基本信息", "设计参数"])
+        self.assertTrue(set(r["paramGroups"]) <= {"测量值", "设定值", "阀位", "控制指令", "状态", "计算值"})
+        params = [x for x in r["items"] if x["section"] == "参数"]
+        self.assertTrue(all(x["binding"] in ("已绑定", "待确认", "未绑定", "失效") for x in params))
+        temp = next(x for x in params if x["name"] == "釜内反应温度")
+        self.assertEqual((temp["category"], temp["binding"]), ("测量值", "待确认"))
+        self.assertTrue(all(x["binding"] is None for x in r["items"] if x["section"] == "属性"))
+
+    def test_override_phenomenon_and_limit(self):
+        import copy
+        eid = _equip("水解罐C")
+        rule = copy.deepcopy(get_ctx().phen.get("PH-S11-01")["rule"])
+        rule["children"][0]["threshold"] = {"kind": "value", "value": 33.5}
+        self.assertEqual(client.put(f"/api/v2/objects/{eid}/overrides/phenomena/PH-S11-01", json={"rule": rule}).status_code, 200)
+        row = next(x for x in client.get(f"/api/v2/objects/{eid}/tabs/phenomena").json()["items"] if x["id"] == "PH-S11-01")
+        self.assertEqual(row["inheritState"], "已覆盖")
+        self.assertIn("33.5", row["ruleText"])
+        ev = client.post("/api/v2/phenomena/PH-S11-01/evaluate", json={"opId": "OP-09"}).json()
+        mine = next(x for x in ev["results"] if x["targetId"] == eid)
+        self.assertIn("覆盖", mine["overrideNote"])
+        # 禁用 → 本台不判定；恢复继承
+        client.put(f"/api/v2/objects/{eid}/overrides/phenomena/PH-S11-01", json={"disabled": True})
+        ev = client.post("/api/v2/phenomena/PH-S11-01/evaluate", json={"opId": "OP-09"}).json()
+        self.assertTrue(next(x for x in ev["results"] if x["targetId"] == eid)["disabled"])
+        client.delete(f"/api/v2/objects/{eid}/overrides/phenomena/PH-S11-01")
+        row = next(x for x in client.get(f"/api/v2/objects/{eid}/tabs/phenomena").json()["items"] if x["id"] == "PH-S11-01")
+        self.assertNotIn("inheritState", row)
+        # 限值：顺序校验、覆盖后显示模板值
+        bad = client.put(f"/api/v2/objects/{eid}/overrides/limits/PL001", json={"values": {"normalHigh": 40, "high": 35}})
+        self.assertEqual(bad.status_code, 400)
+        client.put(f"/api/v2/objects/{eid}/overrides/limits/PL001", json={"values": {"normalHigh": 34}})
+        lim = next(x for x in client.get(f"/api/v2/objects/{eid}/tabs/constraints").json()["operating"] if x["id"] == "PL001")
+        self.assertEqual(lim["inheritState"], "已覆盖")
+        self.assertTrue(lim["template"]["normal"].endswith("35.0"))
+        client.delete(f"/api/v2/objects/{eid}/overrides/limits/PL001")
+        # 不属于设备组的对象不能覆盖
+        self.assertEqual(client.put(f"/api/v2/objects/{_group('水解反应釜组')}/overrides/limits/PL001", json={"disabled": True}).status_code, 400)
+
+    def test_user_relations(self):
+        gid, eid = _group("水解反应釜组"), _equip("水解罐C")
+        util = client.get("/api/v2/relation-candidates", params={"type": "供应", "end": "from", "keyword": "蒸汽"}).json()["items"][0]
+        self.assertEqual(util["kind"], "utility")
+        bad = client.post("/api/v2/relations", json={"type": "供应", "from": {"id": gid}, "to": {"id": eid}})
+        self.assertEqual(bad.status_code, 400)  # 供应的起点只能是公用介质
+        rel = client.post("/api/v2/relations", json={"type": "供应", "from": {"id": util["id"]}, "to": {"id": gid}}).json()
+        topo = client.get(f"/api/v2/objects/{eid}/tabs/topology").json()["items"]
+        mine = [x for x in topo if x.get("relationId") == rel["id"]]
+        self.assertTrue(mine and mine[0]["inherited"])  # 挂在设备组上，设备上显示为继承
+        info = client.get(f"/api/v2/objects/{gid}/info").json()
+        self.assertTrue(any(r["id"] == rel["id"] for r in info["referencedBy"]["relations"]))
+        self.assertEqual(client.delete(f"/api/v2/relations/{rel['id']}").status_code, 200)
+
+    def test_info_and_audit(self):
+        eid = _equip("水解罐C")
+        client.put(f"/api/v2/objects/{eid}/overrides/phenomena/PH-S11-02", json={"disabled": True})
+        client.delete(f"/api/v2/objects/{eid}/overrides/phenomena/PH-S11-02")
+        info = client.get(f"/api/v2/objects/{eid}/info").json()
+        self.assertEqual(info["kind"], "设备")
+        self.assertEqual(info["group"]["id"], _group("水解反应釜组"))
+        ops = [c["op"] for c in info["changes"][:2]]
+        self.assertEqual(ops, ["恢复继承", "禁用继承"])
+
+
 class DocsAndSearchTest(unittest.TestCase):
     def test_docs(self):
         r = client.get("/api/v2/ops/OP-09/documents").json()

@@ -54,6 +54,9 @@ def admin_reset() -> dict[str, Any]:
     ctx = get_ctx()
     ctx.phen.reset_to_seed()
     ctx.calcs.reset_to_seed()
+    ctx.overrides.reset()
+    ctx.relations.reset()
+    ctx.audit.reset()
     return health()
 
 
@@ -241,6 +244,59 @@ def object_tab(object_id: str, key: str, op: Optional[str] = None) -> dict[str, 
     return _guard(tabs.tab, get_ctx(), object_id, key, op)
 
 
+@router.get("/objects/{object_id}/info")
+def object_info(object_id: str, op: Optional[str] = None) -> dict[str, Any]:
+    """对象基础信息与变更记录（需求 SW-041 第 4、5 条，SW-062）：ID、编码、类、状态、来源、所属位置、被谁引用、变更记录。"""
+    ctx = get_ctx()
+    head = _guard(tabs.header, ctx, object_id, op)
+    prof = ctx.profile(object_id)
+    dcs = ctx.store.dcs
+    attrs = {a["name"]: a for a in prof.get("attributes") or [] if a.get("kind") == "固有"}
+    is_group = object_id in dcs.equipment_groups
+    raw = dcs.equipment_groups.get(object_id) if is_group else dcs.equipment.get(object_id) or {}
+    my_tags = {t["name"] for t in ctx.tags_of_equipment.get(object_id, [])}
+    if is_group:
+        for m in ctx.group_members(object_id):
+            my_tags |= {t["name"] for t in ctx.tags_of_equipment.get(m, [])}
+    own_phen = [p for p, o in ctx.phenomena_for_object(object_id)]
+    phen_ids = {p["id"] for p in own_phen}
+    tag_refs = []
+    from backend.v2.phenomena import iter_conditions
+    for p in ctx.phen.phenomena.values():
+        if p["id"] in phen_ids:
+            continue
+        if any((c.get("subject") or {}).get("tag") in my_tags for c in iter_conditions(p.get("rule"))):
+            tag_refs.append({"id": p["id"], "name": p["name"], "anchor": (p.get("anchor") or {}).get("name")})
+    calc_refs = [{"id": c["id"], "name": c["name"], "how": "作用对象" if (c.get("anchor") or {}).get("id") == object_id else "绑定位号"}
+                 for c in ctx.calcs.items.values()
+                 if (c.get("anchor") or {}).get("id") == object_id
+                 or any((b or {}).get("tag") in my_tags for b in (c.get("bindings") or {}).values())
+                 or any((b or {}).get("groupId") == object_id for b in (c.get("bindings") or {}).values())]
+    rels = [{"id": r["id"], "text": f"{r['from']['name']} —{r['label']}→ {r['to']['name']}", "type": r["type"]}
+            for r in ctx.relations.items if object_id in (r["from"]["id"], r["to"]["id"])]
+    overrides = [{"kind": "现象", "id": v["phenomenonId"], "state": "已禁用" if v["disabled"] else "已覆盖", "note": v.get("note"), "at": v["updatedAt"]}
+                 for v in ctx.overrides.data["phenomena"].values() if v["objectId"] == object_id] + \
+                [{"kind": "限值", "id": v["limitId"], "state": "已禁用" if v["disabled"] else "已覆盖", "note": v.get("note"), "at": v["updatedAt"]}
+                 for v in ctx.overrides.data["limits"].values() if v["objectId"] == object_id]
+    h = ctx.hierarchy
+    drawings = [{"opId": o, "name": h.ops[o]["name"], "hasImage": bool(__import__("backend.v2.drawing", fromlist=["image_path"]).image_path(o))}
+                for o in head["opIds"]]
+    return {
+        "id": object_id, "name": head["name"], "kind": "设备组" if is_group else "设备",
+        "code": (attrs.get("设备编码") or {}).get("value") or raw.get("owlSubject") or "",
+        "className": head.get("className"), "classPath": head.get("classPath"),
+        "status": "生效（来自点表与设备主数据）",
+        "source": "DCS 点表 · 设备主数据" + ("（设备归并 / 拆分表）" if (attrs.get("点表中的其他写法") or {}).get("value") else ""),
+        "confidence": (attrs.get("归属置信度") or {}).get("value"),
+        "group": head.get("group"), "path": head["path"], "drawings": drawings,
+        "assetPath": [x for x in [(attrs.get("资产大类") or {}).get("value"), (attrs.get("设备类型") or {}).get("value")] if x],
+        "tagCount": len(my_tags), "phenomenonCount": len(own_phen),
+        "referencedBy": {"phenomena": tag_refs, "calculations": calc_refs, "relations": rels},
+        "overrides": overrides,
+        "changes": ctx.audit.for_object({object_id} | phen_ids)[:200],
+    }
+
+
 @router.get("/objects/{object_id}/profile")
 def object_profile(object_id: str) -> dict[str, Any]:
     return _guard(get_ctx().profile, object_id)
@@ -271,6 +327,130 @@ def limits(keyword: str = "") -> dict[str, Any]:
     return {"items": items}
 
 
+# ------------------------------------------------------------------ 人工关系（拓扑 / 工艺影响，需求 SW-044 / 049）
+@router.get("/relation-candidates")
+def relation_candidates(type: str, end: str = "to", keyword: str = "", limit: int = 30) -> dict[str, Any]:
+    """关系端点候选：按关系类型允许的端点类型过滤，名称 / 拼音首字母匹配。"""
+    from backend.v2.search import initials
+    from backend.v2.userdata import KIND_NAMES, RELATION_TYPES
+    spec = RELATION_TYPES.get(type)
+    if not spec:
+        raise HTTPException(400, f"关系类型只能是：{'、'.join(RELATION_TYPES)}")
+    allowed = spec["from" if end == "from" else "to"]
+    kw = keyword.strip().lower()
+    out = []
+    for e in get_ctx().endpoint_index().values():
+        if e["kind"] not in allowed:
+            continue
+        if kw and kw not in e["name"].lower() and not (kw.isascii() and kw in initials(e["name"])):
+            continue
+        out.append({**e, "kindName": KIND_NAMES[e["kind"]]})
+        if len(out) >= limit:
+            break
+    return {"items": out, "allowed": [KIND_NAMES[k] for k in sorted(allowed)]}
+
+
+@router.post("/relations")
+def create_relation(body: dict = Body(...)) -> dict[str, Any]:
+    from backend.v2.userdata import UserDataError
+    ctx = get_ctx()
+    idx = ctx.endpoint_index()
+
+    def resolve_kind(end: dict) -> Optional[str]:
+        e = idx.get(end.get("id") or "")
+        if e:
+            end["name"] = e["name"]
+            return e["kind"]
+        return None
+    try:
+        rel = ctx.relations.create(body, resolve_kind)
+    except UserDataError as exc:
+        raise HTTPException(400, str(exc))
+    ctx.audit.record("新增", "关系", rel["id"], f"{rel['from']['name']} —{rel['label']}→ {rel['to']['name']}",
+                     objects=[rel["from"]["id"], rel["to"]["id"]], note=rel["type"])
+    return rel
+
+
+@router.delete("/relations/{rid}")
+def delete_relation(rid: str) -> dict[str, Any]:
+    ctx = get_ctx()
+    rel = _guard(ctx.relations.delete, rid)
+    ctx.audit.record("删除", "关系", rid, f"{rel['from']['name']} —{rel['label']}→ {rel['to']['name']}",
+                     objects=[rel["from"]["id"], rel["to"]["id"]], note=rel["type"])
+    return {"deleted": rid}
+
+
+# ------------------------------------------------------------------ 继承覆盖（设备上覆盖 / 禁用设备组的现象与限值）
+def _check_inherited(ctx, object_id: str) -> str:  # noqa: ANN001
+    e = ctx.store.dcs.equipment.get(object_id)
+    if not e or not e.get("equipmentGroupId"):
+        raise HTTPException(400, "只有属于设备组的设备才能覆盖继承来的定义")
+    return e["equipmentGroupId"]
+
+
+@router.put("/objects/{object_id}/overrides/phenomena/{pid}")
+def override_phenomenon(object_id: str, pid: str, body: dict = Body(...)) -> dict[str, Any]:
+    from backend.v2.phenomena import validate_rule
+    from backend.v2.userdata import UserDataError, diff
+    ctx = get_ctx()
+    gid = _check_inherited(ctx, object_id)
+    p = _guard(ctx.phen.get, pid)
+    if (p.get("anchor") or {}).get("id") != gid:
+        raise HTTPException(400, "该现象不是从本设备所属设备组继承来的")
+    if body.get("rule"):
+        _guard(validate_rule, body["rule"])
+    before = ctx.overrides.phenomenon(object_id, pid)
+    try:
+        entry = ctx.overrides.set_phenomenon(object_id, pid, body)
+    except UserDataError as exc:
+        raise HTTPException(400, str(exc))
+    ctx.audit.record("禁用继承" if entry["disabled"] else "覆盖继承", "现象", pid, p["name"], objects=[object_id],
+                     changes=diff(_readable({"rule": (before or {}).get("rule") or p.get("rule"), "disabled": bool((before or {}).get("disabled"))}),
+                                  _readable({"rule": entry.get("rule") or p.get("rule"), "disabled": entry["disabled"]})),
+                     note=f"在 {ctx.object_name(object_id)} 上")
+    return entry
+
+
+@router.delete("/objects/{object_id}/overrides/phenomena/{pid}")
+def restore_phenomenon(object_id: str, pid: str) -> dict[str, Any]:
+    ctx = get_ctx()
+    old = ctx.overrides.clear("phenomena", object_id, pid)
+    if old:
+        name = (ctx.phen.phenomena.get(pid) or {}).get("name", pid)
+        ctx.audit.record("恢复继承", "现象", pid, name, objects=[object_id], note=f"在 {ctx.object_name(object_id)} 上")
+    return {"restored": bool(old)}
+
+
+@router.put("/objects/{object_id}/overrides/limits/{lid}")
+def override_limit(object_id: str, lid: str, body: dict = Body(...)) -> dict[str, Any]:
+    from backend.v2.userdata import UserDataError, diff
+    ctx = get_ctx()
+    _check_inherited(ctx, object_id)
+    limit = ctx.limits.get(lid)
+    if not limit:
+        raise HTTPException(404, f"未找到限值：{lid}")
+    before = ctx.overrides.limit(object_id, lid)
+    try:
+        entry = ctx.overrides.set_limit(object_id, lid, body)
+    except UserDataError as exc:
+        raise HTTPException(400, str(exc))
+    base = {f: limit.get(f) for f in ("lowLow", "low", "normalLow", "normalHigh", "high", "highHigh")}
+    ctx.audit.record("禁用继承" if entry["disabled"] else "覆盖继承", "参数约束", lid, f"{lid} {limit.get('appliesTo') or ''}",
+                     objects=[object_id], note=f"在 {ctx.object_name(object_id)} 上",
+                     changes=diff({**base, **((before or {}).get("values") or {}), "disabled": bool((before or {}).get("disabled"))},
+                                  {**base, **(entry.get("values") or {}), "disabled": entry["disabled"]}))
+    return entry
+
+
+@router.delete("/objects/{object_id}/overrides/limits/{lid}")
+def restore_limit(object_id: str, lid: str) -> dict[str, Any]:
+    ctx = get_ctx()
+    old = ctx.overrides.clear("limits", object_id, lid)
+    if old:
+        ctx.audit.record("恢复继承", "参数约束", lid, lid, objects=[object_id], note=f"在 {ctx.object_name(object_id)} 上")
+    return {"restored": bool(old)}
+
+
 # ------------------------------------------------------------------ 现象
 @router.get("/phenomena")
 def phenomena(anchor: Optional[str] = None, op: Optional[str] = None, keyword: str = "") -> dict[str, Any]:
@@ -297,21 +477,65 @@ def phenomenon(pid: str) -> dict[str, Any]:
     return view
 
 
+# 变更记录（需求 SW-062）：现象、导致关系、计算组态的增删改都记一条
+def _readable(rec: Optional[dict]) -> Optional[dict]:
+    """变更记录里判定规则显示为自然语言，锚点显示名称。"""
+    if not rec:
+        return rec
+    from backend.v2.phenomena import rule_text
+    ctx = get_ctx()
+    out = dict(rec)
+    if "rule" in out:
+        out["rule"] = rule_text(out["rule"], ctx.limits, {k: v["name"] for k, v in ctx.calcs.items.items()}) if out["rule"] else "（待定义）"
+    if isinstance(out.get("anchor"), dict):
+        out["anchor"] = out["anchor"].get("name")
+    return out
+
+
+def _audit(op: str, kind: str, before: Optional[dict], after: Optional[dict], objects: list[str]) -> None:
+    from backend.v2.userdata import diff
+    before, after = _readable(before), _readable(after)
+    rec = after or before or {}
+    name = rec.get("name") or (f"{rec.get('causeName', rec.get('cause'))} → {rec.get('effectName', rec.get('effect'))}" if "cause" in rec else rec.get("id", ""))
+    get_ctx().audit.record(op, kind, rec.get("id", ""), name, objects=objects,
+                           changes=diff(before, after) if op == "修改" else [])
+
+
+def _anchor_objects(rec: Optional[dict]) -> list[str]:
+    return [((rec or {}).get("anchor") or {}).get("id") or ""]
+
+
+def _link_objects(ctx, link: dict) -> list[str]:  # noqa: ANN001
+    return [((ctx.phen.phenomena.get(link.get(k)) or {}).get("anchor") or {}).get("id") or "" for k in ("cause", "effect")] + \
+        [link.get("cause") or "", link.get("effect") or ""]
+
+
 @router.post("/phenomena")
 def create_phenomenon(body: dict = Body(...)) -> dict[str, Any]:
     ctx = get_ctx()
-    return tabs.phenomenon_view(ctx, _guard(ctx.phen.create_phenomenon, body))
+    rec = _guard(ctx.phen.create_phenomenon, body)
+    _audit("新增", "现象", None, rec, _anchor_objects(rec))
+    return tabs.phenomenon_view(ctx, rec)
 
 
 @router.put("/phenomena/{pid}")
 def update_phenomenon(pid: str, body: dict = Body(...)) -> dict[str, Any]:
+    import copy
     ctx = get_ctx()
-    return tabs.phenomenon_view(ctx, _guard(ctx.phen.update_phenomenon, pid, body))
+    before = copy.deepcopy(_guard(ctx.phen.get, pid))
+    rec = _guard(ctx.phen.update_phenomenon, pid, body)
+    _audit("修改", "现象", before, rec, _anchor_objects(rec) + _anchor_objects(before))
+    return tabs.phenomenon_view(ctx, rec)
 
 
 @router.delete("/phenomena/{pid}")
 def delete_phenomenon(pid: str) -> dict[str, Any]:
-    return _guard(get_ctx().phen.delete_phenomenon, pid)
+    import copy
+    ctx = get_ctx()
+    before = copy.deepcopy(_guard(ctx.phen.get, pid))
+    out = _guard(ctx.phen.delete_phenomenon, pid)
+    _audit("删除", "现象", before, None, _anchor_objects(before))
+    return out
 
 
 @router.get("/phenomena/{pid}/chain")
@@ -329,7 +553,7 @@ def evaluate_phenomenon(pid: str, body: dict = Body(default={})) -> dict[str, An
     ctx = get_ctx()
     p = _guard(ctx.phen.get, pid)
     return _guard(rule_eval.evaluate, ctx, p.get("rule"), p["anchor"]["id"], hours=float(body.get("hours") or 24),
-                  op_id=body.get("opId"), target_id=body.get("targetId"))
+                  op_id=body.get("opId"), target_id=body.get("targetId"), phenomenon_id=pid)
 
 
 @router.post("/rules/evaluate")
@@ -360,18 +584,31 @@ def causal_links(op: Optional[str] = None, phenomenon: Optional[str] = None) -> 
 @router.post("/causal-links")
 def create_link(body: dict = Body(...)) -> dict[str, Any]:
     ctx = get_ctx()
-    return tabs.link_view(ctx, _guard(ctx.phen.create_link, body))
+    rec = _guard(ctx.phen.create_link, body)
+    view = tabs.link_view(ctx, rec)
+    _audit("新增", "导致关系", None, view, _link_objects(ctx, rec))
+    return {**view, **({"warnings": rec["warnings"]} if rec.get("warnings") else {})}
 
 
 @router.put("/causal-links/{lid}")
 def update_link(lid: str, body: dict = Body(...)) -> dict[str, Any]:
+    import copy
     ctx = get_ctx()
-    return tabs.link_view(ctx, _guard(ctx.phen.update_link, lid, body))
+    before = copy.deepcopy(_guard(ctx.phen.get_link, lid))
+    rec = _guard(ctx.phen.update_link, lid, body)
+    _audit("修改", "导致关系", before, rec, _link_objects(ctx, rec))
+    return tabs.link_view(ctx, rec)
 
 
 @router.delete("/causal-links/{lid}")
 def delete_link(lid: str) -> dict[str, Any]:
-    return _guard(get_ctx().phen.delete_link, lid)
+    import copy
+    ctx = get_ctx()
+    before = copy.deepcopy(_guard(ctx.phen.get_link, lid))
+    objs = _link_objects(ctx, before)
+    out = _guard(ctx.phen.delete_link, lid)
+    _audit("删除", "导致关系", before, None, objs)
+    return out
 
 
 # ------------------------------------------------------------------ 计算组态
@@ -390,17 +627,27 @@ def calc_get(cid: str) -> dict[str, Any]:
 
 @router.post("/calculations")
 def calc_create(body: dict = Body(...)) -> dict[str, Any]:
-    return _guard(get_ctx().calcs.create, body)
+    rec = _guard(get_ctx().calcs.create, body)
+    _audit("新增", "计算组态", None, rec, _anchor_objects(rec))
+    return rec
 
 
 @router.put("/calculations/{cid}")
 def calc_update(cid: str, body: dict = Body(...)) -> dict[str, Any]:
-    return _guard(get_ctx().calcs.update, cid, body)
+    import copy
+    before = copy.deepcopy(_guard(get_ctx().calcs.get, cid))
+    rec = _guard(get_ctx().calcs.update, cid, body)
+    _audit("修改", "计算组态", before, rec, _anchor_objects(rec))
+    return rec
 
 
 @router.delete("/calculations/{cid}")
 def calc_delete(cid: str) -> dict[str, Any]:
-    return _guard(get_ctx().calcs.delete, cid)
+    import copy
+    before = copy.deepcopy(_guard(get_ctx().calcs.get, cid))
+    out = _guard(get_ctx().calcs.delete, cid)
+    _audit("删除", "计算组态", before, None, _anchor_objects(before))
+    return out
 
 
 @router.post("/calculations/{cid}/run")

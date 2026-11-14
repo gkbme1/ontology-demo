@@ -22,7 +22,7 @@ ATTR_TYPES = {"工艺属性": "工艺参数", "质量指标": "质量指标"}
 INFLUENCE_CATEGORIES = {"影响关系", "质量关系"}
 
 
-def build(ctx: AppContext) -> dict[str, Any]:
+def build(ctx: AppContext, include_user: bool = True) -> dict[str, Any]:
     h = ctx.hierarchy
     dcs = ctx.store.dcs
     nodes: dict[str, dict[str, Any]] = {}
@@ -114,6 +114,13 @@ def build(ctx: AppContext) -> dict[str, Any]:
             edge(a, b, "具有属性", "具有属性")
         elif cat in INFLUENCE_CATEGORIES and s["type"] in ATTR_TYPES and o["type"] in ATTR_TYPES:
             edge(a, b, "工艺影响", r["predicate"], mechanism=r.get("domainDescription") or "")
+
+    # 人工新增的关系（需求 SW-044 / 049：保存后全局图谱同步更新）
+    if include_user:
+        for r in ctx.relations.items:
+            a, b = r["from"]["id"], r["to"]["id"]
+            etype = "工艺影响" if r["type"] == "工艺影响" else "物理拓扑"
+            edge(a, b, etype, r.get("label") or r["type"], mechanism=r.get("mechanism") or "", userRelation=True)
 
     # 工序衔接：设备组之间跨工序的物理拓扑
     for e in list(edges):

@@ -37,11 +37,39 @@ export const nav = reactive({
   graphFocus: null as { id: string; hops?: number } | null
 })
 
+// 浏览历史（需求 SW-041 第 5 条：支持浏览历史后退；SW-088 第 4 条：返回时保留原位置）
+interface Snap { selection: Selection; activeKey: string; category: string; mode: 'root' | 'segment'; segmentId: string; page: 'browse' | 'graph' }
+const history: Snap[] = []
+let restoring = false
+export const navHistory = reactive({ size: 0 })
+function snap(): Snap {
+  return { selection: { ...nav.selection }, activeKey: nav.activeKey, category: nav.category, mode: nav.mode, segmentId: nav.segmentId, page: nav.page }
+}
+function remember(): void {
+  if (restoring || nav.selection.type === 'none') return
+  const last = history[history.length - 1]
+  const cur = snap()
+  if (last && JSON.stringify(last.selection) === JSON.stringify(cur.selection) && last.page === cur.page) return
+  history.push(cur)
+  if (history.length > 50) history.shift()
+  navHistory.size = history.length
+}
+export function goBack(): void {
+  const prev = history.pop()
+  navHistory.size = history.length
+  if (!prev) return
+  restoring = true
+  Object.assign(nav, { category: prev.category, mode: prev.mode, segmentId: prev.segmentId, page: prev.page, activeKey: prev.activeKey })
+  nav.selection = { ...prev.selection }
+  restoring = false
+}
+
 export async function loadMeta(): Promise<void> {
   if (!nav.meta) nav.meta = await api.meta()
 }
 
 export function select(sel: Selection, key?: string): void {
+  if (JSON.stringify(sel) !== JSON.stringify(nav.selection)) remember()
   nav.selection = { ...sel }
   if (key !== undefined) nav.activeKey = key
 }
@@ -82,6 +110,7 @@ export function openObject(objectId: string, opId?: string, tab?: string): void 
 }
 
 export function openGlobalGraph(focusId?: string, hops = 2): void {
+  remember()
   nav.graphFocus = focusId ? { id: focusId, hops } : null
   nav.page = 'graph'
 }

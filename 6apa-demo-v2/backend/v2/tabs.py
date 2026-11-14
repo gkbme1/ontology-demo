@@ -79,6 +79,53 @@ def _scope_members(ctx: AppContext, object_id: str, op_id: str | None) -> list[s
 PARAM_GROUPS = ["基本信息", "设计参数", "工艺属性", "测量", "状态", "控制"]
 _KIND_TO_GROUP = {"固有": "基本信息", "工艺属性": "工艺属性", "测量": "测量", "状态": "状态", "控制": "控制"}
 
+# 需求 SW-004 / SW-005：静态「属性」与带位号的「参数」分开；参数类别按位号的变量类别归类
+ATTR_CATEGORIES = ["基本信息", "设计参数"]
+PARAM_CATEGORIES = ["测量值", "设定值", "阀位", "控制指令", "状态", "计算值"]
+BINDING_STATES = ["已绑定", "待确认", "未绑定", "失效"]
+_VAR_CATEGORY = {
+    "调节阀开度指令": "阀位", "变频频率给定": "设定值",
+    "启停/开关指令": "控制指令", "开关阀控制块": "控制指令", "电机控制块": "控制指令",
+    "阀位开关反馈": "状态", "运行状态反馈": "状态", "故障/报警状态": "状态", "远程/就地状态": "状态",
+}
+_BLOCK_CATEGORY = {"AI": "测量值", "DI": "状态", "AO": "阀位", "DOV": "控制指令", "MOT2": "控制指令", "VAL2": "控制指令"}
+
+
+def _param_category(ctx: AppContext, item: dict[str, Any], tags: list[str]) -> str:
+    """参数类别：按（第一个）位号的变量类别 / 块类型；没有位号的工艺属性是派生量 → 计算值。"""
+    for name in tags:
+        t = ctx.tag_by_name.get(name)
+        if not t:
+            continue
+        cat = _VAR_CATEGORY.get(t.get("variableCategory") or "") or _BLOCK_CATEGORY.get(t.get("blockType") or "")
+        if cat:
+            return cat
+    if item["group"] == "状态":
+        return "状态"
+    if item["group"] == "控制":
+        return "控制指令"
+    if item["group"] == "测量":
+        return "测量值"
+    return "计算值" if item.get("matchStatus") == "未匹配DCS实例" else "测量值"
+
+
+def _binding(ctx: AppContext, item: dict[str, Any]) -> tuple[str, str]:
+    """位号绑定状态（需求 SW-028）：已绑定 / 待确认 / 未绑定 / 失效，附说明。"""
+    links = [l for l in item["links"] if l.get("own", True)]
+    if not links:
+        if item.get("groupLinkTotal"):
+            return "未绑定", f"本台无测点（设备组其他台共 {item['groupLinkTotal']} 个）"
+        return "未绑定", "派生量，可做成计算组态" if item["category"] == "计算值" else "无测点"
+    missing = [l["tag"] for l in links if l["tag"] not in ctx.tag_by_name]
+    if missing:
+        return "失效", f"位号不在点表中：{'、'.join(missing)}"
+    low = [l["tag"] for l in links if (ctx.tag_by_name[l["tag"]].get("confidence") == "低")]
+    if item.get("pendingConfirmation"):
+        return "待确认", "工艺属性 ↔ 位号按名称推断，待工艺确认"
+    if low:
+        return "待确认", f"位号归属置信度低：{'、'.join(low)}"
+    return "已绑定", ""
+
 
 def _equipment_type(ctx: AppContext, object_id: str) -> tuple[str, str, str | None]:
     """(名称, 设备类型, 所属设备组名)"""
@@ -148,7 +195,8 @@ def _parameters(ctx: AppContext, object_id: str, prof: dict[str, Any], op_id: st
         items.append({"group": group, "name": a.get("name"), "valueType": a.get("valueType") or "",
                       "value": a.get("value"), "description": a.get("description") or "",
                       "note": a.get("note") or "", "links": links, "inheritedFrom": a.get("inheritedFrom"),
-                      "linkTotal": a.get("dataLinkTotal"), "groupLinkTotal": a.get("groupLinkTotal")})
+                      "linkTotal": a.get("dataLinkTotal"), "groupLinkTotal": a.get("groupLinkTotal"),
+                      "matchStatus": a.get("matchStatus"), "pendingConfirmation": a.get("pendingConfirmation")})
     if object_id.startswith("egrp-"):
         items += _member_signals(ctx, object_id, op_id)
     for x in items:
@@ -160,13 +208,28 @@ def _parameters(ctx: AppContext, object_id: str, prof: dict[str, Any], op_id: st
         _inherit(x, True, f"类「{tpl}」参数模板")
     pos = next((i for i, x in enumerate(items) if x["group"] != "基本信息"), len(items))
     items[pos:pos] = design
-    counts = {g: sum(1 for x in items if x["group"] == g) for g in PARAM_GROUPS}
-    return {"items": items, "groups": [g for g in PARAM_GROUPS if counts[g]], "counts": counts,
+    for x in items:
+        if x["group"] in ATTR_CATEGORIES:
+            x["section"], x["category"], x["binding"], x["bindingNote"] = "属性", x["group"], None, ""
+        else:
+            x["section"] = "参数"
+            x["semantic"] = x["group"] == "工艺属性"  # 工艺属性 = 本体语义参数（如 釜内反应温度），其余为点表测点参数
+            x["category"] = _param_category(ctx, x, [l["tag"] for l in x["links"]])
+            x["binding"], x["bindingNote"] = _binding(ctx, x)
+    # 属性在前，参数按类别排序
+    order = ATTR_CATEGORIES + PARAM_CATEGORIES
+    items.sort(key=lambda x: (order.index(x["category"]), 0 if x.get("semantic") else 1))
+    counts = {g: sum(1 for x in items if x["category"] == g) for g in order}
+    bcounts = {b: sum(1 for x in items if x.get("binding") == b) for b in BINDING_STATES}
+    return {"items": items, "groups": [g for g in order if counts[g]], "counts": counts,
+            "attrGroups": [g for g in ATTR_CATEGORIES if counts[g]], "paramGroups": [g for g in PARAM_CATEGORIES if counts[g]],
+            "bindingCounts": bcounts,
             "tagTotal": len({l["tag"] for x in items for l in x["links"] if l["own"]}),
             "scope": "本组" if object_id.startswith("egrp-") else "本台",
             "designTemplate": (ctx.design.template_for(etype, name) or {}).get("name"),
             "designPending": sum(1 for x in design if x["pending"]),
-            "note": "基本信息与设计参数是设备的固定参数；工艺属性与测量 / 状态 / 控制参数的数据关联（DCS 位号）直接列在行里"}
+            "note": "属性 = 静态信息（基本信息、设计参数）；参数 = 工艺量，按位号的变量类别分为 测量值 / 设定值 / 阀位 / 控制指令 / 状态 / 计算值，"
+                    "DCS 位号与绑定状态直接列在行里"}
 
 
 def header(ctx: AppContext, object_id: str, op_id: str | None) -> dict[str, Any]:
@@ -267,10 +330,53 @@ def _constraints(ctx: AppContext, object_id: str, prof: dict[str, Any]) -> dict[
                 "reason": v.get("reason") or "", "status": v.get("status") or "",
             })
         inherited = object_id.startswith("equip-") and c.get("appliesTo") in inherited_attrs
-        items.append(_inherit({**c, "modePhenomenon": _condition_phen(ctx, f"mode:{code}:{mode}") if mode else None,
-                               "versions": versions}, inherited, f"设备组 {group_name}"))
-    return {"operating": items, "safety": cons.get("safety") or [],
+        row = _inherit({**c, "modePhenomenon": _condition_phen(ctx, f"mode:{code}:{mode}") if mode else None,
+                        "versions": versions}, inherited, f"设备组 {group_name}")
+        ov = ctx.overrides.limit(object_id, c["id"]) if inherited else None
+        if ov:
+            # 本台覆盖限值（需求 SW-045）：alarm / normal 换成覆盖值，template 保留设备组（类）的值以便对比
+            row["inheritState"] = "已禁用" if ov.get("disabled") else "已覆盖"
+            row["override"] = ov
+            row["template"] = {"alarm": c.get("alarm"), "normal": c.get("normal")}
+            v = ov.get("values") or {}
+            if v:
+                alarm = dict(c.get("alarm") or {})
+                for f in ("lowLow", "low", "high", "highHigh"):
+                    if f in v:
+                        alarm[f] = v[f]
+                row["alarm"] = alarm
+                if "normalLow" in v or "normalHigh" in v:
+                    lo = v.get("normalLow", limit.get("normalLow"))
+                    hi = v.get("normalHigh", limit.get("normalHigh"))
+                    row["normal"] = f"{'' if lo is None else lo}~{'' if hi is None else hi}"
+                row["hasValues"] = True
+        row["limitValues"] = {f: limit.get(f) for f in ("lowLow", "low", "normalLow", "normalHigh", "high", "highHigh")}
+        items.append(row)
+    return {"operating": items, "safety": cons.get("safety") or [], "canOverride": object_id.startswith("equip-") and bool(group_name),
             "note": "工况与版本适用条件都是「工况」类现象，点击可跳到现象定义；判断历史数据时按当时生效的版本"}
+
+
+_KIND_TYPE = {"equipment": "生产设备", "group": "生产设备", "stream": "物料流股", "utility": "公用介质"}
+
+
+def _user_topology(ctx: AppContext, object_id: str, group_name: str | None) -> list[dict[str, Any]]:
+    """人工新增的拓扑关系（物理拓扑 / 工艺流向 / 供应），设备上也显示挂在所属设备组上的（继承）。"""
+    gid = (ctx.store.dcs.equipment.get(object_id) or {}).get("equipmentGroupId")
+    out = []
+    for u in ctx.relations.items:
+        if u["type"] == "工艺影响":
+            continue
+        for me, other, direction, role in ((u["from"], u["to"], "out", "下游"), (u["to"], u["from"], "in", "上游")):
+            if me["id"] not in (object_id, gid):
+                continue
+            out.append(_inherit({
+                "relationId": u["id"], "userRelation": True, "category": {"物理拓扑": "物理拓扑关系"}.get(u["type"], u["type"]),
+                "predicate": u["label"], "direction": direction, "from": u["from"]["name"], "to": u["to"]["name"],
+                "target": other["name"], "targetId": other["id"], "targetType": _KIND_TYPE.get(other.get("kind"), "生产设备"),
+                "mechanism": u.get("mechanism") or "", "tags": [], "source": f"人工新增 · {u['createdAt']}",
+                "role": role, "layer": "人工", "status": u.get("status"),
+            }, me["id"] == gid and gid != object_id, f"设备组 {group_name}"))
+    return out
 
 
 def calc_view(ctx: AppContext, c: dict[str, Any]) -> dict[str, Any]:
@@ -329,12 +435,26 @@ def tab(ctx: AppContext, object_id: str, key: str, op_id: str | None = None) -> 
                  if r.get("category") in ("物理拓扑关系", "空间层级", "设备分类", "结构关系")]
         gname = _group_name(ctx, object_id)
         items = [_inherit(dict(r), r.get("layer") == "所属组", f"设备组 {gname}") for r in items]
-        return {"items": items, "instances": prof.get("instances") or []}
+        items += _user_topology(ctx, object_id, gname)
+        return {"items": items, "instances": prof.get("instances") or [],
+                "relationTypes": ["物理拓扑", "工艺流向", "供应"], "canEdit": True}
     if key == "phenomena":
         gname = _group_name(ctx, object_id)
-        items = [_inherit(phenomenon_view(ctx, p, origin), origin == "继承自设备组", f"设备组 {gname}")
-                 for p, origin in ctx.phenomena_for_object(object_id)]
-        return {"items": items}
+        items = []
+        for p, origin in ctx.phenomena_for_object(object_id):
+            view = _inherit(phenomenon_view(ctx, p, origin), origin == "继承自设备组", f"设备组 {gname}")
+            ov = ctx.overrides.phenomenon(object_id, p["id"]) if view["inherited"] else None
+            if ov:
+                # 本台覆盖 / 禁用了继承来的现象（需求 SW-026 / 046）：显示覆盖后的规则，保留模板规则以便对比
+                view["inheritState"] = "已禁用" if ov.get("disabled") else "已覆盖"
+                view["override"] = ov
+                view["templateRuleText"] = view["ruleText"]
+                view["templateRule"] = p.get("rule")
+                if ov.get("rule"):
+                    view["ruleText"] = rule_text(ov["rule"], ctx.limits, _calc_names(ctx))
+                    view["rule"] = ov["rule"]
+            items.append(view)
+        return {"items": items, "canOverride": object_id.startswith("equip-") and bool(gname)}
     if key == "causal":
         pairs = ctx.phenomena_for_object(object_id)
         own = {p["id"] for p, _ in pairs}
@@ -350,8 +470,19 @@ def tab(ctx: AppContext, object_id: str, key: str, op_id: str | None = None) -> 
         gname = _group_name(ctx, object_id)
         items = [_inherit(dict(r), object_id.startswith("equip-") and not ({r.get("from"), r.get("to")} & own_attrs),
                           f"设备组 {gname}") for r in items]
+        attr_ids = {a.get("entityId") for a in prof.get("attributes") or [] if a.get("entityId")}
+        for u in ctx.relations.items:
+            if u["type"] == "工艺影响" and {u["from"]["id"], u["to"]["id"]} & attr_ids:
+                items.append(_inherit({"relationId": u["id"], "userRelation": True, "from": u["from"]["name"], "to": u["to"]["name"],
+                                       "fromId": u["from"]["id"], "toId": u["to"]["id"], "predicate": u["label"], "category": "影响关系",
+                                       "kind": "人工", "via": u["to"]["name"], "mechanism": u.get("mechanism") or "", "tagCount": 0,
+                                       "lag": u.get("lag") or "", "status": u.get("status"),
+                                       "source": f"人工新增 · {u['createdAt']}"}, False, None))
         own_names = sorted({a["name"] for a in prof.get("attributes") or [] if a.get("kind") == "工艺属性"})
-        return {"items": items, "own": own_names, "note": "工艺属性之间的影响关系（正向 / 负向影响、质量关系），来自工业关系表"}
+        return {"items": items, "own": own_names, "canEdit": True,
+                "params": [{"id": a["entityId"], "name": a["name"]} for a in prof.get("attributes") or []
+                           if a.get("kind") == "工艺属性" and a.get("entityId")],
+                "note": "工艺属性之间的影响关系（正向 / 负向影响、质量关系），来自工业关系表；人工新增的标「人工」，可删除"}
     if key == "calc":
         gname = _group_name(ctx, object_id)
         calcs = [_inherit({**calc_view(ctx, c), "origin": c["origin"]}, c["origin"] == "继承自设备组", f"设备组 {gname}")

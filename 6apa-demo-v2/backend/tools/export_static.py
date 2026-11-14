@@ -145,6 +145,7 @@ def main() -> None:
         for tab in STATIC_TABS:
             col.fetch(f"/objects/{oid}/tabs/{tab}")
         col.fetch(f"/objects/{oid}/parameters")
+        col.fetch(f"/objects/{oid}/info")
 
     print("收集其他分类 …")
     for cat in nav.CATEGORIES:

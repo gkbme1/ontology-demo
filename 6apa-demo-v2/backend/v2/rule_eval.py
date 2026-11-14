@@ -4,7 +4,8 @@
 - 条件只用位号时与台号无关，只判定一次；
 - 持续时长：原始条件连续成立满 durationSec 才算成立；
 - 由…变为…：上一采样点等于 from、本采样点等于 to 的时刻成立；
-- 限值引用按基础版本（V0）取值；
+- 限值引用按基础版本（V0）取值；设备上覆盖了限值（需求 SW-045）时按本台覆盖值，本台禁用的限值无法判定；
+- 设备组上的现象在某台设备上被覆盖（阈值 / 持续时长）时，该台按覆盖后的规则判定，被禁用时该台不判定；
 - 主体无法落到测点时，该条件记为「无法判定」，按不成立处理并在结果里列出。
 """
 from __future__ import annotations
@@ -73,8 +74,13 @@ class _Evaluator:
         equip = self.ctx.store.dcs.equipment.get(target)
         return bool(equip and equip.get("equipmentGroupId") == anchor)
 
-    def threshold(self, th: dict[str, Any]) -> float | None:
+    def threshold(self, th: dict[str, Any], target: str | None = None) -> float | None:
         if th.get("kind") == "limit":
+            ov = self.ctx.overrides.limit(target, th.get("limitId") or "") if target else None
+            if ov and ov.get("disabled"):
+                return None
+            if ov and th.get("field") in (ov.get("values") or {}):
+                return float(ov["values"][th["field"]])
             limit = self.ctx.limits.get(th.get("limitId") or "")
             value = (limit or {}).get(th.get("field") or "")
             return None if value is None else float(value)
@@ -119,9 +125,15 @@ class _Evaluator:
             raw = per.all(axis=0) if agg == "all" else per.any(axis=0)
             th_value = None
         else:
-            th_value = self.threshold(c.get("threshold") or {})
+            th = c.get("threshold") or {}
+            th_value = self.threshold(th, target)
+            ov = self.ctx.overrides.limit(target, th.get("limitId") or "") if th.get("kind") == "limit" else None
+            if ov and not ov.get("disabled") and th.get("field") in (ov.get("values") or {}):
+                entry["overridden"] = f"{th.get('limitId')} 在本台覆盖为 {th_value}"
             if th_value is None:
-                entry.update(status="无法判定", reason=f"阈值 {threshold_text(c.get('threshold'))} 没有数值")
+                reason = (f"限值 {th.get('limitId')} 在本台已禁用" if ov and ov.get("disabled")
+                          else f"阈值 {threshold_text(c.get('threshold'))} 没有数值")
+                entry.update(status="无法判定", reason=reason)
                 report.append(entry)
                 return np.zeros(n, dtype=bool)
             data = mat.mean(axis=0, keepdims=True) if agg == "mean" else mat
@@ -213,7 +225,7 @@ def targets_for(ctx: AppContext, anchor_id: str, rule: dict[str, Any] | None, op
 
 
 def evaluate(ctx: AppContext, rule: dict[str, Any] | None, anchor_id: str, *, hours: float = 24,
-             op_id: str | None = None, target_id: str | None = None) -> dict[str, Any]:
+             op_id: str | None = None, target_id: str | None = None, phenomenon_id: str | None = None) -> dict[str, Any]:
     if not rule:
         raise EvalError("该现象还没有判定规则，无法试算")
     if hours <= 0 or hours > 72:
@@ -223,13 +235,22 @@ def evaluate(ctx: AppContext, rule: dict[str, Any] | None, anchor_id: str, *, ho
     results = []
     for target in targets_for(ctx, anchor_id, rule, op_id, target_id):
         report: list[dict[str, Any]] = []
-        mask = ev.rule(rule, target, report)
+        ov = ctx.overrides.phenomenon(target, phenomenon_id) if phenomenon_id and target != anchor_id else None
+        if ov and ov.get("disabled"):
+            results.append({"targetId": target, "targetName": ctx.object_name(target), "current": False, "eventCount": 0,
+                            "totalMinutes": 0, "events": [], "conditions": [], "disabled": True,
+                            "overrideNote": "本台已禁用继承的该现象，不判定"})
+            continue
+        target_rule = (ov or {}).get("rule") or rule
+        mask = ev.rule(target_rule, target, report)
         events = ev.events(mask)
         results.append({
             "targetId": target, "targetName": ctx.object_name(target),
             "current": bool(mask[-1]), "eventCount": len(events),
             "totalMinutes": round(sum(e["minutes"] for e in events), 1),
             "events": events[-20:], "conditions": report,
+            **({"overrideNote": "本台按覆盖后的规则判定：" + rule_text(target_rule, ctx.limits, {k: v["name"] for k, v in ctx.calcs.items.items()})}
+               if ov else {}),
         })
     return {
         "window": {"start": simulator.fmt_times(times[:1])[0], "end": simulator.fmt_times(times[-1:])[0],

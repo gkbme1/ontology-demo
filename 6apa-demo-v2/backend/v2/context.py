@@ -21,6 +21,10 @@ class AppContext:
         self.algos = AlgorithmLibrary()
         self.calcs = CalcStore(self.algos)
         self.design = DesignParams()
+        from backend.v2.userdata import AuditLog, OverrideStore, RelationStore
+        self.audit = AuditLog()
+        self.overrides = OverrideStore()
+        self.relations = RelationStore()
         self.limits = {l["id"]: l for l in process_limits._load()}
         dcs = self.store.dcs
         self.tag_by_name = {t["name"]: t for t in dcs.tags.values()}
@@ -57,6 +61,25 @@ class AppContext:
             from backend.v2.search import search_index
             self._search_index = search_index(self)
         return self._search_index
+
+    def endpoint_index(self) -> dict[str, dict[str, Any]]:
+        """人工关系可选的端点：导航中的设备 / 设备组 + 全局图谱里的物料流股、公用介质、工艺参数、质量指标。"""
+        if getattr(self, "_endpoints", None) is None:
+            from backend.v2 import global_graph
+            h, dcs = self.hierarchy, self.store.dcs
+            idx: dict[str, dict[str, Any]] = {}
+            for gid, ops in h.ops_of_group.items():
+                if ops:
+                    idx[gid] = {"id": gid, "kind": "group", "name": dcs.equipment_groups[gid]["name"], "hint": h.ops[ops[0]]["name"]}
+            for eid, op in h.op_of_equipment.items():
+                idx[eid] = {"id": eid, "kind": "equipment", "name": dcs.equipment[eid]["name"], "hint": h.ops[op]["name"]}
+            kinds = {"物料流股": "stream", "公用介质": "utility", "工艺参数": "parameter", "质量指标": "quality"}
+            for n in global_graph.build(self, include_user=False)["nodes"]:
+                if n["type"] in kinds and n["id"] not in idx:
+                    near = h.ops[n["opId"]]["name"] if n.get("opId") in h.ops else ""
+                    idx[n["id"]] = {"id": n["id"], "kind": kinds[n["type"]], "name": n["name"], "hint": f"{n['type']}{' · ' + near if near else ''}"}
+            self._endpoints = idx
+        return self._endpoints
 
     def object_name(self, object_id: str) -> str:
         dcs = self.store.dcs

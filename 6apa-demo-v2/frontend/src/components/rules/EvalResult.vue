@@ -22,8 +22,9 @@ const openTarget = ref<string>(props.result?.results?.[0]?.targetId ?? '')
       <tbody>
         <template v-for="r in result.results" :key="r.targetId">
           <tr :class="{ 'bg-ink-panel2': openTarget === r.targetId }" @click="openTarget = openTarget === r.targetId ? '' : r.targetId">
-            <td>{{ r.targetName }}</td>
-            <td><span class="pill" :class="r.current ? 'pill-err' : 'pill-ok'">{{ r.current ? '成立' : '不成立' }}</span></td>
+            <td>{{ r.targetName }}<div v-if="r.overrideNote" class="text-[11px] text-warn">{{ r.overrideNote }}</div></td>
+            <td><span v-if="r.disabled" class="pill pill-mute">已禁用</span>
+              <span v-else class="pill" :class="r.current ? 'pill-err' : 'pill-ok'">{{ r.current ? '成立' : '不成立' }}</span></td>
             <td class="tabular-nums">{{ r.eventCount }}</td>
             <td class="tabular-nums">{{ r.totalMinutes }} 分钟</td>
             <td class="text-fg-dim">{{ r.events.length ? `${r.events[r.events.length - 1].start} 起 ${r.events[r.events.length - 1].minutes} 分钟` : '—' }}</td>
@@ -36,6 +37,7 @@ const openTarget = ref<string>(props.result?.results?.[0]?.targetId ?? '')
                   <span class="font-mono">{{ c.text }}</span>
                   <span v-if="c.trueRatio !== undefined" class="text-fg-mute">成立占比 {{ (c.trueRatio * 100).toFixed(1) }}%</span>
                   <span v-if="c.reason" class="text-warn">{{ c.reason }}</span>
+                  <span v-if="c.overridden" class="text-warn">{{ c.overridden }}</span>
                 </div>
                 <LineChart v-if="c.chart" :times="c.chart.times" :lines="c.chart.lines" :threshold="c.threshold" :height="150" />
               </div>

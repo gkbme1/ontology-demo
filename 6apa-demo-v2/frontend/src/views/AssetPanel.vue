@@ -15,6 +15,9 @@ import InfluenceGraph from '@/components/InfluenceGraph.vue'
 import CausePopup from '@/components/causal/CausePopup.vue'
 import PhenomenaPanel from '@/components/causal/PhenomenaPanel.vue'
 import CausalPanel from '@/components/causal/CausalPanel.vue'
+import LimitOverrideEditor from '@/components/LimitOverrideEditor.vue'
+import RelationEditor from '@/components/RelationEditor.vue'
+import ObjectInfo from '@/components/ObjectInfo.vue'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any
@@ -89,15 +92,37 @@ async function gotoPhen(id: string): Promise<void> {
 }
 watch(tab, (t) => { if (t !== 'phenomena') focusPhen.value = '' })
 const GROUP_PILL: Record<string, string> = {
-  基本信息: 'pill-plain', 设计参数: 'pill-warn', 工艺属性: 'pill-ok', 测量: 'pill-info', 状态: 'pill-info', 控制: 'pill-info'
+  基本信息: 'pill-plain', 设计参数: 'pill-warn', 测量值: 'pill-info', 设定值: 'pill-info', 阀位: 'pill-info', 控制指令: 'pill-info',
+  状态: 'pill-info', 计算值: 'pill-ok'
 }
+const BIND_PILL: Record<string, string> = { 已绑定: 'pill-ok', 待确认: 'pill-warn', 未绑定: 'pill-mute', 失效: 'pill-err' }
+const bindFilter = ref('')
 const params = computed(() => (data.value?.items ?? []).filter((a: Any) =>
-  (!paramGroup.value || a.group === paramGroup.value) &&
+  (!paramGroup.value || a.category === paramGroup.value || (paramGroup.value === '属性' && a.section === '属性') || (paramGroup.value === '参数' && a.section === '参数')) &&
+  (!bindFilter.value || a.binding === bindFilter.value) &&
   (!tagKw.value || `${a.name}${a.description}${a.links?.map((l: Any) => l.tag + l.desc).join('') ?? ''}`.toLowerCase().includes(tagKw.value.toLowerCase()))))
 const counts = computed<Record<string, number>>(() => head.value?.counts ?? {})
 
 function pick(id: string, kind: string, opId?: string): void {
   if (kind === 'equipment' || kind === 'group') openObject(id, opId ?? props.opId ?? head.value?.opId, 'drawing')
+}
+// 人工新增 / 删除拓扑与工艺影响关系（需求 SW-044 / 049）
+const relEditing = ref<'' | 'topology' | 'influence'>('')
+const showInfo = ref(false)
+async function removeRelation(r: Any): Promise<void> {
+  if (!confirm(`删除人工新增的关系「${r.from} —${r.predicate}→ ${r.to}」？`)) return
+  try { await api.deleteRelation(r.relationId); await loadTab(); await loadHead() } catch (e) { alert((e as Error).message) }
+}
+async function relSaved(): Promise<void> { relEditing.value = ''; await loadTab(); await loadHead() }
+
+// 设备上覆盖 / 禁用 / 恢复继承来的限值（需求 SW-045）
+const limitEditing = ref<Any>(null)
+async function limitDisable(c: Any): Promise<void> {
+  if (!confirm(`在「${head.value.name}」上禁用继承的限值 ${c.id}（${c.appliesTo}）？本台引用该限值的判定规则将无法判定。`)) return
+  try { await api.overrideLimit(props.objectId, c.id, { disabled: true }); await loadTab() } catch (e) { alert((e as Error).message) }
+}
+async function limitRestore(c: Any): Promise<void> {
+  try { await api.restoreLimit(props.objectId, c.id); await loadTab() } catch (e) { alert((e as Error).message) }
 }
 function fmtBand(c: Any): string {
   const a = c.alarm ?? {}
@@ -117,6 +142,7 @@ function fmtBand(c: Any): string {
           <span v-if="head.className" class="pill pill-plain">{{ head.className }}</span>
           <span class="text-[11px] text-fg-mute truncate" :title="head.badges.join(' · ')">{{ head.badges.join(' · ') }}</span>
           <span class="flex-1" />
+          <button class="ctl !py-0.5" title="ID、编码、类、状态、来源、所属位置、被引用、变更记录" @click="showInfo = true">ⓘ 基础信息 · 变更记录</button>
           <button class="ctl !py-0.5" title="在全局图谱中以本对象为中心查看 1 跳邻域（可再扩到 2 / 3 跳）" @click="openGlobalGraph(objectId, 1)">◎ 全局图谱定位</button>
           <span class="text-[11px] text-fg-mute whitespace-nowrap truncate max-w-[40%]">
             <span v-for="(p, i) in head.path" :key="p.id">{{ p.name }}<span v-if="i < head.path.length - 1"> › </span></span>
@@ -163,21 +189,30 @@ function fmtBand(c: Any): string {
           <div v-else-if="tab === 'parameters'">
             <div class="flex flex-wrap items-center gap-1.5 mb-2">
               <button class="ctl" :class="{ 'ctl-on': !paramGroup }" @click="paramGroup = ''">全部 <span class="text-fg-mute">{{ data.items.length }}</span></button>
-              <button v-for="g in data.groups" :key="g" class="ctl" :class="{ 'ctl-on': paramGroup === g }" @click="paramGroup = g">
+              <span class="text-[11px] text-fg-mute ml-1">属性</span>
+              <button v-for="g in data.attrGroups" :key="g" class="ctl" :class="{ 'ctl-on': paramGroup === g }" @click="paramGroup = g">
                 {{ g }} <span class="text-fg-mute">{{ data.counts[g] }}</span>
               </button>
+              <span class="text-[11px] text-fg-mute ml-1">参数</span>
+              <button v-for="g in data.paramGroups" :key="g" class="ctl" :class="{ 'ctl-on': paramGroup === g }" @click="paramGroup = g">
+                {{ g }} <span class="text-fg-mute">{{ data.counts[g] }}</span>
+              </button>
+              <span class="text-[11px] text-fg-mute ml-1">绑定</span>
+              <template v-for="(n, b) in (data.bindingCounts as Record<string, number>)" :key="b">
+                <button v-if="n" class="ctl" :class="{ 'ctl-on': bindFilter === b }" @click="bindFilter = bindFilter === b ? '' : String(b)">{{ b }} <span class="text-fg-mute">{{ n }}</span></button>
+              </template>
               <input v-model="tagKw" class="inp w-56 ml-2" placeholder="筛选参数名 / 位号 / 描述" />
               <span class="flex-1" />
               <span class="text-[11px] text-fg-mute">{{ data.scope }} {{ data.tagTotal }} 个 DCS 测点<template v-if="data.designPending"> · 设计参数 {{ data.designPending }} 项待补充</template></span>
             </div>
             <table class="tbl">
-              <thead><tr><th class="w-16 !text-center">来源</th><th class="w-[84px]">类别</th><th>参数</th><th class="w-[110px]">类型 · 单位</th><th>值 / 数据关联（DCS 位号）</th></tr></thead>
+              <thead><tr><th class="w-16 !text-center">来源</th><th class="w-[84px]">类别</th><th>参数 / 属性</th><th class="w-[110px]">类型 · 单位</th><th>值 / 数据关联（DCS 位号）</th><th class="w-[84px]">绑定</th></tr></thead>
               <tbody>
                 <tr v-for="(a, i) in params" :key="i" class="!cursor-default">
                   <td><InheritBox :checked="a.inherited" :from="a.inheritedFrom" /></td>
-                  <td><span class="pill" :class="GROUP_PILL[a.group] ?? 'pill-plain'">{{ a.group }}</span></td>
+                  <td><span class="pill" :class="GROUP_PILL[a.category] ?? 'pill-plain'">{{ a.category }}</span></td>
                   <td>
-                    <div class="font-medium">{{ a.name }}</div>
+                    <div class="font-medium">{{ a.name }}<span v-if="a.semantic" class="pill pill-ok !py-0 ml-1" title="本体工艺属性（语义参数），由工业关系表定义">工艺属性</span></div>
                     <div v-if="a.description" class="text-[11px] text-fg-mute">{{ a.description }}</div>
                   </td>
                   <td class="text-fg-dim whitespace-nowrap">{{ a.valueType }}</td>
@@ -192,15 +227,18 @@ function fmtBand(c: Any): string {
                         {{ l.tag }}<span v-if="l.unit" class="opacity-70">{{ l.unit }}</span><span v-if="!l.own" class="opacity-70">@{{ l.equipment }}</span>
                       </span>
                     </div>
-                    <span v-else-if="!a.note && ['工艺属性', '测量', '状态', '控制'].includes(a.group) && (a.value === undefined || a.value === null)" class="text-[11px] text-fg-mute">
-                      无本台测点{{ a.groupLinkTotal ? `（设备组共 ${a.groupLinkTotal} 个）` : '（派生量或待补）' }}
-                    </span>
+                  </td>
+                  <td>
+                    <span v-if="a.binding" class="pill whitespace-nowrap cursor-help" :class="BIND_PILL[a.binding]" :title="a.bindingNote">{{ a.binding }}</span>
+                    <span v-else class="text-fg-mute">—</span>
+                    <div v-if="a.binding && a.binding !== '已绑定'" class="text-[10.5px] text-fg-mute leading-tight mt-0.5">{{ a.bindingNote }}</div>
                   </td>
                 </tr>
               </tbody>
             </table>
             <div class="text-[11px] text-fg-mute mt-2">
               设计参数来自 data/config/6APA_设备设计参数.xlsx（模板「{{ data.designTemplate ?? '无匹配模板' }}」），按设备档案 / 铭牌填写后重新导出即可显示；灰色位号表示测点在其他设备上（共用设备或组级属性）。
+              {{ data.note }}。绑定状态：已绑定 / 待确认（按名称推断或归属置信度低）/ 未绑定 / 失效（位号不在点表中）。
             </div>
           </div>
 
@@ -209,11 +247,11 @@ function fmtBand(c: Any): string {
             <div class="text-xs text-fg-mute">{{ data.note }}</div>
             <div v-if="!data.operating.length" class="empty">暂无工艺限值</div>
             <table v-else class="tbl">
-              <thead><tr><th class="w-16 !text-center">来源</th><th>编号</th><th>适用参数</th><th>工况</th><th>LL / L / 正常 / H / HH</th><th>单位</th><th>版本</th><th>状态</th></tr></thead>
+              <thead><tr><th class="w-16 !text-center">来源</th><th>编号</th><th>适用参数</th><th>工况</th><th>LL / L / 正常 / H / HH</th><th>单位</th><th>版本</th><th>状态</th><th v-if="data.canOverride"></th></tr></thead>
               <tbody>
                 <template v-for="c in data.operating" :key="c.id">
-                  <tr class="!cursor-default">
-                    <td><InheritBox :checked="c.inherited" :from="c.inheritedFrom" /></td>
+                  <tr class="!cursor-default" :class="{ 'opacity-50': c.inheritState === '已禁用' }">
+                    <td><InheritBox :checked="c.inherited" :from="c.inheritedFrom" :state="c.inheritState" /></td>
                     <td class="font-mono">{{ c.id }}</td>
                     <td>{{ c.appliesTo }}<div class="text-[11px] text-fg-mute max-w-[340px] truncate" :title="c.basis">{{ c.basis }}</div></td>
                     <td>
@@ -222,16 +260,27 @@ function fmtBand(c: Any): string {
                       </button>
                       <span v-else class="text-fg-dim">{{ c.operatingMode || '—' }}</span>
                     </td>
-                    <td class="font-mono text-xs whitespace-nowrap">{{ c.hasValues ? fmtBand(c) : '待现场提供' }}</td>
+                    <td class="font-mono text-xs whitespace-nowrap">
+                      <template v-if="c.inheritState === '已禁用'">本台已禁用</template>
+                      <template v-else>{{ c.hasValues ? fmtBand(c) : '待现场提供' }}</template>
+                      <div v-if="c.template" class="text-[10.5px] text-fg-mute font-sans">设备组：{{ fmtBand(c.template) }}<span v-if="c.override?.note"> · {{ c.override.note }}</span></div>
+                    </td>
                     <td>{{ c.unit }}</td>
                     <td>
                       <button class="ctl !py-0" @click="openVer[c.id] = !openVer[c.id]">{{ c.versions.length }} 个 {{ openVer[c.id] ? '▾' : '▸' }}</button>
                     </td>
                     <td><span class="pill pill-warn">{{ c.status }}</span></td>
+                    <td v-if="data.canOverride" class="whitespace-nowrap">
+                      <template v-if="c.inherited">
+                        <button v-if="c.inheritState !== '已禁用'" class="ctl" title="只改本台的限值" @click="limitEditing = c">覆盖</button>
+                        <button v-if="!c.inheritState" class="ctl ml-1" @click="limitDisable(c)">禁用</button>
+                        <button v-else class="ctl ml-1" @click="limitRestore(c)">恢复继承</button>
+                      </template>
+                    </td>
                   </tr>
                   <tr v-if="openVer[c.id]" class="!cursor-default hover:!bg-transparent">
                     <td />
-                    <td colspan="7" class="!pt-0">
+                    <td :colspan="data.canOverride ? 8 : 7" class="!pt-0">
                       <table class="w-full text-xs border border-line-soft rounded">
                         <thead><tr class="bg-ink-panel2 text-fg-mute">
                           <th class="text-left px-2 py-1 font-medium">版本</th><th class="text-left px-2 py-1 font-medium">适用条件</th>
@@ -270,12 +319,14 @@ function fmtBand(c: Any): string {
             <div class="flex items-center gap-2">
               <button class="ctl" :class="{ 'ctl-on': topoView === 'graph' }" @click="topoView = 'graph'">关系图谱</button>
               <button class="ctl" :class="{ 'ctl-on': topoView === 'list' }" @click="topoView = 'list'">列表</button>
-              <span class="text-xs text-fg-mute">{{ data.items.length }} 条关系</span>
+              <span class="text-xs text-fg-mute">{{ data.items.length }} 条关系<template v-if="data.items.some((r: Any) => r.userRelation)">（人工新增 {{ data.items.filter((r: Any) => r.userRelation).length }} 条，列表中可删除）</template></span>
+              <span class="flex-1" />
+              <button v-if="data.canEdit" class="btn btn-primary" @click="relEditing = 'topology'">+ 新增关系</button>
             </div>
             <TopologyGraph v-if="topoView === 'graph'" :items="data.items" :center-name="head.name" :center-kind="head.kind"
                            @open="(id: string) => openObject(id, opId ?? head.opId)" />
             <table v-else class="tbl">
-              <thead><tr><th class="w-16 !text-center">来源</th><th>层</th><th>类别</th><th>方向</th><th>关系</th><th>对象</th><th>说明</th><th>来源</th></tr></thead>
+              <thead><tr><th class="w-16 !text-center">来源</th><th>层</th><th>类别</th><th>方向</th><th>关系</th><th>对象</th><th>说明</th><th>来源</th><th></th></tr></thead>
               <tbody>
                 <tr v-for="(r, i) in data.items" :key="i" class="!cursor-default">
                   <td><InheritBox :checked="r.inherited" :from="r.inheritedFrom" /></td>
@@ -286,6 +337,7 @@ function fmtBand(c: Any): string {
                   <td>{{ r.target }}<div v-if="r.targetType" class="text-[11px] text-fg-mute">{{ r.targetType }}</div></td>
                   <td class="text-fg-dim">{{ r.mechanism }}</td>
                   <td class="text-[11px] text-fg-mute">{{ r.source }}</td>
+                  <td><button v-if="r.userRelation && !r.inherited" class="ctl" @click="removeRelation(r)">删除</button></td>
                 </tr>
               </tbody>
             </table>
@@ -294,7 +346,8 @@ function fmtBand(c: Any): string {
           <!-- 现象定义 -->
           <div v-else-if="tab === 'phenomena'">
             <div class="text-xs text-fg-mute mb-2">现象 = 当前情况的描述 + 判定规则；设备组上定义的现象对组内每台设备生效（「来源」列标「设备组」）。类别为「工况」的现象被参数约束引用。点一行查看它由什么导致。</div>
-            <PhenomenaPanel :items="data.items" :anchor-options="anchorOptions" :op-id="opId ?? head.opId" show-inherit :focus-id="focusPhen" @changed="loadTab" />
+            <PhenomenaPanel :items="data.items" :anchor-options="anchorOptions" :op-id="opId ?? head.opId" show-inherit :focus-id="focusPhen"
+                            :object-id="objectId" :object-name="head.name" :can-override="data.canOverride" @changed="loadTab" />
           </div>
 
           <!-- 根因影响关系 -->
@@ -306,11 +359,13 @@ function fmtBand(c: Any): string {
               <button class="ctl" :class="{ 'ctl-on': inflView === 'graph' }" @click="inflView = 'graph'">关系图谱</button>
               <button class="ctl" :class="{ 'ctl-on': inflView === 'list' }" @click="inflView = 'list'">列表</button>
               <span class="text-xs text-fg-mute">{{ data.items.length }} 条 · {{ data.note }}</span>
+              <span class="flex-1" />
+              <button v-if="data.canEdit && data.params?.length" class="btn btn-primary" @click="relEditing = 'influence'">+ 新增关系</button>
             </div>
             <div v-if="!data.items.length" class="empty">暂无工艺影响关系</div>
             <InfluenceGraph v-else-if="inflView === 'graph'" :items="data.items" :own="data.own" />
             <table v-else class="tbl">
-              <thead><tr><th class="w-16 !text-center">来源</th><th>影响方</th><th>关系</th><th>被影响方</th><th>机理</th><th>测点</th><th>来源</th></tr></thead>
+              <thead><tr><th class="w-16 !text-center">来源</th><th>影响方</th><th>关系</th><th>被影响方</th><th>机理</th><th>测点</th><th>来源</th><th></th></tr></thead>
               <tbody>
                 <tr v-for="(r, i) in data.items" :key="i" class="!cursor-default">
                   <td><InheritBox :checked="r.inherited" :from="r.inheritedFrom" /></td>
@@ -318,6 +373,7 @@ function fmtBand(c: Any): string {
                   <td class="whitespace-nowrap" :class="r.predicate === '负向影响' ? 'text-warn' : 'text-ok'">{{ r.predicate }}</td>
                   <td>{{ r.to }}</td><td class="text-fg-dim">{{ r.mechanism }}</td>
                   <td class="text-fg-mute tabular-nums">{{ r.tagCount }}</td><td class="text-[11px] text-fg-mute">{{ r.source }}</td>
+                  <td><button v-if="r.userRelation" class="ctl" @click="removeRelation(r)">删除</button></td>
                 </tr>
               </tbody>
             </table>
@@ -351,5 +407,10 @@ function fmtBand(c: Any): string {
       </div>
     </template>
     <CausePopup v-if="popupPhen" :phenomenon-id="popupPhen" :phenomena="allPhen" :op-id="opId ?? head?.opId" @close="popupPhen = ''" />
+    <ObjectInfo v-if="showInfo" :object-id="objectId" :op-id="opId ?? head?.opId" @close="showInfo = false" />
+    <RelationEditor v-if="relEditing" :mode="relEditing" :self="{ id: objectId, name: head?.name ?? '' }" :params="data?.params"
+                    @close="relEditing = ''" @saved="relSaved" />
+    <LimitOverrideEditor v-if="limitEditing" :object-id="objectId" :object-name="head?.name ?? ''" :limit="limitEditing"
+                         @close="limitEditing = null" @saved="limitEditing = null; loadTab()" />
   </div>
 </template>

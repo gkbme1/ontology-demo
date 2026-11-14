@@ -3,7 +3,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { api } from '@/api/client'
 import { staticBackend } from '@/api/static'
-import { bump, enterSegment, loadMeta, nav, openGlobalGraph, openObject, select } from '@/composables/useNav'
+import { bump, enterSegment, goBack, loadMeta, nav, navHistory, openGlobalGraph, openObject, select } from '@/composables/useNav'
 import NavPanel from '@/components/NavPanel.vue'
 import Overview from '@/views/Overview.vue'
 import OpSections from '@/views/OpSections.vue'
@@ -88,6 +88,7 @@ const kind = (): string => nav.selection.type
   <div class="h-full flex flex-col">
     <header class="flex items-center gap-4 px-4 h-12 border-b border-line bg-ink-panel2 shrink-0">
       <div class="font-semibold tracking-wide"><span class="text-brand">◆</span> 6APA 本体 <span class="text-fg-mute text-xs font-normal">v2 · 105 车间</span></div>
+      <button class="ctl !px-2" :disabled="!navHistory.size" :class="{ 'opacity-40': !navHistory.size }" title="后退到上一个查看的位置" @click="goBack">← 后退</button>
       <div class="flex rounded-md border border-line overflow-hidden text-xs font-medium">
         <button class="px-3 py-1.5" :class="nav.page === 'browse' ? 'bg-brand text-white' : 'bg-white text-fg-dim hover:text-brand'" @click="nav.page = 'browse'">本体浏览</button>
         <button class="px-3 py-1.5 border-l border-line" :class="nav.page === 'graph' ? 'bg-brand text-white' : 'bg-white text-fg-dim hover:text-brand'" @click="nav.page = 'graph'">◎ 全局图谱</button>

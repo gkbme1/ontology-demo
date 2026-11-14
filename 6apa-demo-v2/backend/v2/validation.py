@@ -99,6 +99,13 @@ def run(ctx: AppContext) -> dict[str, Any]:
             add("警告", "因果环路", f"导致关系 {lid}「{c['name']} → {e['name']}」处在因果环路上，请确认是正反馈 / 控制回路还是方向登记错误",
                 obj_target((e.get("anchor") or {}).get("id") or "", "causal"))
 
+    # 3b 人工新增的关系：端点仍然存在
+    idx = ctx.endpoint_index()
+    for r in ctx.relations.items:
+        for end in (r["from"], r["to"]):
+            if end["id"] not in idx:
+                add("错误", "关系有效性", f"人工关系 {r['id']}（{r['type']}）的端点「{end.get('name')}」已不存在", None)
+
     # 4 计算组态
     for cid, calc in ctx.calcs.items.items():
         aid = (calc.get("anchor") or {}).get("id") or ""

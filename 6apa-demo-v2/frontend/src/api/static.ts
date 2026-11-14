@@ -425,6 +425,8 @@ export class StaticBackend {
     const hit = g[key(path, q)] ?? g[path]
     if (hit === undefined) throw new ApiError(404, `单文件版未包含该数据：${path}`)
     const out = clone(hit)
+    // 单文件版不支持继承覆盖、人工关系的编辑（需要后端保存），隐藏这些按钮
+    if (/^\/objects\/[^/]+\/tabs\/(topology|influence|constraints)$/.test(path)) { out.canEdit = false; out.canOverride = false }
     const om = path.match(/^\/objects\/([^/]+)$/)
     if (om && out.counts) {
       const own = new Set(this.forObject(om[1]).map(([p]) => p.id))

@@ -67,6 +67,7 @@ export const api = {
   document: (id: string) => request<Any>('GET', `/documents/${id}`),
   object: (id: string, op?: string) => request<Any>('GET', `/objects/${id}`, undefined, { op }),
   objectTab: (id: string, key: string, op?: string) => request<Any>('GET', `/objects/${id}/tabs/${key}`, undefined, { op }),
+  objectInfo: (id: string, op?: string) => request<Any>('GET', `/objects/${id}/info`, undefined, { op }),
   objectProfile: (id: string) => request<Any>('GET', `/objects/${id}/profile`),
   objectParameters: (id: string) => request<Any>('GET', `/objects/${id}/parameters`),
   limits: (keyword = '') => request<Any>('GET', '/limits', undefined, { keyword }),
@@ -85,5 +86,12 @@ export const api = {
   calculations: () => request<Any>('GET', '/calculations'),
   calculation: (id: string) => request<Any>('GET', `/calculations/${id}`),
   runCalc: (id: string, body: Any) => request<Any>('POST', `/calculations/${id}/run`, body),
+  overridePhenomenon: (oid: string, pid: string, body: Any) => request<Any>('PUT', `/objects/${oid}/overrides/phenomena/${pid}`, body),
+  restorePhenomenon: (oid: string, pid: string) => request<Any>('DELETE', `/objects/${oid}/overrides/phenomena/${pid}`),
+  overrideLimit: (oid: string, lid: string, body: Any) => request<Any>('PUT', `/objects/${oid}/overrides/limits/${lid}`, body),
+  restoreLimit: (oid: string, lid: string) => request<Any>('DELETE', `/objects/${oid}/overrides/limits/${lid}`),
+  relationCandidates: (q: Query) => request<Any>('GET', '/relation-candidates', undefined, q),
+  createRelation: (body: Any) => request<Any>('POST', '/relations', body),
+  deleteRelation: (id: string) => request<Any>('DELETE', `/relations/${id}`),
   resetStore: () => request<Any>('POST', '/admin/reset-store')
 }
