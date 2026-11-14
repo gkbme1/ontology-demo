@@ -9,7 +9,9 @@ import { computed } from 'vue'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any
 
-const props = defineProps<{ drawing: Any; highlight?: string[]; compact?: boolean }>()
+const props = defineProps<{ drawing: Any; highlight?: string[]; compact?: boolean; alarms?: Record<string, Any> }>()
+// 运行态：有异常现象的设备 / 设备组标红（严重）或橙（警告）
+const alarmColor = (id: string): string | null => { const a = props.alarms?.[id]; return a?.active?.length ? (a.severity === '严重' ? '#dc2626' : '#ea580c') : null }
 // 单击 select（显示摘要），双击 pick（打开对象本体详情）
 const emit = defineEmits<{ (e: 'pick' | 'select', id: string, kind: 'group' | 'equipment'): void }>()
 
@@ -136,8 +138,8 @@ function short(s: string, n = 13): string {
       <g v-for="n in layout.nodes" :key="n.id" :transform="`translate(${n.x},${n.y})`">
         <rect :width="NODE_W" :height="n.h" rx="8"
               :fill="hl.has(n.id) ? '#dff3f6' : '#ffffff'"
-              :stroke="hl.has(n.id) ? '#0e8fa3' : n.kind === 'ungrouped' ? '#b6c2d1' : '#9fb3c8'"
-              :stroke-dasharray="n.kind === 'ungrouped' ? '5 3' : ''" :stroke-width="hl.has(n.id) ? 2 : 1" />
+              :stroke="alarmColor(n.id) ?? (hl.has(n.id) ? '#0e8fa3' : n.kind === 'ungrouped' ? '#b6c2d1' : '#9fb3c8')"
+              :stroke-dasharray="n.kind === 'ungrouped' ? '5 3' : ''" :stroke-width="alarmColor(n.id) || hl.has(n.id) ? 2 : 1" />
         <g class="cursor-pointer" @click="n.kind === 'group' && emit('select', n.id, 'group')" @dblclick="n.kind === 'group' && emit('pick', n.id, 'group')">
           <rect :width="NODE_W" :height="HEAD_H" rx="8" fill="transparent" />
           <text x="10" y="19" font-size="12" font-weight="600" :fill="n.kind === 'ungrouped' ? '#4b5563' : '#1f2937'">{{ short(n.name, 16) }}<title>{{ n.name }}{{ n.type ? `（${n.type}）` : '' }}</title></text>
@@ -145,8 +147,8 @@ function short(s: string, n = 13): string {
         </g>
         <g v-for="(m, i) in n.shown" :key="m.id" class="cursor-pointer" @click.stop="emit('select', m.id, 'equipment')" @dblclick.stop="emit('pick', m.id, 'equipment')">
           <rect :x="chipX(i)" :y="chipY(i)" :width="(NODE_W - 16) / CHIP_COLS - 6" :height="CHIP_H - 4" rx="4"
-                :fill="hl.has(m.id) ? '#0e8fa3' : '#eef3f8'" :stroke="hl.has(m.id) ? '#0e8fa3' : '#c9d4e0'" />
-          <text :x="chipX(i) + 6" :y="chipY(i) + 13" font-size="10.5" :fill="hl.has(m.id) ? '#ffffff' : '#334155'">{{ short(m.name, 9) }}<title>{{ m.name }} · {{ m.tagCount }} 个测点</title></text>
+                :fill="hl.has(m.id) ? '#0e8fa3' : alarmColor(m.id) ? '#fee2e2' : '#eef3f8'" :stroke="alarmColor(m.id) ?? (hl.has(m.id) ? '#0e8fa3' : '#c9d4e0')" :stroke-width="alarmColor(m.id) ? 1.6 : 1" />
+          <text :x="chipX(i) + 6" :y="chipY(i) + 13" font-size="10.5" :fill="hl.has(m.id) ? '#ffffff' : alarmColor(m.id) ?? '#334155'">{{ short(m.name, 9) }}<title>{{ m.name }} · {{ m.tagCount }} 个测点{{ alarms?.[m.id]?.active?.length ? '\n异常现象：' + alarms[m.id].active.join('、') : '' }}</title></text>
         </g>
         <text v-if="n.more > 0" x="10" :y="n.h - 10" font-size="10.5" fill="#7b8798">另有 {{ n.more }} 台（见左侧树）</text>
       </g>

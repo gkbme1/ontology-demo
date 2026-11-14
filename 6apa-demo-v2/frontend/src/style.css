@@ -17,6 +17,9 @@
   .panel-head h3 { @apply text-[13px] font-semibold; }
   .panel-body { @apply px-4 py-3.5; }
 
+  /* 运行态只读：编辑控件加 ro-hide，根节点 run-mode 时隐藏 */
+  .run-mode .ro-hide { display: none !important; }
+
   .tbl { @apply w-full border-collapse text-[12.5px]; }
   .tbl th {
     @apply sticky top-0 z-10 bg-ink-panel2 text-fg-mute font-medium text-[11px] tracking-wider

@@ -580,6 +580,29 @@ class ClassLibTest(unittest.TestCase):
         self.assertEqual(r.get("added", 0), 0)
 
 
+class RunStateTest(unittest.TestCase):
+    """运行态（需求 SW-088 第 3 条）：同一套界面只读，叠加实时值与现象状态（模拟数据）。"""
+    def test_live_values(self):
+        r = client.get("/api/v2/live/values", params={"tags": "TI_1301C,P_1303C_RUN,NOPE"}).json()
+        self.assertTrue(r["dataSource"]["simulated"])
+        self.assertIsInstance(r["values"]["TI_1301C"]["v"], float)
+        self.assertTrue(r["values"]["P_1303C_RUN"]["digital"])
+        self.assertIsNone(r["values"]["NOPE"]["v"])
+
+    def test_alarm_levels(self):
+        from backend.v2.runtime import alarm_of
+        lim = {"lowLow": 10, "low": 20, "normalLow": 30, "normalHigh": 40, "high": 50, "highHigh": 60}
+        self.assertEqual([alarm_of(v, lim) for v in (5, 15, 25, 35, 45, 55, 65)], ["LL", "L", "偏离", None, "偏离", "H", "HH"])
+
+    def test_op_states(self):
+        r = client.get("/api/v2/live/op/OP-09").json()
+        self.assertTrue(r["items"])
+        self.assertTrue({i["state"] for i in r["items"]} <= {"发生", "未发生", "未知"})
+        for o in r["objects"].values():
+            self.assertTrue(o["active"] or o["conditions"])
+        self.assertEqual(client.get("/api/v2/live/op/NOPE").status_code, 404)
+
+
 class DocsAndSearchTest(unittest.TestCase):
     def test_docs(self):
         r = client.get("/api/v2/ops/OP-09/documents").json()

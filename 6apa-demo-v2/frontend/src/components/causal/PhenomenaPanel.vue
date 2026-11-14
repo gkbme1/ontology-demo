@@ -3,7 +3,7 @@
 import StatusPill from '@/components/StatusPill.vue'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { api } from '@/api/client'
-import { bump } from '@/composables/useNav'
+import { bump, isRun } from '@/composables/useNav'
 import Modal from '../Modal.vue'
 import RuleView from '../rules/RuleView.vue'
 import EvalResult from '../rules/EvalResult.vue'
@@ -27,11 +27,14 @@ const props = defineProps<{
   objectId?: string
   objectName?: string
   canOverride?: boolean
+  // 运行态：现象 id → 当前状态（发生 / 未发生 / 未知，逐台）
+  states?: Record<string, Any>
 }>()
+const STATE_PILL: Record<string, string> = { 发生: 'pill-err', 未发生: 'pill-ok', 未知: 'pill-mute' }
 const overriding = ref<Any>(null)
 // 批量变更状态
 const picked = ref<Set<string>>(new Set())
-const canBatch = !staticBackend
+const canBatch = computed(() => !staticBackend && !isRun())
 function togglePick(id: string): void { const s = new Set(picked.value); if (s.has(id)) s.delete(id); else s.add(id); picked.value = s }
 function toggleAll(): void { picked.value = picked.value.size === rows.value.length ? new Set() : new Set(rows.value.map((p: Any) => p.id)) }
 const canOv = (p: Any) => props.canOverride && p.inherited
@@ -108,12 +111,12 @@ function changed(): void {
       <label class="text-xs flex items-center gap-1 text-fg-dim"><input v-model="onlyRule" type="checkbox" /> 只看已定义判定规则</label>
       <span class="text-xs text-fg-mute">{{ rows.length }} 个</span>
       <span class="flex-1" />
-      <button class="btn btn-primary" :disabled="!anchorOptions.length" @click="creating = true">+ 新增现象</button>
+      <button class="btn btn-primary ro-hide" :disabled="!anchorOptions.length" @click="creating = true">+ 新增现象</button>
     </div>
     <BatchStatusBar kind="phenomena" :ids="[...picked]" @done="picked = new Set(); emit('changed')" />
     <div v-if="!rows.length" class="empty">暂无现象定义</div>
     <table v-else class="tbl">
-      <thead><tr><th v-if="canBatch" class="w-8"><input type="checkbox" title="全选" :checked="picked.size > 0 && picked.size === rows.length" @change="toggleAll" /></th><th v-if="showInherit" class="w-16 !text-center">来源</th><th>现象</th><th>挂载对象</th><th>判定规则</th><th>角色</th><th>状态</th><th></th></tr></thead>
+      <thead><tr><th v-if="canBatch" class="w-8"><input type="checkbox" title="全选" :checked="picked.size > 0 && picked.size === rows.length" @change="toggleAll" /></th><th v-if="showInherit" class="w-16 !text-center">来源</th><th>现象</th><th v-if="states" class="w-[120px]">当前状态</th><th>挂载对象</th><th>判定规则</th><th>角色</th><th>状态</th><th></th></tr></thead>
       <tbody>
         <tr v-for="p in rows" :id="`phen-row-${p.id}`" :key="p.id" :class="{ '!bg-brand/15 outline outline-2 outline-brand/60': flash === p.id, 'opacity-50': p.inheritState === '已禁用' }" @click="popup = p.id">
           <td v-if="canBatch" @click.stop><input type="checkbox" :checked="picked.has(p.id)" @change="togglePick(p.id)" /></td>
@@ -121,6 +124,17 @@ function changed(): void {
           <td class="min-w-[150px]">
             <div class="font-medium text-fg">{{ p.name }} <span v-if="p.category === '工况'" class="pill pill-info">工况</span></div>
             <div class="text-[11px] text-fg-mute">{{ p.id }} · {{ p.category }} · {{ p.severity }}</div>
+          </td>
+          <td v-if="states" class="whitespace-nowrap">
+            <template v-if="states[p.id]">
+              <span class="pill" :class="p.category === '工况' && states[p.id].state === '发生' ? 'pill-info' : STATE_PILL[states[p.id].state]"
+                    :title="states[p.id].targets.map((t: Any) => `${t.name}：${t.state}${t.since ? '（自 ' + t.since + '）' : ''}`).join('\n')">
+                ● {{ p.category === '工况' ? (states[p.id].state === '发生' ? '处于该工况' : states[p.id].state === '未发生' ? '不在该工况' : '未知') : states[p.id].state }}
+              </span>
+              <div v-if="states[p.id].targets.length > 1" class="text-[10.5px] text-fg-mute mt-0.5">{{ states[p.id].on }}/{{ states[p.id].targets.length }} 台</div>
+              <div v-else-if="states[p.id].since" class="text-[10.5px] text-fg-mute mt-0.5">自 {{ states[p.id].since.slice(11) }}</div>
+            </template>
+            <span v-else class="text-[11px] text-fg-mute">{{ p.hasRule ? '—' : '无判定规则' }}</span>
           </td>
           <td class="text-fg-dim">
             {{ p.anchor?.name }}
@@ -139,12 +153,12 @@ function changed(): void {
           <td><StatusPill :status="p.status" /></td>
           <td class="whitespace-nowrap" @click.stop>
             <button class="ctl" :disabled="!p.hasRule" :class="{ 'opacity-40': !p.hasRule }" @click="p.hasRule && runEval(p)">试算</button>
-            <template v-if="canOv(p)">
+            <template v-if="canOv(p) && !isRun()">
               <button v-if="p.inheritState !== '已禁用'" class="ctl ml-1" :disabled="!p.hasRule" title="只改本台的阈值 / 持续时长" @click="overriding = p">覆盖</button>
               <button v-if="!p.inheritState" class="ctl ml-1" title="本台不判定该现象" @click="disable(p)">禁用</button>
               <button v-else class="ctl ml-1" title="删除本台的覆盖 / 禁用，回到设备组的定义" @click="restore(p)">恢复继承</button>
             </template>
-            <template v-else>
+            <template v-else-if="!isRun()">
               <button class="ctl ml-1" @click="editing = p">编辑</button>
               <button class="ctl ml-1" @click="remove(p)">删除</button>
             </template>

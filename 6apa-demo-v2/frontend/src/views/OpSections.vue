@@ -3,7 +3,8 @@
 import { computed, ref, watch } from 'vue'
 import { marked } from 'marked'
 import { api } from '@/api/client'
-import { nav, openGlobalGraph, openObject, select } from '@/composables/useNav'
+import { isRun, nav, openGlobalGraph, openObject, select } from '@/composables/useNav'
+import { live } from '@/composables/useLive'
 import DrawingView from '@/components/DrawingView.vue'
 import CalcPanel from '@/components/CalcPanel.vue'
 import PhenomenaPanel from '@/components/causal/PhenomenaPanel.vue'
@@ -30,6 +31,12 @@ async function load(): Promise<void> {
   if (props.kind === 'section:docs') docs.value = await api.opDocuments(props.opId)
 }
 watch(() => [props.kind, props.opId, nav.version], load, { immediate: true })
+// 运行态：图纸上按现象状态着色（模拟数据）
+const opState = ref<Any>(null)
+watch(() => [live.tick, props.opId, props.kind], async () => {
+  if (!isRun() || props.kind !== 'drawing') return
+  try { opState.value = await api.liveOp(props.opId); live.at = opState.value.at } catch { /* 保留上次 */ }
+}, { immediate: true })
 
 // 新增现象时的挂载对象候选：本工序的设备组 + 设备
 const anchorOptions = computed(() => {
@@ -81,7 +88,7 @@ const title = computed(() => ({
 
     <!-- 图纸 -->
     <template v-if="kind === 'drawing' && drawing">
-      <DrawingView :drawing="drawing" :caption="drawing.image ? '单击图上的设备看摘要，双击打开本体详情' : drawing.note" @pick="pick" />
+      <DrawingView :drawing="drawing" :caption="drawing.image ? '单击图上的设备看摘要，双击打开本体详情' : drawing.note" :alarms="isRun() ? opState?.objects ?? {} : undefined" @pick="pick" />
       <div v-if="drawing.internalStreams?.length" class="text-xs text-fg-mute">本工序内部物料：{{ drawing.internalStreams.join('、') }}</div>
     </template>
 

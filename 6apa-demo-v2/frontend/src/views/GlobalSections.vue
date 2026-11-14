@@ -6,7 +6,7 @@
 import { computed, ref, watch } from 'vue'
 import { marked } from 'marked'
 import { api } from '@/api/client'
-import { nav, select } from '@/composables/useNav'
+import { isRun, nav, select } from '@/composables/useNav'
 import CalcPanel from '@/components/CalcPanel.vue'
 import PhenomenaPanel from '@/components/causal/PhenomenaPanel.vue'
 import CausalPanel from '@/components/causal/CausalPanel.vue'
@@ -98,7 +98,7 @@ const docHtml = computed(() => (docView.value ? (marked.parse(docView.value.cont
           {{ scopeText }}：{{ calcs.length }} 条计算组态。计算组态只引用算法库里的算法，并把算法的每个参数绑定到本体（本对象参数 / 设备组全部成员的参数 / 位号 / 常量）；
           作用范围是工艺段、输入取设备组全部成员的，属于跨装置 / 跨工艺统计。
         </div>
-        <CalcPanel :items="calcs" :op-id="op || undefined" :can-edit="!staticBackend" :anchor-options="calcAnchors" @changed="load" />
+        <CalcPanel :items="calcs" :op-id="op || undefined" :can-edit="!staticBackend && !isRun()" :anchor-options="calcAnchors" @changed="load" />
       </template>
 
       <!-- 算法库 -->

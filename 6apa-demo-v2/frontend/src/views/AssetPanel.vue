@@ -5,7 +5,8 @@
  */
 import { computed, ref, watch } from 'vue'
 import { api } from '@/api/client'
-import { nav, openGlobalGraph, openObject } from '@/composables/useNav'
+import { isRun, nav, openGlobalGraph, openObject } from '@/composables/useNav'
+import { alarmClass, fmtLive, live } from '@/composables/useLive'
 import DrawingView from '@/components/DrawingView.vue'
 import CalcPanel from '@/components/CalcPanel.vue'
 import ProcedureCard from '@/components/ProcedureCard.vue'
@@ -63,6 +64,49 @@ watch(() => [props.objectId, props.opId], async () => { await loadHead(); await 
 watch(() => props.initialTab, (t) => { if (t) tab.value = t })
 watch(tab, loadTab)
 watch(() => nav.version, () => { loadHead(); if (['phenomena', 'causal', 'calc'].includes(tab.value)) loadTab() })
+
+// ---------------- 运行态：实时值（参数页签的位号）与现象状态（本工序逐台），每次 tick 刷新（模拟数据）
+const liveVals = ref<Record<string, Any>>({})
+const opState = ref<Any>(null)
+const liveTags = computed<string[]>(() => tab.value === 'parameters'
+  ? [...new Set<string>((data.value?.items ?? []).flatMap((a: Any) => (a.links ?? []).map((l: Any) => String(l.tag))))] : [])
+async function refreshLive(): Promise<void> {
+  if (!isRun()) return
+  const op = props.opId ?? head.value?.opId
+  try {
+    const [v, s] = await Promise.all([liveTags.value.length ? api.liveValues(liveTags.value) : Promise.resolve(null), op ? api.liveOp(op) : Promise.resolve(null)])
+    if (v) { liveVals.value = v.values; live.at = v.at }
+    if (s) { opState.value = s; if (!v) live.at = s.at }
+  } catch { /* 运行态刷新失败时保留上次结果 */ }
+}
+watch(() => [live.tick, liveTags.value.join(','), head.value?.opId], refreshLive, { immediate: true })
+const objState = computed(() => opState.value?.objects?.[props.objectId] ?? null)
+// 现象页签：按现象汇总本对象（设备组为组内各台）的当前状态
+const phenStates = computed<Record<string, Any> | undefined>(() => {
+  if (!isRun() || !opState.value) return undefined
+  const out: Record<string, Any> = {}
+  for (const i of opState.value.items) {
+    if (i.targetId !== props.objectId && i.anchorId !== props.objectId) continue
+    const o = (out[i.id] ??= { targets: [] })
+    o.targets.push({ name: i.targetName, state: i.state, since: i.since })
+  }
+  for (const o of Object.values(out)) {
+    const ts = o.targets as Any[]
+    o.state = ts.some((t) => t.state === '发生') ? '发生' : ts.every((t) => t.state === '未知') ? '未知' : '未发生'
+    o.on = ts.filter((t) => t.state === '发生').length
+    o.since = ts.find((t) => t.since)?.since
+  }
+  return out
+})
+const linkCopied = ref(false)
+async function copyLink(): Promise<void> {
+  const q = [props.opId ?? head.value?.opId ? `op=${props.opId ?? head.value?.opId}` : '', `tab=${tab.value}`].filter(Boolean).join('&')
+  const url = `${location.origin}${location.pathname}${location.search}#run/object/${props.objectId}?${q}`
+  try { await navigator.clipboard.writeText(url) } catch { prompt('复制链接', url) }
+  linkCopied.value = true
+  setTimeout(() => (linkCopied.value = false), 2000)
+}
+watch(tab, (t) => { if (isRun() && nav.selection.type === 'object' && nav.selection.id === props.objectId) nav.selection.tab = t })
 
 // 新增现象时可挂在本对象，或（设备时）挂在它所属的设备组上
 const anchorOptions = computed(() => {
@@ -146,7 +190,14 @@ function fmtBand(c: Any): string {
           <span class="pill pill-info">{{ head.kind === 'group' ? '设备组' : '设备' }}</span>
           <span v-if="head.className" class="pill pill-plain">{{ head.className }}</span>
           <span class="text-[11px] text-fg-mute truncate" :title="head.badges.join(' · ')">{{ head.badges.join(' · ') }}</span>
+          <template v-if="isRun() && opState">
+            <span v-if="objState?.active?.length" class="pill whitespace-nowrap" :class="objState.severity === '严重' ? 'pill-err' : 'pill-warn'" :title="objState.active.join('、')">
+              ● 异常现象 {{ objState.active.length }}：{{ objState.active.slice(0, 2).join('、') }}{{ objState.active.length > 2 ? '…' : '' }}</span>
+            <span v-else class="pill pill-ok whitespace-nowrap">● 无异常现象</span>
+            <span v-if="objState?.conditions?.length" class="pill pill-info whitespace-nowrap" :title="objState.conditions.join('、')">工况：{{ objState.conditions.join('、') }}</span>
+          </template>
           <span class="flex-1" />
+          <button v-if="isRun()" class="ctl !py-0.5" title="复制定位到本对象（及当前页签）的运行态链接，可从智能体平台或其他系统直接打开" @click="copyLink">{{ linkCopied ? '已复制 ✓' : '🔗 复制链接' }}</button>
           <button class="ctl !py-0.5" title="ID、编码、类、状态、来源、所属位置、被引用、变更记录" @click="showInfo = true">ⓘ 基础信息 · 变更记录</button>
           <button class="ctl !py-0.5" title="在全局图谱中以本对象为中心查看 1 跳邻域（可再扩到 2 / 3 跳）" @click="openGlobalGraph(objectId, 1)">◎ 全局图谱定位</button>
           <span class="text-[11px] text-fg-mute whitespace-nowrap truncate max-w-[40%]">
@@ -169,7 +220,7 @@ function fmtBand(c: Any): string {
         <template v-else-if="data">
           <!-- 图纸位置与外观 -->
           <div v-if="tab === 'drawing'" class="space-y-3">
-            <DrawingView v-if="drawing" :drawing="drawing" :highlight="data.highlight" :caption="`所在图纸：${drawing.name}`" @pick="pick" />
+            <DrawingView v-if="drawing" :drawing="drawing" :highlight="data.highlight" :caption="`所在图纸：${drawing.name}`" :alarms="isRun() ? opState?.objects ?? {} : undefined" @pick="pick" />
             <div v-else class="empty">该对象不在导航树的工序内，没有图纸位置</div>
             <div class="grid grid-cols-2 gap-4">
               <div class="card">
@@ -226,11 +277,17 @@ function fmtBand(c: Any): string {
                     <span v-else-if="a.value !== undefined && a.value !== null && a.value !== ''" class="font-medium">{{ a.value }}<span v-if="a.group === '设计参数' && a.valueType !== '文本'" class="text-fg-mute"> {{ a.valueType }}</span></span>
                     <span v-if="a.note" class="text-[11px] text-fg-mute ml-1">{{ a.note }}</span>
                     <div v-if="a.links.length" class="flex flex-wrap gap-1 mt-0.5">
-                      <span v-for="l in a.links" :key="l.tag" class="pill font-mono"
+                      <template v-for="l in a.links" :key="l.tag">
+                      <span class="pill font-mono"
                             :class="l.own ? 'pill-info' : 'pill-mute'"
                             :title="`${l.desc}${l.unit ? ' · ' + l.unit : ''}${l.limit ? ' · 限值 ' + l.limit : ''}${l.own ? '' : ' · 测点在 ' + l.equipment}`">
-                        {{ l.tag }}<span v-if="l.unit" class="opacity-70">{{ l.unit }}</span><span v-if="!l.own" class="opacity-70">@{{ l.equipment }}</span>
+                        {{ l.tag }}<span v-if="l.unit && !isRun()" class="opacity-70">{{ l.unit }}</span><span v-if="!l.own" class="opacity-70">@{{ l.equipment }}</span>
                       </span>
+                      <span v-if="isRun() && liveVals[l.tag]" class="pill font-mono tabular-nums" :class="alarmClass(liveVals[l.tag].alarm)"
+                            :title="`${l.tag} 实时值（模拟数据）${liveVals[l.tag].alarm ? ' · ' + liveVals[l.tag].alarm : ''}${liveVals[l.tag].limitId ? ' · 限值 ' + liveVals[l.tag].limitId : ''}`">
+                        {{ fmtLive(liveVals[l.tag]) }}<span v-if="!liveVals[l.tag].digital && liveVals[l.tag].unit" class="opacity-70">{{ liveVals[l.tag].unit }}</span><b v-if="liveVals[l.tag].alarm">{{ liveVals[l.tag].alarm }}</b>
+                      </span>
+                      </template>
                     </div>
                   </td>
                   <td>
@@ -342,7 +399,7 @@ function fmtBand(c: Any): string {
                   <td>{{ r.target }}<div v-if="r.targetType" class="text-[11px] text-fg-mute">{{ r.targetType }}</div></td>
                   <td class="text-fg-dim">{{ r.mechanism }}</td>
                   <td class="text-[11px] text-fg-mute">{{ r.source }}</td>
-                  <td><button v-if="r.userRelation && !r.inherited" class="ctl" @click="removeRelation(r)">删除</button></td>
+                  <td><button v-if="r.userRelation && !r.inherited" class="ctl ro-hide" @click="removeRelation(r)">删除</button></td>
                 </tr>
               </tbody>
             </table>
@@ -352,7 +409,7 @@ function fmtBand(c: Any): string {
           <div v-else-if="tab === 'phenomena'">
             <div class="text-xs text-fg-mute mb-2">现象 = 当前情况的描述 + 判定规则；设备组上定义的现象对组内每台设备生效（「来源」列标「设备组」）。类别为「工况」的现象被参数约束引用。点一行查看它由什么导致。</div>
             <PhenomenaPanel :items="data.items" :anchor-options="anchorOptions" :op-id="opId ?? head.opId" show-inherit :focus-id="focusPhen"
-                            :object-id="objectId" :object-name="head.name" :can-override="data.canOverride" @changed="loadTab" />
+                            :object-id="objectId" :object-name="head.name" :can-override="data.canOverride" :states="phenStates" @changed="loadTab" />
           </div>
 
           <!-- 根因影响关系 -->
@@ -378,7 +435,7 @@ function fmtBand(c: Any): string {
                   <td class="whitespace-nowrap" :class="r.predicate === '负向影响' ? 'text-warn' : 'text-ok'">{{ r.predicate }}</td>
                   <td>{{ r.to }}</td><td class="text-fg-dim">{{ r.mechanism }}</td>
                   <td class="text-fg-mute tabular-nums">{{ r.tagCount }}</td><td class="text-[11px] text-fg-mute">{{ r.source }}</td>
-                  <td><button v-if="r.userRelation" class="ctl" @click="removeRelation(r)">删除</button></td>
+                  <td><button v-if="r.userRelation" class="ctl ro-hide" @click="removeRelation(r)">删除</button></td>
                 </tr>
               </tbody>
             </table>

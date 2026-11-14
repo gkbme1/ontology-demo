@@ -266,6 +266,10 @@ def main() -> None:
         "evals": evals,
         "calcRuns": calc_runs,
         "classlib": classlib,
+        # 运行态实时值：浏览器内模拟器（frontend/src/api/simLocal.ts）用的位号元数据 → [块类型, 参数类型, 参数名, 单位, 标准单位, 限值编号]
+        "liveTags": {n: [t.get("blockType") or "", t.get("parameterType") or "", t.get("parameterName") or "", t.get("unit") or "",
+                         t.get("standardUnit") or "", (ctx.limit_of_tag.get(t["name"]) or {}).get("id")]
+                     for n, t in ctx.tag_by_name.items()},
     }
     raw = json.dumps(snapshot, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     packed = base64.b64encode(gzip.compress(raw, 9)).decode("ascii")

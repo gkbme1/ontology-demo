@@ -32,15 +32,18 @@ export const nav = reactive({
   // 编辑后递增，触发各视图刷新
   version: 0,
   // 顶层页面：本体浏览 / 全局图谱
-  page: 'browse' as 'browse' | 'graph',
+  page: 'browse' as 'browse' | 'graph' | 'service',
   // 三态（需求 SW-088）：开发态（类库）/ 工程态（实例组态）/ 运行态（运行服务）
   stage: 'eng' as 'dev' | 'eng' | 'run',
   // 从设备 / 工序跳到全局图谱时的定位
   graphFocus: null as { id: string; hops?: number } | null
 })
 
+/** 运行态：与工程态同一套界面，只读，叠加实时值与现象状态（需求 SW-088 第 3 条）。 */
+export const isRun = (): boolean => nav.stage === 'run'
+
 // 浏览历史（需求 SW-041 第 5 条：支持浏览历史后退；SW-088 第 4 条：返回时保留原位置）
-interface Snap { selection: Selection; activeKey: string; category: string; mode: 'root' | 'segment'; segmentId: string; page: 'browse' | 'graph'; stage: 'dev' | 'eng' | 'run' }
+interface Snap { selection: Selection; activeKey: string; category: string; mode: 'root' | 'segment'; segmentId: string; page: 'browse' | 'graph' | 'service'; stage: 'dev' | 'eng' | 'run' }
 const history: Snap[] = []
 let restoring = false
 export const navHistory = reactive({ size: 0 })

@@ -23,7 +23,22 @@ export class ApiError extends Error {
   }
 }
 
+// 运行态（需求 SW-088 第 3 条）：与工程态同一套界面，只读——应答里的 canEdit / canOverride 一律置 false
+let readOnly = false
+export function setReadOnly(v: boolean): void { readOnly = v }
+function guard<T>(out: T): T {
+  if (readOnly && out && typeof out === 'object') {
+    const o = out as Record<string, unknown>
+    if ('canEdit' in o) o.canEdit = false
+    if ('canOverride' in o) o.canOverride = false
+  }
+  return out
+}
+
 async function request<T>(method: string, path: string, body?: unknown, query?: Query): Promise<T> {
+  return guard(await rawRequest<T>(method, path, body, query))
+}
+async function rawRequest<T>(method: string, path: string, body?: unknown, query?: Query): Promise<T> {
   if (staticBackend) return staticBackend.handle(method, path, body, query) as Promise<T>
   const res = await fetch(`${BASE}/api/v2${path}${qs(query)}`, {
     method,
@@ -168,6 +183,8 @@ export const api = {
   clNewVersion: (base?: string) => request<Any>('POST', '/classlib/versions', { base }),
   clDiff: (a: string, b: string) => request<Any>('GET', '/classlib/diff', undefined, { a, b }),
   clImport: (body: Any) => request<Any>('POST', '/classlib/import', body),
+  liveValues: (tags: string[]) => request<Any>('GET', '/live/values', undefined, { tags: tags.join(',') }),
+  liveOp: (opId: string) => request<Any>('GET', `/live/op/${opId}`),
   clBinding: () => request<Any>('GET', '/classlib/binding'),
   clUpgradeImpact: (to: string) => request<Any>('GET', '/classlib/upgrade-impact', undefined, { to }),
   resetStore: () => request<Any>('POST', '/admin/reset-store')

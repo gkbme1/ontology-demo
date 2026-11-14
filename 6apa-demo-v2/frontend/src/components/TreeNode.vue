@@ -58,7 +58,7 @@ function onClick(): void {
 </script>
 
 <template>
-  <div>
+  <div :class="{ 'ro-hide': ['global:check', 'global:release'].includes(node.kind) }">
     <div
       ref="row"
       class="tree-row"

@@ -83,6 +83,12 @@
 - 继承覆盖：设备上的覆盖存 `ctx.overrides`；`rule_eval.evaluate(..., phenomenon_id=)` 逐台套用覆盖规则 / 禁用，`threshold(th, target)` 取本台覆盖限值。
 - 计算组态：`execution`（周期 / 事件触发 / 按需…）与 `output`（输出测点、写回）在 `calculations._clean` 校验并补默认值；
   绑定引用的参数 / 位号在 `routes._check_calc_refs` 校验；运行记录 `ctx.calcs.log_run`（内存）。
+- 运行态（需求 SW-088 第 3、5 条）：与工程态**同一套界面**（导航树、图纸、对象详情、全局图谱、搜索），只读，叠加实时值与现象状态：
+  `client.setReadOnly` 把应答里的 canEdit / canOverride 置 false，编辑控件加 `ro-hide`（根节点 `run-mode` 时隐藏）；`useLive.ts` 每 5 秒 tick；
+  实时值 `GET /live/values?tags=`（`runtime.live_values`，模拟器当前时刻）、工序现象状态 `GET /live/op/{op}`（`runtime.op_states`，含草案，缓存 20 秒）；
+  参数页签位号后显示实时值与报警级别、现象页签「当前状态」列、图纸按异常现象着色（工况不着色）、页头「复制链接」；
+  链接 `#run/object/<id>?op=&tab=` / `#run/op/<op>`（`App.vue` 的 `openFromHash`）；原运行态页面（服务状态 / 评估 / 绑定 / 知识沉淀）放在视角栏「运行服务」。
+  单文件版：`api/simLocal.ts` 是 simulator.py 的浏览器版（blake2b 随机数，值与完整版逐位一致），现象状态取导出时刻的评估结果。
 - 三态：`nav.stage`（dev / eng / run），`App.vue` 顶栏切换；`DevStudio.vue`（左侧元模型在最前；类库写操作只允许「编辑中」版本，`useClassLib.canEdit`）、`RuntimeView.vue`；从开发态 / 运行态打开对象用 `openInEngineering`。
 - 知识沉淀 `userdata.KnowledgeStore`（`knowledge.json`），审核在 `ReleaseCenter.vue` 的「知识审核」页。
 - 一致性校验每条带 `draft` / `blocking`：生效对象上的错误才阻止发布（`publishable`）。

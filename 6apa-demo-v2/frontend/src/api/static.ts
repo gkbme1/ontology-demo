@@ -10,6 +10,7 @@
  */
 import { ApiError, type Query } from './client'
 import { ClassLibLocal, type ClassLibBundle } from './classlibLocal'
+import { alarmOf, isDigital, valueAt, type SimTag } from './simLocal'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any
@@ -30,6 +31,7 @@ interface Snapshot {
   evals: Record<string, Any>
   calcRuns: Record<string, Any>
   classlib?: ClassLibBundle
+  liveTags?: Record<string, [string, string, string, string, string, string | null]>
 }
 
 const STORE_KEY = 'v2-static-store'
@@ -281,6 +283,9 @@ export class StaticBackend {
     let m: RegExpMatchArray | null
     // 开发态类库：浏览器内实现（classlibLocal.ts）
     if (this.cl && path.startsWith('/classlib')) return this.cl.handle(method, path, body, q)
+    // 运行态：实时值（浏览器内模拟器，与完整版同一套公式）与现象状态（导出时刻的评估结果）
+    if (path === '/live/values') return this.liveValues(String(q.tags ?? '').split(',').filter(Boolean))
+    if ((m = path.match(/^\/live\/op\/([^/]+)$/))) return this.liveOp(m[1])
     // 现象
     if (path === '/phenomena' && method === 'GET') {
       const items = Object.values(this.phen).filter((p) =>
@@ -446,6 +451,61 @@ export class StaticBackend {
     }
     if (path.match(/^\/(ops|segments)\/[^/]+$/)) this.patchCounts(out)
     return out
+  }
+
+  // ------------------------------------------------------------ 运行态
+  private liveValues(names: string[]): Any {
+    const now = Math.floor(Date.now() / 1000)
+    const values: Record<string, Any> = {}
+    for (const n of names.slice(0, 400)) {
+      const meta = this.snap.liveTags?.[n.toUpperCase()] ?? this.snap.liveTags?.[n]
+      if (!meta) { values[n] = { v: null, quality: '无此位号' }; continue }
+      const [blockType, parameterType, parameterName, unit, standardUnit, limitId] = meta
+      const tag: SimTag = { name: n.toUpperCase() in (this.snap.liveTags ?? {}) ? n.toUpperCase() : n, blockType, parameterType, parameterName, unit, standardUnit }
+      const limit = limitId ? this.snap.base.limits[limitId] : null
+      const v = valueAt(tag, limit, now)
+      const digital = isDigital(tag)
+      values[n] = { v: Math.round(v * 1000) / 1000, digital, alarm: digital ? null : alarmOf(v, limit), unit: unit || standardUnit, limitId }
+    }
+    const d = new Date(now * 1000)
+    const p = (x: number) => String(x).padStart(2, '0')
+    return { at: `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`, values,
+             dataSource: { simulated: true, label: '模拟数据', note: '单文件版：测点值由浏览器内的确定性模拟器生成（与完整版同一套公式），不是现场数据' } }
+  }
+  private liveOp(op: string): Any {
+    const items: Any[] = []
+    for (const p of Object.values(this.phen)) {
+      if (!p.rule || !this.ops(p).includes(op)) continue
+      const hit = this.snap.evals[`${p.id}|${op}`] ?? this.snap.evals[`${p.id}|`]
+      const base = { id: p.id, name: p.name, category: p.category, severity: p.severity, anchorId: p.anchor?.id }
+      if (!hit || this.seedRules[p.id] !== `${p.anchor?.id}|${canon(p.rule)}`) {
+        items.push({ ...base, targetId: p.anchor?.id, targetName: p.anchor?.name, state: '未知', reason: '单文件版：新建或改过的规则没有评估结果' })
+        continue
+      }
+      for (const x of hit.results ?? []) {
+        if (x.disabled) continue
+        const unknown = x.conditions?.length && x.conditions.every((c: Any) => c.status === '无法判定')
+        const state = unknown ? '未知' : x.current ? '发生' : '未发生'
+        items.push({ ...base, targetId: x.targetId, targetName: x.targetName, state,
+                     since: state === '发生' && x.events?.length ? x.events[x.events.length - 1].start : null })
+      }
+    }
+    const objects: Record<string, Any> = {}
+    for (const i of items) {
+      if (i.state !== '发生') continue
+      const ids = new Set<string>([i.targetId])
+      const g = this.snap.base.equipGroup[i.targetId]
+      if (g) ids.add(g)
+      const cond = i.category === '工况'
+      for (const id of ids) {
+        const o = (objects[id] ??= { active: [], conditions: [], severity: null })
+        const lst = cond ? o.conditions : o.active
+        if (!lst.includes(i.name)) lst.push(i.name)
+        if (!cond) o.severity = i.severity === '严重' || o.severity === '严重' ? '严重' : '警告'
+      }
+    }
+    return { at: this.liveValues([]).at, evaluatedAt: this.snap.info.generatedAt, opId: op, items, objects, dataSource: { simulated: true, label: '模拟数据' },
+             basis: `单文件版：现象状态为导出时刻（${this.snap.info.generatedAt}）的评估结果，不随时间变化；实时值随时间刷新` }
   }
 
   /** 单文件版可导出的文件（目前只有类库包）。 */

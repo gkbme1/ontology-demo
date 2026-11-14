@@ -8,7 +8,7 @@ import BatchStatusBar from '@/components/BatchStatusBar.vue'
 import { staticBackend } from '@/api/static'
 import { computed, onMounted, ref } from 'vue'
 import { api } from '@/api/client'
-import { bump } from '@/composables/useNav'
+import { bump, isRun } from '@/composables/useNav'
 import CausalGraph from './CausalGraph.vue'
 import CausePopup from './CausePopup.vue'
 import LinkEditor from './LinkEditor.vue'
@@ -28,7 +28,7 @@ const allPhen = ref<Any[]>([])
 const groupByEffect = ref(true)
 // 批量变更状态（列表视图）
 const picked = ref<Set<string>>(new Set())
-const canBatch = !staticBackend
+const canBatch = computed(() => !staticBackend && !isRun())
 function togglePick(id: string): void { const s = new Set(picked.value); if (s.has(id)) s.delete(id); else s.add(id); picked.value = s }
 
 onMounted(async () => {
@@ -86,7 +86,7 @@ function changed(): void {
       </label>
       <span class="text-xs text-fg-mute">{{ links.length }} 条导致关系</span>
       <span class="flex-1" />
-      <button class="btn btn-primary" @click="creating = true">+ 新增导致关系</button>
+      <button class="btn btn-primary ro-hide" @click="creating = true">+ 新增导致关系</button>
     </div>
 
     <CausalGraph v-if="view === 'graph'" :graph="globalGraph" height="calc(100vh - 290px)" @pick="(id: string) => (popup = id)" />
@@ -133,8 +133,8 @@ function changed(): void {
                 <td class="text-fg-dim">{{ l.mechanism }}<div class="text-[11px] text-fg-mute">{{ l.basis }}</div></td>
                 <td class="whitespace-nowrap"><span class="pill pill-plain">{{ l.confidence }}</span> <StatusPill :status="l.status" /> <span v-if="l.inCycle" class="pill pill-err" title="这条关系处在因果环路上">环路</span></td>
                 <td class="whitespace-nowrap" @click.stop>
-                  <button class="ctl" @click="editing = l">编辑</button>
-                  <button class="ctl ml-1" @click="remove(l)">删除</button>
+                  <button class="ctl ro-hide" @click="editing = l">编辑</button>
+                  <button class="ctl ml-1 ro-hide" @click="remove(l)">删除</button>
                 </td>
               </tr>
             </tbody>
@@ -156,8 +156,8 @@ function changed(): void {
             <td class="text-fg-dim">{{ l.mechanism }}<div class="text-[11px] text-fg-mute">{{ l.basis }}</div></td>
             <td>{{ l.confidence }}</td>
             <td class="whitespace-nowrap" @click.stop>
-              <button class="ctl" @click="editing = l">编辑</button>
-              <button class="ctl ml-1" @click="remove(l)">删除</button>
+              <button class="ctl ro-hide" @click="editing = l">编辑</button>
+              <button class="ctl ml-1 ro-hide" @click="remove(l)">删除</button>
             </td>
           </tr>
         </tbody>

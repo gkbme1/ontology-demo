@@ -10,7 +10,10 @@ import PidCanvas from './PidCanvas.vue'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any
-const props = defineProps<{ drawing: Any; highlight?: string[]; caption?: string }>()
+const props = defineProps<{ drawing: Any; highlight?: string[]; caption?: string; alarms?: Record<string, Any> }>()
+// 运行态：热区按对象（或所属设备组）的异常现象着色
+function alarmOf(h: Any): Any { return props.alarms?.[h.objectId]?.active?.length ? props.alarms[h.objectId] : null }
+const alarmCount = computed(() => props.alarms ? Object.keys(props.alarms).filter((k) => props.alarms![k].active?.length && k.startsWith('equip-')).length : 0)
 const emit = defineEmits<{ (e: 'pick', id: string, kind: 'group' | 'equipment', opId?: string): void }>()
 
 const mode = ref<'image' | 'schematic'>(props.drawing?.image ? 'image' : 'schematic')
@@ -77,6 +80,8 @@ const TAB_NAMES: Record<string, string> = { phenomena: '现象', calc: '计算�
         </span>
       </template>
       <span v-else class="text-fg-mute">{{ img ? '' : '本工序暂无现场图纸，显示本体示意图' }}</span>
+      <span v-if="alarms" class="pill" :class="alarmCount ? 'pill-err' : 'pill-ok'" title="运行态：按现象当前状态着色（模拟数据）；红 = 严重，橙 = 警告">
+        ● {{ alarmCount ? `${alarmCount} 台设备有异常现象` : '无异常现象' }}</span>
     </div>
 
     <!-- 单击摘要：双击图上对象或点「打开本体详情」进入对象本体详情 -->
@@ -107,10 +112,10 @@ const TAB_NAMES: Record<string, string> = { phenomena: '现象', calc: '计算�
         <svg class="absolute inset-0 w-full h-full" :viewBox="`0 0 ${img.width} ${img.height}`" preserveAspectRatio="none">
           <g v-for="(h, i) in img.hotspots" :key="i" class="cursor-pointer" @click="chooseSpot(h)" @dblclick="pick(h)" @mouseenter="hover = h" @mouseleave="hover = null">
             <rect :x="h.x" :y="h.y" :width="h.w" :height="h.h" rx="4"
-                  :fill="lit(h) ? 'rgba(53,196,215,0.35)' : hover === h ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0)'"
-                  :stroke="lit(h) ? '#35c4d7' : showSpots || hover === h ? (h.confirmed ? '#f2c744' : '#d17bff') : 'transparent'"
-                  :stroke-width="lit(h) ? 4 : 2" :stroke-dasharray="h.confirmed ? '' : '6 4'" />
-            <title>{{ h.name }}{{ h.otherOp ? '（属于其他工序）' : '' }}：{{ h.note }}</title>
+                  :fill="alarmOf(h) ? 'rgba(239,68,68,0.28)' : lit(h) ? 'rgba(53,196,215,0.35)' : hover === h ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0)'"
+                  :stroke="alarmOf(h) ? (alarmOf(h).severity === '严重' ? '#ef4444' : '#f97316') : lit(h) ? '#35c4d7' : showSpots || hover === h ? (h.confirmed ? '#f2c744' : '#d17bff') : 'transparent'"
+                  :stroke-width="alarmOf(h) || lit(h) ? 4 : 2" :stroke-dasharray="h.confirmed || alarmOf(h) ? '' : '6 4'" />
+            <title>{{ h.name }}{{ h.otherOp ? '（属于其他工序）' : '' }}：{{ h.note }}{{ alarmOf(h) ? '\n异常现象：' + alarmOf(h).active.join('、') : '' }}</title>
           </g>
         </svg>
       </div>
@@ -123,7 +128,7 @@ const TAB_NAMES: Record<string, string> = { phenomena: '现象', calc: '计算�
     </div>
     <div v-if="mode === 'image' && img?.unresolved?.length" class="text-xs text-err">未对应到本体的热区：{{ img.unresolved.join('、') }}</div>
 
-    <PidCanvas v-if="mode === 'schematic'" :drawing="drawing" :highlight="highlight"
+    <PidCanvas v-if="mode === 'schematic'" :drawing="drawing" :highlight="highlight" :alarms="alarms"
                @select="(id: string, k: 'group' | 'equipment') => choose(id, k)"
                @pick="(id: string, k: 'group' | 'equipment') => emit('pick', id, k)" />
   </div>

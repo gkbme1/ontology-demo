@@ -681,6 +681,20 @@ def runtime_causes(pid: str, target: Optional[str] = None) -> dict[str, Any]:
     return _guard(runtime.cause_states, get_ctx(), pid, target)
 
 
+@router.get("/live/values")
+def live_values(tags: str = "") -> dict[str, Any]:
+    """运行态实时值（模拟数据）：tags 用逗号分隔，最多 400 个。"""
+    from backend.v2 import runtime
+    return runtime.live_values(get_ctx(), [t.strip() for t in tags.split(",") if t.strip()])
+
+
+@router.get("/live/op/{op_id}")
+def live_op(op_id: str) -> dict[str, Any]:
+    """运行态：工序内现象 / 工况的当前状态（逐台），图纸着色与对象页签用。"""
+    from backend.v2 import runtime
+    return _guard(runtime.op_states, get_ctx(), op_id)
+
+
 @router.get("/runtime/bindings")
 def runtime_bindings() -> dict[str, Any]:
     from backend.v2 import runtime

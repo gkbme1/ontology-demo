@@ -155,3 +155,96 @@ def binding_summary(ctx: AppContext) -> dict[str, Any]:
            "note": "按导航中的设备逐台统计参数绑定状态；位号存在性以点表代替 XBase 位号目录"}
     _cache["binding"] = res
     return res
+
+
+# ------------------------------------------------------------------ 运行态画面（需求 SW-088 第 3 条：同一套界面，只读，叠加实时值与现象状态）
+ALARM_KEYS = (("highHigh", "HH", 1), ("high", "H", 1), ("lowLow", "LL", -1), ("low", "L", -1))
+
+
+def alarm_of(v: float, limit: dict[str, Any] | None) -> str | None:
+    """按位号的工艺限值判断报警级别：HH / H / LL / L；在报警限内但超出正常区间为「偏离」。"""
+    if not limit:
+        return None
+    for key, label, sign in ALARM_KEYS:
+        x = limit.get(key)
+        if x is not None and (v >= x if sign > 0 else v <= x):
+            return label
+    lo, hi = limit.get("normalLow"), limit.get("normalHigh")
+    if (lo is not None and v < lo) or (hi is not None and v > hi):
+        return "偏离"
+    return None
+
+
+def live_values(ctx: AppContext, names: list[str]) -> dict[str, Any]:
+    """位号实时值（模拟数据，当前时刻；与历史试算同一个确定性模拟器）。"""
+    import numpy as np
+    from backend.v2 import simulator
+    now = int(time.time())
+    out: dict[str, Any] = {}
+    for n in names[:400]:
+        tag = ctx.tag_by_name.get(n.upper()) or ctx.tag_by_name.get(n)
+        if not tag:
+            out[n] = {"v": None, "quality": "无此位号"}
+            continue
+        limit = ctx.limit_of_tag.get(tag["name"])
+        v = float(simulator.series(tag, limit, np.array([now], dtype=np.int64))[0])
+        digital = simulator.is_digital(tag)
+        out[n] = {"v": round(v, 3), "digital": digital, "alarm": None if digital else alarm_of(v, limit),
+                  "unit": tag.get("unit") or tag.get("standardUnit") or "", "limitId": (limit or {}).get("id")}
+    return {"at": datetime.fromtimestamp(now).strftime("%Y-%m-%d %H:%M:%S"), "values": out, "dataSource": simulator.DATA_SOURCE}
+
+
+_op_cache: dict[str, tuple[float, dict[str, Any]]] = {}
+
+
+def op_states(ctx: AppContext, op_id: str) -> dict[str, Any]:
+    """一道工序内现象 / 工况的当前状态（逐台）：评估全部已定义判定规则的现象（含草案，演示），缓存 20 秒。
+    objects：设备 / 设备组 → 当前发生的异常现象（active，图纸着色）与当前工况（conditions）。"""
+    hit = _op_cache.get(op_id)
+    if hit and time.time() - hit[0] < 20:
+        return hit[1]
+    if op_id not in ctx.hierarchy.ops:
+        raise LookupError(op_id)
+    items = []
+    for p in ctx.phen.phenomena.values():
+        if not p.get("rule") or op_id not in ctx.phenomenon_ops(p):
+            continue
+        try:
+            r = rule_eval.evaluate(ctx, p["rule"], p["anchor"]["id"], hours=1, phenomenon_id=p["id"])
+        except Exception as exc:  # noqa: BLE001
+            items.append({"id": p["id"], "name": p["name"], "anchorId": p["anchor"]["id"], "targetId": p["anchor"]["id"],
+                          "state": "未知", "reason": str(exc)[:120]})
+            continue
+        for x in r["results"]:
+            if x.get("disabled"):
+                continue
+            unknown = x["conditions"] and all(c.get("status") == "无法判定" for c in x["conditions"])
+            state = "未知" if unknown else ("发生" if x["current"] else "未发生")
+            items.append({"id": p["id"], "name": p["name"], "category": p.get("category"), "severity": p.get("severity"),
+                          "anchorId": p["anchor"]["id"], "targetId": x["targetId"], "targetName": x["targetName"], "state": state,
+                          "since": x["events"][-1]["start"] if state == "发生" and x["events"] else None})
+    res = {"at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "opId": op_id, "items": items,
+           "objects": _objects_of(ctx, items), "dataSource": {"simulated": True, "label": "模拟数据"},
+           "basis": "评估全部已定义判定规则的现象（含草案，演示）：最近 1 小时模拟数据，最后一个采样点的状态"}
+    _op_cache[op_id] = (time.time(), res)
+    return res
+
+
+def _objects_of(ctx: AppContext, items: list[dict[str, Any]]) -> dict[str, Any]:
+    objs: dict[str, Any] = {}
+    for i in items:
+        if i["state"] != "发生":
+            continue
+        ids = {i["targetId"]}
+        e = ctx.store.dcs.equipment.get(i["targetId"])
+        if e and e.get("equipmentGroupId"):
+            ids.add(e["equipmentGroupId"])
+        cond = i.get("category") == "工况"
+        for oid in ids:
+            o = objs.setdefault(oid, {"active": [], "conditions": [], "severity": None})
+            lst = o["conditions"] if cond else o["active"]
+            if i["name"] not in lst:
+                lst.append(i["name"])
+            if not cond:
+                o["severity"] = "严重" if i.get("severity") == "严重" or o["severity"] == "严重" else "警告"
+    return objs

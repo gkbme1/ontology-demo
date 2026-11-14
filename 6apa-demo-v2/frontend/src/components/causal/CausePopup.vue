@@ -114,7 +114,7 @@ async function onAdded(): Promise<void> {
         <button class="ctl" :class="{ 'ctl-on': direction === 'up' }" @click="direction = 'up'">由什么导致（{{ detail.causes.length }} 条直接原因）</button>
         <button class="ctl" :class="{ 'ctl-on': direction === 'down' }" @click="direction = 'down'">会导致什么（{{ detail.effects.length }}）</button>
         <span class="flex-1" />
-        <button class="btn" @click="adding = true">+ 补一条{{ direction === 'up' ? '原因' : '结果' }}</button>
+        <button class="btn ro-hide" @click="adding = true">+ 补一条{{ direction === 'up' ? '原因' : '结果' }}</button>
       </div>
       <div v-if="chain?.graph.links.some((l: Any) => l.inCycle)" class="text-xs text-err border border-err/30 bg-err/5 rounded px-2 py-1">
         ⟳ 这条导致链上有因果环路（{{ chain.graph.links.filter((l: Any) => l.inCycle).map((l: Any) => `${l.causeName}→${l.effectName}`).join('、') }}），请确认是正反馈 / 控制回路还是方向登记错误
