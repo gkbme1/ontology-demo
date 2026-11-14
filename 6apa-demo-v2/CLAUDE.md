@@ -91,7 +91,7 @@
 - 页签顺序同需求 SW-041：图纸位置与外观、参数、参数约束、拓扑关系、现象/工况定义、根因影响关系、工艺影响关系、计算组态、处置规程；
   页头 `counts` 给出全部页签条目数。「继承」列改为「来源」（类 / 设备组 / 本对象），`InheritBox.vue`。
 - 图纸：单击显示摘要、双击打开对象详情（`DrawingView.vue`，`PidCanvas` 发 select / pick 两个事件）。
-- 开发态界面按用户要求：元类列表不显示「类」数、层级模板不显示「引用工程」；**映射规则模块先屏蔽**（`DevStudio.vue` 不挂页面，`dev/MappingRulesPage.vue` 与后端接口保留，恢复时加回 PAGES 即可）。
+- 开发态界面按用户要求：元类列表不显示「类」数、层级模板不显示「引用工程」；类详情不显示「实例」页签与实例数；参数模板不显示位号匹配规则（`tagRule` 数据保留）与位号匹配试验；**映射规则模块先屏蔽**（`DevStudio.vue` 不挂页面，`dev/MappingRulesPage.vue` 与后端接口保留，恢复时加回 PAGES 即可）。
 - 能力挂载只以**类的 `caps`** 为准：能力定义不存「适用类」，`classlib.capabilities_view` 由类的挂载算出 `classes`（直接挂载）/ `inheritedClasses`（子类继承）；在能力定义里改适用类会写回各类的 caps（`upsert` 时 `classes` 不落库），改能力编码同步改类上的引用；加载时清掉旧数据里能力上的 `classes`。
 - 工程使用的类库版本（`classlib.binding`，固定为首个已发布版本 v0.1，`library.boundVersion` 可指定）：类库发布只是升版，不自动更新工程；工程态顶栏「类库 vX」标签、对象基础信息、「发布与导出 · 类库版本」页签（`components/ClassLibUpgrade.vue`）可查看；升级影响分析 `classlib.upgrade_impact`（可自动同步 / 冲突 / 需人工处理）；**确认切换只做二次提示，不改任何数据**（用户确认）。
 - 单文件版开发态可编辑：`api/classlibLocal.ts` 是 `classlib.py` + `/classlib/*` 路由的浏览器版（改了后端类库规则要同步改它），依赖实例的数据由 `export_static.classlib_bundle` 预先导出；client.ts → static.ts → classlibLocal.ts 有循环引用，模块顶层不能继承 / 调用 `ApiError`。

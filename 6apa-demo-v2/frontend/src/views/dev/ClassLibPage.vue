@@ -5,7 +5,6 @@
  */
 import { computed, ref, watch } from 'vue'
 import { api } from '@/api/client'
-import { openInEngineering } from '@/composables/useNav'
 import { act, canEdit, lib } from '@/composables/useClassLib'
 import DevForm from './DevForm.vue'
 import ClassTreeNode from './ClassTreeNode.vue'
@@ -37,7 +36,7 @@ async function init(): Promise<void> {
   await loadClass()
 }
 init()
-watch(sel, () => { tab.value = tab.value === 'inst' ? 'base' : tab.value; loadClass() })
+watch(sel, () => loadClass())
 watch(() => lib.summary?.current?.version, init)
 async function refresh(): Promise<void> { await Promise.all([loadTree(), loadClass()]) }
 
@@ -139,14 +138,6 @@ const rows = (part: string): Any[] => (cls.value?.parts?.[part] ?? []).filter((x
 const SRC = (x: Any) => (x._own ? (x._src.startsWith('覆盖') ? 'pill-warn' : 'pill-info') : 'pill-plain')
 const bandText = (c: Any) => c.source === '逻辑约束' ? c.expr : c.source === '取 XBase 报警限' ? '取 XBase 位号报警限 H / HH' : [c.ll, c.l, c.nl != null || c.nh != null ? `${c.nl ?? ''}~${c.nh ?? ''}` : null, c.h, c.hh].map((v) => (v ?? '—')).join(' / ')
 
-// ---------------- 参数模板：位号匹配试验
-const testTag = ref('TI_1301C')
-const testRes = ref<Any>(null)
-async function runTagTest(): Promise<void> {
-  const code = editing.value?.part === 'params' ? editing.value.item.code : rows('params')[0]?.code
-  if (!code) return
-  try { testRes.value = await api.clParamTest(sel.value, code, { tag: testTag.value }) } catch (e) { alert((e as Error).message) }
-}
 const dimCount = computed(() => (editing.value?.item?.dims ?? []).reduce((n: number, d: Any) => n * Math.max(1, (d.values ?? []).length), 1))
 
 // ---------------- 现象模板
@@ -182,8 +173,8 @@ async function toggleCap(code: string): Promise<void> {
   if (await act(() => api.clCaps(sel.value, [...s]), '已更新挂载能力')) await loadClass()
 }
 const CLS_TABS = [['base', '基本信息'], ['attrs', '属性'], ['params', '参数模板'], ['constraints', '约束模板'], ['phenomena', '现象/工况模板'],
-  ['causes', '根因模板'], ['influences', '工艺影响模板'], ['caps', '能力'], ['inst', '实例']] as const
-const cnt = (k: string) => (k === 'caps' ? cls.value?.caps?.length : k === 'inst' ? cls.value?.instances?.length : cls.value?.parts?.[k]?.length)
+  ['causes', '根因模板'], ['influences', '工艺影响模板'], ['caps', '能力']] as const
+const cnt = (k: string) => (k === 'caps' ? cls.value?.caps?.length : cls.value?.parts?.[k]?.length)
 </script>
 
 <template>
@@ -217,7 +208,7 @@ const cnt = (k: string) => (k === 'caps' ? cls.value?.caps?.length : k === 'inst
         <span class="pill pill-info">{{ cls.metaclassName }}类</span>
         <span class="pill" :class="cls.status === '生效' ? 'pill-ok' : cls.status === '停用' ? 'pill-mute' : 'pill-warn'">{{ cls.status }}</span>
         <span v-if="cls.abstract" class="pill pill-mute">抽象类</span>
-        <span class="text-xs text-fg-mute">{{ cls.path.map((p: Any) => p.name).join(' › ') }} ｜ 编码 {{ cls.code }} ｜ 实例 {{ cls.instances.reduce((n: number, i: Any) => n + i.members + 1, 0) }} 个</span>
+        <span class="text-xs text-fg-mute">{{ cls.path.map((p: Any) => p.name).join(' › ') }} ｜ 编码 {{ cls.code }}</span>
       </div>
       <div class="flex flex-wrap gap-1.5">
         <button v-for="[k, l] in CLS_TABS" :key="k" class="asset-tab" :class="{ 'asset-tab-on': tab === k }" @click="tab = k; editing = null">
@@ -303,11 +294,10 @@ const cnt = (k: string) => (k === 'caps' ? cls.value?.caps?.length : k === 'inst
             <label class="text-xs inline-flex items-center gap-1"><input v-model="onlyRequired" type="checkbox" />只看必备参数</label>
             <button class="btn btn-primary" :disabled="!canEdit()" @click="add('params')">+ 新增参数模板</button>
           </div>
-          <table class="tbl"><thead><tr><th>参数编码</th><th>名称</th><th>类别</th><th>物理量</th><th>单位</th><th>可重复 / 位置维度</th><th>位号匹配规则</th><th>必备</th><th>来源</th></tr></thead><tbody>
-            <tr v-for="x in rows('params')" :key="x.code" :class="{ '!bg-brand/10': editing?.code === x.code }" @click="edit('params', x); testRes = null">
+          <table class="tbl"><thead><tr><th>参数编码</th><th>名称</th><th>类别</th><th>物理量</th><th>单位</th><th>可重复 / 位置维度</th><th>必备</th><th>来源</th></tr></thead><tbody>
+            <tr v-for="x in rows('params')" :key="x.code" :class="{ '!bg-brand/10': editing?.code === x.code }" @click="edit('params', x)">
               <td class="font-mono text-xs">{{ x.code }}</td><td>{{ x.name }}<span v-if="x.semantic" class="pill pill-ok !py-0 ml-1">工艺属性</span></td><td>{{ x.category }}</td><td>{{ x.quantity }}</td><td>{{ x.unit }}</td>
               <td class="text-xs">{{ x.repeatable ? `是 · ${(x.dims ?? []).map((d: Any) => d.name).join('×') || '—'}` : '否' }}</td>
-              <td class="font-mono text-xs">{{ x.tagRule?.funcs ? `${x.tagRule.funcs} + ` : '' }}{{ x.tagRule?.keywords ? `「${x.tagRule.keywords}」` : '' }}</td>
               <td>{{ x.required ? '是' : '否' }}</td><td><span class="pill" :class="SRC(x)">{{ x._src }}</span></td></tr>
           </tbody></table>
         </div>
@@ -316,12 +306,8 @@ const cnt = (k: string) => (k === 'caps' ? cls.value?.caps?.length : k === 'inst
             <button v-if="!editing.isNew" class="btn btn-danger mr-1" :disabled="!canEdit()" @click="delItem('params', editing.item)">删除</button>
             <button class="btn mr-1" @click="editing = null">取消</button><button class="btn btn-primary" :disabled="!canEdit()" @click="saveItem">保存</button></div>
           <DevForm :model="editing.item" :fields="fieldsFor('params')" :disabled="!canEdit()" :cols="2" />
-          <div class="grid grid-cols-[96px_1fr_96px_1fr] gap-x-4 gap-y-2 items-center text-sm mt-2">
-            <span class="text-xs text-fg-mute text-right">功能字母</span><input v-model="editing.item.tagRule.funcs" class="inp font-mono" :disabled="!canEdit()" placeholder="如 TI|TE" />
-            <span class="text-xs text-fg-mute text-right">描述关键字</span><input v-model="editing.item.tagRule.keywords" class="inp" :disabled="!canEdit()" placeholder="如 温度 | 轴承" />
-          </div>
         </div>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 gap-3">
           <div class="card">
             <div class="sec-title">多实例参数：{{ editing?.part === 'params' ? editing.item.name : '（选中一个参数模板）' }} · 位置维度</div>
             <template v-if="editing?.part === 'params'">
@@ -334,18 +320,6 @@ const cnt = (k: string) => (k === 'caps' ? cls.value?.caps?.length : k === 'inst
               <button class="ctl" :disabled="!canEdit()" @click="editing.item.dims.push({ name: '', values: [] }); editing.item.repeatable = true">+ 维度</button>
               <div class="text-xs text-fg-dim mt-2">实例化：每台设备展开为 <b>{{ editing.item.repeatable ? dimCount : 1 }}</b> 个参数</div>
             </template>
-          </div>
-          <div class="card">
-            <div class="sec-title">位号匹配试验</div>
-            <div class="flex gap-2"><input v-model="testTag" class="inp flex-1 font-mono" placeholder="输入位号，如 TI_1301C" @keydown.enter="runTagTest" />
-              <button class="btn btn-primary" @click="runTagTest">试验</button></div>
-            <div v-if="testRes" class="text-xs mt-2 space-y-1">
-              <div class="text-fg-dim">{{ testRes.tag }} · {{ testRes.desc || '（点表中无此位号描述）' }}<span v-if="testRes.equipment"> · {{ testRes.equipment }}</span></div>
-              <div>→ {{ testRes.matched ? '匹配' : '不匹配' }} <b>{{ testRes.template }}</b>
-                <span v-if="testRes.dims.some((d: Any) => d.value)">[{{ testRes.dims.map((d: Any) => d.value ?? '?').join(', ') }}]</span>
-                <span class="pill ml-1" :class="testRes.matched ? 'pill-ok' : 'pill-mute'">置信度 {{ testRes.confidence }}</span></div>
-              <div class="text-fg-mute">规则：功能字母 {{ testRes.funcs.join('|') || '—' }}{{ testRes.funcOk ? ' ✓' : ' ✗' }}（位号前缀 {{ testRes.prefix }}）· 关键字「{{ testRes.keywordsAll.join('|') }}」{{ testRes.keywords.length ? ' ✓' : ' ✗' }}</div>
-            </div>
           </div>
         </div>
       </template>
@@ -434,16 +408,6 @@ const cnt = (k: string) => (k === 'caps' ? cls.value?.caps?.length : k === 'inst
         </div>
       </template>
 
-      <!-- 实例 -->
-      <template v-else-if="tab === 'inst'">
-        <div class="card">
-          <div v-if="!cls.instances.length" class="text-xs text-fg-mute">{{ cls.abstract ? '抽象类没有直接实例；实例数见子类' : '暂无实例' }}</div>
-          <table v-else class="tbl"><thead><tr><th>实例（设备组）</th><th>成员设备</th><th>导航</th><th></th></tr></thead><tbody>
-            <tr v-for="x in cls.instances" :key="x.id" class="!cursor-default"><td>{{ x.name }}</td><td>{{ x.members }}</td><td class="text-xs">{{ x.inNav ? '在导航中' : '未纳入导航' }}</td>
-              <td><button v-if="x.inNav" class="ctl" @click="openInEngineering(x.id, x.opId, x.segmentId)">在工程态打开 ↗</button></td></tr>
-          </tbody></table>
-        </div>
-      </template>
     </div>
     <div v-else class="empty">左侧选择一个类</div>
   </div>
