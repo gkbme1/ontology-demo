@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * 画面图纸（示意）：设备组为框、成员为框内设备块，按拓扑分层从左到右排布；
- * 左侧为进入本画面的物料 / 公用介质，右侧为产出；顶部写子流程。
+ * 工序图纸（示意）：设备组为框、成员为框内设备块，按拓扑分层从左到右排布；
+ * 左侧为进入本工序的物料 / 公用介质，右侧为产出；顶部写子工序。
  * 单击设备块 / 设备组标题 → pick；highlight 中的对象高亮。
  */
 import { computed } from 'vue'
@@ -10,7 +10,8 @@ import { computed } from 'vue'
 type Any = any
 
 const props = defineProps<{ drawing: Any; highlight?: string[]; compact?: boolean }>()
-const emit = defineEmits<{ (e: 'pick', id: string, kind: 'group' | 'equipment'): void }>()
+// 单击 select（显示摘要），双击 pick（打开对象本体详情）
+const emit = defineEmits<{ (e: 'pick' | 'select', id: string, kind: 'group' | 'equipment'): void }>()
 
 const NODE_W = 230
 const COL_GAP = 90
@@ -103,11 +104,11 @@ function short(s: string, n = 13): string {
         </pattern>
       </defs>
       <rect x="0" y="0" :width="layout.width" :height="layout.height" fill="url(#grid)" />
-      <!-- 标题与子流程 -->
+      <!-- 标题与子工序 -->
       <text x="16" y="24" fill="#1f2937" font-size="14" font-weight="600">{{ drawing.name }}</text>
       <text x="16" y="24" :dx="drawing.name.length * 14 + 12" fill="#7b8798" font-size="11">流程画面：{{ drawing.screen }}</text>
       <g v-if="drawing.subSteps?.length">
-        <text x="16" y="46" fill="#7b8798" font-size="11">子流程</text>
+        <text x="16" y="46" fill="#7b8798" font-size="11">子工序</text>
         <g v-for="(s, i) in drawing.subSteps" :key="s">
           <rect :x="60 + i * 112" y="34" width="104" height="18" rx="9" fill="#eef3f8" stroke="#c9d4e0" />
           <text :x="112 + i * 112" y="47" fill="#4b5563" font-size="10.5" text-anchor="middle">{{ short(s, 9) }}</text>
@@ -137,12 +138,12 @@ function short(s: string, n = 13): string {
               :fill="hl.has(n.id) ? '#dff3f6' : '#ffffff'"
               :stroke="hl.has(n.id) ? '#0e8fa3' : n.kind === 'ungrouped' ? '#b6c2d1' : '#9fb3c8'"
               :stroke-dasharray="n.kind === 'ungrouped' ? '5 3' : ''" :stroke-width="hl.has(n.id) ? 2 : 1" />
-        <g class="cursor-pointer" @click="n.kind === 'group' && emit('pick', n.id, 'group')">
+        <g class="cursor-pointer" @click="n.kind === 'group' && emit('select', n.id, 'group')" @dblclick="n.kind === 'group' && emit('pick', n.id, 'group')">
           <rect :width="NODE_W" :height="HEAD_H" rx="8" fill="transparent" />
           <text x="10" y="19" font-size="12" font-weight="600" :fill="n.kind === 'ungrouped' ? '#4b5563' : '#1f2937'">{{ short(n.name, 16) }}<title>{{ n.name }}{{ n.type ? `（${n.type}）` : '' }}</title></text>
           <text :x="NODE_W - 10" y="19" font-size="10.5" fill="#7b8798" text-anchor="end">{{ n.members.length }} 台</text>
         </g>
-        <g v-for="(m, i) in n.shown" :key="m.id" class="cursor-pointer" @click="emit('pick', m.id, 'equipment')">
+        <g v-for="(m, i) in n.shown" :key="m.id" class="cursor-pointer" @click.stop="emit('select', m.id, 'equipment')" @dblclick.stop="emit('pick', m.id, 'equipment')">
           <rect :x="chipX(i)" :y="chipY(i)" :width="(NODE_W - 16) / CHIP_COLS - 6" :height="CHIP_H - 4" rx="4"
                 :fill="hl.has(m.id) ? '#0e8fa3' : '#eef3f8'" :stroke="hl.has(m.id) ? '#0e8fa3' : '#c9d4e0'" />
           <text :x="chipX(i) + 6" :y="chipY(i) + 13" font-size="10.5" :fill="hl.has(m.id) ? '#ffffff' : '#334155'">{{ short(m.name, 9) }}<title>{{ m.name }} · {{ m.tagCount }} 个测点</title></text>

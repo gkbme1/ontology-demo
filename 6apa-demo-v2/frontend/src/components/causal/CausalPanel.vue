@@ -3,6 +3,7 @@
  * 根因影响关系：一条记录 =「原因现象 导致 结果现象」，列表与关系图谱两种方式展示。
  * 选中某个结果现象（列表里点结果、图谱里点节点）弹窗查看它由什么导致。
  */
+import StatusPill from '@/components/StatusPill.vue'
 import { computed, onMounted, ref } from 'vue'
 import { api } from '@/api/client'
 import { bump } from '@/composables/useNav'
@@ -124,7 +125,7 @@ function changed(): void {
                 <td v-if="showInherit" class="w-12" @click.stop><InheritBox :checked="l.inherited" :from="l.inheritedFrom" /></td>
                 <td class="w-[32%]"><span class="text-brand">{{ l.causeName }}</span><div class="text-[11px] text-fg-mute">{{ l.causeAnchor }}</div></td>
                 <td class="text-fg-dim">{{ l.mechanism }}<div class="text-[11px] text-fg-mute">{{ l.basis }}</div></td>
-                <td class="whitespace-nowrap"><span class="pill pill-plain">{{ l.confidence }}</span> <span class="pill" :class="l.status === '已确认' ? 'pill-ok' : 'pill-warn'">{{ l.status === '已确认' ? '已确认' : '草案' }}</span></td>
+                <td class="whitespace-nowrap"><span class="pill pill-plain">{{ l.confidence }}</span> <StatusPill :status="l.status" /> <span v-if="l.inCycle" class="pill pill-err" title="这条关系处在因果环路上">环路</span></td>
                 <td class="whitespace-nowrap" @click.stop>
                   <button class="ctl" @click="editing = l">编辑</button>
                   <button class="ctl ml-1" @click="remove(l)">删除</button>
@@ -135,7 +136,7 @@ function changed(): void {
         </div>
       </template>
       <table v-else class="tbl">
-        <thead><tr><th v-if="showInherit" class="w-12 !text-center">继承</th><th>编号</th><th>原因现象</th><th></th><th>结果现象</th><th>机理 / 依据</th><th>置信度</th><th></th></tr></thead>
+        <thead><tr><th v-if="showInherit" class="w-16 !text-center">来源</th><th>编号</th><th>原因现象</th><th></th><th>结果现象</th><th>机理 / 依据</th><th>置信度</th><th></th></tr></thead>
         <tbody>
           <tr v-for="l in rows" :key="l.id" @click="popup = l.effect">
             <td v-if="showInherit" @click.stop><InheritBox :checked="l.inherited" :from="l.inheritedFrom" /></td>

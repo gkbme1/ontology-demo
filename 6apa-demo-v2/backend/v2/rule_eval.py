@@ -41,7 +41,7 @@ class _Evaluator:
     def resolve(self, subject: dict[str, Any], target: str) -> list[tuple[str, np.ndarray]]:
         kind = subject.get("kind")
         if kind == "context":
-            return []  # 运行上下文（DCS 程序状态 / MOM 班次）本 Demo 未接入
+            return []  # 运行上下文（EBR / MOM）本 Demo 未接入
         if kind == "tag":
             tag = self.ctx.tag_by_name.get(subject.get("tag") or "")
             return [(tag["name"], self.tag_series(tag))] if tag else []
@@ -102,7 +102,7 @@ class _Evaluator:
         }
         n = len(self.times)
         if not found and (c.get("subject") or {}).get("kind") == "context":
-            entry.update(status="无法判定", reason="运行上下文（分子筛程序阶段、运行工况、班次）本 Demo 未接入，需在线环境取数")
+            entry.update(status="无法判定", reason="运行上下文（EBR 批次 / 换酶记录）本 Demo 未接入，需在线环境取数")
             report.append(entry)
             return np.zeros(n, dtype=bool)
         if not found:

@@ -57,7 +57,7 @@ def check_deps() -> None:
 
 
 def check_data() -> None:
-    for rel in ("data/config/空间层级.xlsx", "data/seed/phenomena.json", "data/source/DCS.xlsx"):
+    for rel in ("data/config/6APA_空间层级.xlsx", "data/seed/phenomena.json", "data/source/6APA_DCS.xlsx"):
         if not (ROOT / rel).exists():
             fail(f"缺少数据文件 {rel}。请确认拿到的是完整的 6apa-demo-v2 文件夹（git 拉取或完整解压）。")
     say("[3/5] 数据文件齐全")

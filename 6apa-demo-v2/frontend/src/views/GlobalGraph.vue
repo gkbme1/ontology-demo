@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * 全局图谱：整个本体（层级、设备、工艺参数、物料、现象）一张图。
- * 视图 = 显示哪些节点 / 关系类型的预设；布局 = 工艺流程（按画面顺序左→右）/ 层级 / 力导向；
+ * 视图 = 显示哪些节点 / 关系类型的预设；布局 = 工艺流程（按工序顺序左→右）/ 层级 / 力导向；
  * 中心 + 范围（1 / 2 / 3 跳）只看某个对象的邻域；图例可开关节点类型；单击节点看详情。
  */
 import * as echarts from 'echarts/core'
@@ -18,9 +18,9 @@ echarts.use([GraphChart, LegendComponent, TooltipComponent, CanvasRenderer])
 type Any = any
 
 const TYPES: { name: string; color: string; symbol: string; size: number; rank: number }[] = [
-  { name: '装置', color: '#0f172a', symbol: 'roundRect', size: 34, rank: 0 },
-  { name: '单元', color: '#1e40af', symbol: 'roundRect', size: 28, rank: 1 },
-  { name: '画面', color: '#0e8fa3', symbol: 'roundRect', size: 22, rank: 2 },
+  { name: '车间', color: '#0f172a', symbol: 'roundRect', size: 34, rank: 0 },
+  { name: '工艺段', color: '#1e40af', symbol: 'roundRect', size: 28, rank: 1 },
+  { name: '工序', color: '#0e8fa3', symbol: 'roundRect', size: 22, rank: 2 },
   { name: '设备组', color: '#ea7a1a', symbol: 'circle', size: 15, rank: 3 },
   { name: '设备', color: '#f59e0b', symbol: 'circle', size: 8, rank: 4 },
   { name: '物料流股', color: '#6366f1', symbol: 'diamond', size: 12, rank: 3 },
@@ -33,7 +33,7 @@ const TYPES: { name: string; color: string; symbol: string; size: number; rank: 
 const TYPE = Object.fromEntries(TYPES.map((t) => [t.name, t]))
 const EDGE_TYPES: { name: string; color: string; dashed?: boolean }[] = [
   { name: '包含', color: '#cbd5e1' },
-  { name: '画面衔接', color: '#0e8fa3' },
+  { name: '工序衔接', color: '#0e8fa3' },
   { name: '物理拓扑', color: '#6366f1' },
   { name: '具有属性', color: '#86efac', dashed: true },
   { name: '工艺影响', color: '#16a34a' },
@@ -42,8 +42,8 @@ const EDGE_TYPES: { name: string; color: string; dashed?: boolean }[] = [
 ]
 const EDGE = Object.fromEntries(EDGE_TYPES.map((e) => [e.name, e]))
 const VIEWS: Record<string, { label: string; nodes: string[]; edges: string[]; layout: string }> = {
-  flow: { label: '工艺流程', nodes: ['单元', '画面', '设备组', '物料流股', '公用介质'], edges: ['包含', '画面衔接', '物理拓扑'], layout: 'flow' },
-  asset: { label: '设备与参数', nodes: ['画面', '设备组', '设备', '工艺参数', '质量指标'], edges: ['包含', '具有属性', '工艺影响'], layout: 'force' },
+  flow: { label: '工艺流程', nodes: ['工艺段', '工序', '设备组', '物料流股', '公用介质'], edges: ['包含', '工序衔接', '物理拓扑'], layout: 'flow' },
+  asset: { label: '设备与参数', nodes: ['工序', '设备组', '设备', '工艺参数', '质量指标'], edges: ['包含', '具有属性', '工艺影响'], layout: 'force' },
   cause: { label: '现象因果', nodes: ['设备组', '设备', '现象', '工况'], edges: ['挂载', '导致'], layout: 'force' },
   all: { label: '全部', nodes: TYPES.map((t) => t.name), edges: EDGE_TYPES.map((e) => e.name), layout: 'force' }
 }
@@ -58,6 +58,12 @@ const centerId = ref('')
 const hops = ref(0)
 const centerQuery = ref('')
 const selected = ref<Any>(null)
+// 路径查找结果：只显示选中的路径（需求 SW-055 第 5 条）
+const pathView = ref<{ nodes: Any[]; edges: Any[] } | null>(null)
+const pathTarget = ref('')
+const paths = ref<Any[] | null>(null)
+const pathMsg = ref('')
+const LIMIT = 200
 const el = ref<HTMLDivElement>()
 let chart: echarts.ECharts | null = null
 
@@ -75,13 +81,14 @@ function toggleEdge(t: string): void {
   edgeOn.value = s
 }
 
-// 当前可见的子图：视图类型 ∩ 单元 ∩（中心 N 跳邻域）
+// 当前可见的子图：视图类型 ∩ 工艺段 ∩（中心 N 跳邻域）
 const sub = computed(() => {
   const d = data.value
   if (!d) return { nodes: [] as Any[], edges: [] as Any[] }
+  if (pathView.value) return pathView.value
   const types = new Set(VIEWS[view.value].nodes)
   if (centerId.value && byId.value[centerId.value]) types.add(byId.value[centerId.value].type)
-  let nodes = d.nodes.filter((n: Any) => types.has(n.type) && (!segFilter.value || n.segId === segFilter.value || n.type === '装置'))
+  let nodes = d.nodes.filter((n: Any) => types.has(n.type) && (!segFilter.value || n.segId === segFilter.value || n.type === '车间'))
   let ids = new Set(nodes.map((n: Any) => n.id))
   let edges = d.edges.filter((e: Any) => edgeOn.value.has(e.type) && ids.has(e.s) && ids.has(e.t))
   // 当前关系类型下没有任何关系的节点不画（中心对象除外），避免散点铺满画布
@@ -107,7 +114,7 @@ const sub = computed(() => {
 
 // ---------------- 布局
 function flowPositions(nodes: Any[]): Record<string, [number, number]> {
-  // 按画面顺序从左到右排列；每列顶部是画面，下方依次是设备组、物料、参数、现象；单元居中放在它的画面上方
+  // 按工序顺序从左到右排列；每列顶部是工序，下方依次是设备组、物料、参数、现象；工艺段居中放在它的工序上方
   const COL = 230, ROW = 46, MAXROWS = 16, SUB = 190
   const cols: Record<number, Any[]> = {}
   for (const n of nodes) (cols[n.opIndex ?? -1] ??= []).push(n)
@@ -116,19 +123,19 @@ function flowPositions(nodes: Any[]): Record<string, [number, number]> {
   let x = 0
   for (const k of Object.keys(cols).map(Number).sort((a, b) => a - b)) {
     const list = cols[k].sort((a: Any, b: Any) => (TYPE[a.type]?.rank ?? 9) - (TYPE[b.type]?.rank ?? 9) || a.name.localeCompare(b.name))
-    const rest = list.filter((n: Any) => !['装置', '单元', '画面'].includes(n.type))
+    const rest = list.filter((n: Any) => !['车间', '工艺段', '工序'].includes(n.type))
     colX[k] = x
-    list.filter((n: Any) => n.type === '画面').forEach((n: Any) => { pos[n.id] = [x, -80] })
+    list.filter((n: Any) => n.type === '工序').forEach((n: Any) => { pos[n.id] = [x, -80] })
     rest.forEach((n: Any, i: number) => { pos[n.id] = [x + Math.floor(i / MAXROWS) * SUB, (i % MAXROWS) * ROW] })
     x += COL + Math.max(0, Math.ceil(rest.length / MAXROWS) - 1) * SUB
   }
   const opsBySeg: Record<string, number[]> = {}
   for (const o of data.value?.ops ?? []) (opsBySeg[o.segId] ??= []).push(o.index)
   for (const n of nodes) {
-    if (n.type === '单元') {
+    if (n.type === '工艺段') {
       const xs = (opsBySeg[n.id] ?? []).map((i) => colX[i]).filter((v) => v !== undefined)
       pos[n.id] = [xs.length ? (Math.min(...xs) + Math.max(...xs)) / 2 : 0, -170]
-    } else if (n.type === '装置') pos[n.id] = [x / 2, -250]
+    } else if (n.type === '车间') pos[n.id] = [x / 2, -250]
   }
   return pos
 }
@@ -169,20 +176,22 @@ function render(): void {
       layout: pos ? 'none' : 'force',
       roam: true, draggable: true, zoom: 1,
       categories: shownTypes.map((t) => ({ name: t.name, itemStyle: { color: t.color }, symbol: t.symbol })),
-      force: { repulsion: big ? 60 : 160, edgeLength: big ? [20, 60] : [40, 110], gravity: big ? 0.15 : 0.08, friction: 0.15 },
+      force: nodes.length < 40
+        ? { repulsion: 600, edgeLength: [90, 170], gravity: 0.05, friction: 0.15 }  // 路径 / 小邻域：拉开排布，标签不重叠
+        : { repulsion: big ? 60 : 160, edgeLength: big ? [20, 60] : [40, 110], gravity: big ? 0.15 : 0.08, friction: 0.15 },
       data: nodes.map((n: Any) => {
         const t = TYPE[n.type] ?? TYPES[3]
         const isCenter = n.id === centerId.value
         const size = t.size + Math.min(14, Math.sqrt(n.degree || 0) * (t.rank <= 3 ? 1.6 : 0.8)) + (isCenter ? 10 : 0)
         const p = pos?.[n.id]
         return {
-          id: n.id, name: n.name, category: catIndex[n.type], symbolSize: ['画面', '单元', '装置'].includes(n.type) ? [Math.max(64, n.name.length * 12 + 18), t.size + (isCenter ? 6 : 0)] : size,
+          id: n.id, name: n.name, category: catIndex[n.type], symbolSize: ['工序', '工艺段', '车间'].includes(n.type) ? [Math.max(64, n.name.length * 12 + 18), t.size + (isCenter ? 6 : 0)] : size,
           x: p?.[0], y: p?.[1], raw: n,
           itemStyle: { borderColor: isCenter ? '#111827' : '#ffffff', borderWidth: isCenter ? 3 : 1, shadowBlur: isCenter ? 16 : 6, shadowColor: `${t.color}66` },
           label: {
             show: !big || t.rank <= 3 || isCenter,
-            position: ['画面', '单元', '装置'].includes(n.type) ? 'inside' : 'right',
-            color: ['画面', '单元', '装置'].includes(n.type) ? '#ffffff' : '#334155', fontSize: t.rank <= 2 ? 12 : 10,
+            position: ['工序', '工艺段', '车间'].includes(n.type) ? 'inside' : 'right',
+            color: ['工序', '工艺段', '车间'].includes(n.type) ? '#ffffff' : '#334155', fontSize: t.rank <= 2 ? 12 : 10,
             fontWeight: t.rank <= 2 ? 600 : 400,
             formatter: (x: Any) => (x.name.length > 14 ? `${x.name.slice(0, 13)}…` : x.name)
           }
@@ -193,7 +202,7 @@ function render(): void {
         const color = e.type === '工艺影响' && e.label === '负向影响' ? '#ea7a1a' : et.color
         return {
           source: e.s, target: e.t, label: e.label, etype: e.type, mechanism: e.mechanism,
-          lineStyle: { color, width: e.type === '画面衔接' ? 2.6 : e.type === '导致' ? 1.6 : 1, type: et.dashed ? 'dashed' : 'solid',
+          lineStyle: { color, width: e.type === '工序衔接' ? 2.6 : e.type === '导致' ? 1.6 : 1, type: et.dashed ? 'dashed' : 'solid',
                        opacity: e.type === '包含' ? 0.55 : 0.85, curveness: layoutMode.value === 'force' ? 0.08 : 0.22 }
         }
       }),
@@ -209,19 +218,26 @@ function render(): void {
   chart.on('dblclick', (p: Any) => { if (p.dataType === 'node') showHops(p.data.raw.id, 1) })
 }
 
+function applyFocus(): void {
+  const f = nav.graphFocus
+  if (!f?.id || !data.value) return
+  // 中心对象不在当前视图的节点类型里时切到「全部」
+  if (byId.value[f.id] && !VIEWS[view.value].nodes.includes(byId.value[f.id].type)) applyView('all')
+  pathView.value = null
+  centerId.value = f.id
+  hops.value = f.hops ?? 1
+  centerQuery.value = byId.value[f.id]?.name ?? ''
+  selected.value = byId.value[f.id] ?? null
+  nav.graphFocus = null
+}
 onMounted(async () => {
   data.value = await api.globalGraph()
-  const f = nav.graphFocus
-  if (f?.id) {
-    applyView('all')
-    centerId.value = f.id
-    hops.value = f.hops ?? 2
-    selected.value = byId.value[f.id] ?? null
-    nav.graphFocus = null
-  }
+  if (nav.graphFocus?.id) applyView('all')
+  applyFocus()
   await nextTick()
   render()
 })
+watch(() => nav.graphFocus, applyFocus)
 watch(() => [sub.value, layoutMode.value], () => nextTick(render))
 const ro = new ResizeObserver(() => chart?.resize())
 onMounted(() => el.value && ro.observe(el.value))
@@ -264,17 +280,66 @@ const selectedEdges = computed(() => {
   if (!selected.value) return []
   return sub.value.edges.filter((e: Any) => e.s === selected.value.id || e.t === selected.value.id).slice(0, 40)
 })
+// 图谱 → 本体详情：按当前视角定位到相应页签（需求 SW-056）
+const VIEW_TAB: Record<string, string> = { flow: 'topology', asset: 'parameters', cause: 'causal', all: 'drawing' }
 function openInBrowse(n: Any): void {
   nav.page = 'browse'
-  if (n.type === '单元') enterSegment(n.id)
-  else if (n.type === '画面') openDrawing(n.id, n.segId)
-  else if (n.type === '设备组' || n.type === '设备') { enterSegment(n.segId, { type: 'object', id: n.objectId, opId: n.opId }); openObject(n.objectId, n.opId) }
-  else if (n.type === '现象' || n.type === '工况') {
+  if (n.type === '工艺段') enterSegment(n.id)
+  else if (n.type === '工序') openDrawing(n.id, n.segId)
+  else if (n.type === '设备组' || n.type === '设备') {
+    const tab = VIEW_TAB[view.value]
+    enterSegment(n.segId, { type: 'object', id: n.objectId, opId: n.opId, tab }); openObject(n.objectId, n.opId, tab)
+  } else if (n.type === '现象' || n.type === '工况') {
     const a = byId.value[n.anchorId]
-    if (a) { enterSegment(a.segId, { type: 'object', id: a.objectId, opId: a.opId, tab: 'phenomena' }); openObject(a.objectId, a.opId, 'phenomena') }
+    const tab = view.value === 'cause' ? 'causal' : 'phenomena'
+    if (a) { enterSegment(a.segId, { type: 'object', id: a.objectId, opId: a.opId, tab }); openObject(a.objectId, a.opId, tab) }
   } else if (n.opId) openDrawing(n.opId, n.segId)
 }
-const canOpen = (n: Any) => ['单元', '画面', '设备组', '设备', '现象', '工况'].includes(n?.type) || !!n?.opId
+
+// ---------------- 两个对象之间的关系路径（最多 3 跳，按当前视图开启的关系类型，不分方向走、显示方向）
+function findPaths(): void {
+  paths.value = null
+  pathMsg.value = ''
+  const from = selected.value
+  const q = pathTarget.value.trim()
+  const to = data.value.nodes.find((x: Any) => x.name === q) ?? data.value.nodes.find((x: Any) => x.name.includes(q))
+  if (!from || !to) { pathMsg.value = '没有找到终点对象'; return }
+  if (from.id === to.id) { pathMsg.value = '起点与终点相同'; return }
+  const adj: Record<string, Any[]> = {}
+  for (const e of data.value.edges) {
+    if (!edgeOn.value.has(e.type)) continue
+    ;(adj[e.s] ??= []).push({ e, other: e.t, forward: true })
+    ;(adj[e.t] ??= []).push({ e, other: e.s, forward: false })
+  }
+  const out: Any[] = []
+  const walk = (cur: string, nodes: string[], steps: Any[]): void => {
+    if (out.length >= 30) return
+    if (cur === to.id) { out.push({ nodes: [...nodes], steps: [...steps] }); return }
+    if (steps.length >= 3) return
+    for (const x of adj[cur] ?? []) {
+      if (nodes.includes(x.other)) continue
+      nodes.push(x.other); steps.push(x)
+      walk(x.other, nodes, steps)
+      nodes.pop(); steps.pop()
+    }
+  }
+  walk(from.id, [from.id], [])
+  out.sort((a, b) => a.steps.length - b.steps.length)
+  paths.value = out.map((p) => ({ ...p, lowConf: p.steps.some((x: Any) => x.e.type === '导致' && x.e.confidence === '低') }))
+  if (!out.length) pathMsg.value = `「${from.name}」与「${to.name}」在当前关系类型下 3 跳内没有路径`
+}
+function showPaths(list: Any[]): void {
+  const ids = new Set<string>(list.flatMap((p) => p.nodes))
+  const edges = [...new Set(list.flatMap((p) => p.steps.map((x: Any) => x.e)))]
+  pathView.value = { nodes: data.value.nodes.filter((n: Any) => ids.has(n.id)), edges }
+}
+const tooMany = computed(() => !pathView.value && centerId.value && hops.value > 0 && sub.value.nodes.length > LIMIT)
+const tooManyByEdge = computed(() => {
+  const c: Record<string, number> = {}
+  for (const e of sub.value.edges) c[e.type] = (c[e.type] ?? 0) + 1
+  return Object.entries(c).sort((a, b) => b[1] - a[1])
+})
+const canOpen = (n: Any) => ['工艺段', '工序', '设备组', '设备', '现象', '工况'].includes(n?.type) || !!n?.opId
 </script>
 
 <template>
@@ -289,7 +354,7 @@ const canOpen = (n: Any) => ['单元', '画面', '设备组', '设备', '现象'
       <label class="flex items-center gap-1.5"><span class="text-fg-mute">布局</span>
         <select v-model="layoutMode" class="inp font-medium"><option v-for="(v, k) in LAYOUTS" :key="k" :value="k">{{ v }}</option></select>
       </label>
-      <label class="flex items-center gap-1.5"><span class="text-fg-mute">单元</span>
+      <label class="flex items-center gap-1.5"><span class="text-fg-mute">工艺段</span>
         <select v-model="segFilter" class="inp"><option value="">全部</option><option v-for="s in data?.segments ?? []" :key="s.id" :value="s.id">{{ s.name }}</option></select>
       </label>
       <span class="flex items-center gap-1.5"><span class="text-fg-mute">中心</span>
@@ -321,6 +386,13 @@ const canOpen = (n: Any) => ['单元', '画面', '设备组', '设备', '现象'
         <div ref="el" class="absolute inset-0" />
         <div v-if="!data" class="absolute inset-0 grid place-items-center text-fg-mute">加载中…</div>
         <div v-else-if="!sub.nodes.length" class="absolute inset-0 grid place-items-center text-fg-mute">当前筛选下没有节点</div>
+        <div v-if="pathView" class="absolute left-3 top-3 z-10 rounded-md border border-brand/40 bg-white/95 px-3 py-1.5 text-xs shadow">
+          只显示查到的关系路径（{{ pathView.nodes.length }} 个对象）<button class="ctl !py-0 ml-2" @click="pathView = null">返回图谱</button>
+        </div>
+        <div v-if="tooMany" class="absolute left-3 top-3 z-10 max-w-[560px] rounded-md border border-warn/50 bg-white/95 px-3 py-1.5 text-xs shadow">
+          展开的对象有 {{ sub.nodes.length }} 个，超过 {{ LIMIT }}，图会比较密。可减少跳数，或关掉部分关系类型：
+          <button v-for="[t, n] in tooManyByEdge" :key="t" class="ctl !py-0 ml-1" @click="toggleEdge(t)">{{ t }} {{ n }} ✕</button>
+        </div>
         <div class="absolute right-3 bottom-2 text-[11px] text-fg-mute bg-white/80 rounded px-2 py-0.5">
           单击节点看详情 · 双击节点看它的 1 跳邻域 · 选中节点后点「1 / 2 / 3 跳」看更远 · 滚轮缩放 · 拖拽平移
         </div>
@@ -338,14 +410,36 @@ const canOpen = (n: Any) => ['单元', '画面', '设备组', '设备', '现象'
         <div class="flex flex-wrap gap-1.5">
           <span class="text-fg-mute self-center">以它为中心看：</span>
           <button v-for="h in [1, 2, 3]" :key="h" class="btn" :class="{ 'btn-primary': centerId === selected.id && hops === h }" @click="showHops(selected.id, h)">{{ h }} 跳</button>
-          <button v-if="canOpen(selected)" class="btn btn-primary" @click="openInBrowse(selected)">在本体浏览中打开</button>
+          <button v-if="canOpen(selected)" class="btn btn-primary" :title="`按当前视角打开对应页签`" @click="openInBrowse(selected)">在本体浏览中打开</button>
         </div>
         <dl class="kv">
-          <template v-if="selected.opId"><dt>所在画面</dt><dd>{{ byId[selected.opId]?.name }}</dd></template>
-          <template v-if="selected.segId"><dt>单元</dt><dd>{{ byId[selected.segId]?.name }}</dd></template>
+          <template v-if="selected.opId"><dt>所在工序</dt><dd>{{ byId[selected.opId]?.name }}</dd></template>
+          <template v-if="selected.segId"><dt>工艺段</dt><dd>{{ byId[selected.segId]?.name }}</dd></template>
           <template v-if="selected.anchorId"><dt>挂载对象</dt><dd>{{ byId[selected.anchorId]?.name }}</dd></template>
           <template v-if="selected.hop !== undefined"><dt>距中心</dt><dd>{{ selected.hop }} 跳</dd></template>
         </dl>
+        <div class="space-y-1.5">
+          <div class="sec-title">查找关系路径（最多 3 跳）</div>
+          <div class="flex gap-1">
+            <input v-model="pathTarget" list="gg-names" class="inp flex-1 min-w-0" placeholder="终点对象名称" @keydown.enter="findPaths" />
+            <button class="btn" @click="findPaths">查找</button>
+          </div>
+          <div class="text-[11px] text-fg-mute">按当前开启的关系类型查找；低置信度的导致关系标「低」</div>
+          <div v-if="pathMsg" class="text-fg-mute">{{ pathMsg }}</div>
+          <template v-if="paths?.length">
+            <div class="flex items-center gap-2"><span class="text-fg-dim">共 {{ paths.length }} 条</span>
+              <button class="ctl !py-0" @click="showPaths(paths)">图中只看这些路径</button></div>
+            <div v-for="(p, i) in paths" :key="i" class="py-1 border-b border-line-soft cursor-pointer hover:bg-ink-panel2" @click="showPaths([p])">
+              <span class="text-fg-mute">{{ p.steps.length }} 跳 </span>
+              <template v-for="(x, j) in p.steps" :key="j">
+                <span v-if="j === 0">{{ byId[p.nodes[0]]?.name }}</span>
+                <span class="text-fg-mute"> {{ x.forward ? '—' : '←' }}{{ x.e.label || x.e.type }}{{ x.forward ? '→' : '—' }} </span>
+                <span>{{ byId[p.nodes[j + 1]]?.name }}</span>
+                <span v-if="x.e.type === '导致' && x.e.confidence === '低'" class="pill pill-warn !py-0 ml-0.5">低</span>
+              </template>
+            </div>
+          </template>
+        </div>
         <div>
           <div class="sec-title">当前图中的关系（{{ selectedEdges.length }}）</div>
           <div v-for="(e, i) in selectedEdges" :key="i" class="py-1 border-b border-line-soft">

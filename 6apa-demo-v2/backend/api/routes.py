@@ -80,44 +80,13 @@ def global_graph_view() -> dict[str, Any]:
 
 
 @router.get("/search")
-def search(keyword: str = "", limit: int = 30) -> dict[str, Any]:
-    ctx = get_ctx()
-    kw = keyword.strip()
-    if not kw:
-        return {"items": []}
-    items = []
-    h = ctx.hierarchy
-    for op in h.ops.values():
-        if kw in op["name"] or kw in op["screen"]:
-            items.append({"kind": "op", "id": op["id"], "label": op["name"], "hint": " / ".join(p["name"] for p in h.path(op["id"])[:2]),
-                          "segmentId": op["segmentId"], "opId": op["id"]})
-    dcs = ctx.store.dcs
-    for gid, g in dcs.equipment_groups.items():
-        if kw in g["name"] and h.ops_of_group.get(gid):
-            op_id = h.ops_of_group[gid][0]
-            items.append({"kind": "group", "id": gid, "label": g["name"], "hint": h.ops[op_id]["name"],
-                          "segmentId": h.ops[op_id]["segmentId"], "opId": op_id})
-    for eid, e in dcs.equipment.items():
-        if kw in e["name"] and eid in h.op_of_equipment:
-            op_id = h.op_of_equipment[eid]
-            items.append({"kind": "equipment", "id": eid, "label": e["name"], "hint": h.ops[op_id]["name"],
-                          "segmentId": h.ops[op_id]["segmentId"], "opId": op_id})
-    tag = ctx.tag_by_name.get(kw.upper()) or ctx.tag_by_name.get(kw)
-    if tag and tag.get("equipmentId") in h.op_of_equipment:
-        op_id = h.op_of_equipment[tag["equipmentId"]]
-        items.insert(0, {"kind": "tag", "id": tag["equipmentId"], "label": f"{tag['name']}（{tag.get('rawDescription') or ''}）",
-                         "hint": f"{tag.get('equipmentName')} · {h.ops[op_id]['name']}",
-                         "segmentId": h.ops[op_id]["segmentId"], "opId": op_id})
-    for p in ctx.phen.phenomena.values():
-        if kw in p["name"]:
-            ops = ctx.phenomenon_ops(p)
-            if ops:
-                items.append({"kind": "phenomenon", "id": p["id"], "label": p["name"], "hint": (p.get("anchor") or {}).get("name"),
-                              "segmentId": h.ops[ops[0]]["segmentId"], "opId": ops[0]})
-    return {"items": items[:limit], "total": len(items)}
+def search(keyword: str = "", limit: int = 80) -> dict[str, Any]:
+    """全局搜索：名称 / 编码 / 位号 / 拼音首字母，结果带类型与所属位置（前端按类型分组）。"""
+    from backend.v2 import search as search_mod
+    return search_mod.search(get_ctx(), keyword, limit)
 
 
-# ------------------------------------------------------------------ 单元 / 画面
+# ------------------------------------------------------------------ 工艺段 / 工序
 @router.get("/segments/{seg_id}")
 def segment(seg_id: str) -> dict[str, Any]:
     ctx = get_ctx()
@@ -161,7 +130,7 @@ def drawing_image(op_id: str):  # noqa: ANN201
     from fastapi.responses import FileResponse
     path = drawing.image_path(op_id)
     if not path:
-        raise HTTPException(404, f"画面 {op_id} 没有现场图纸")
+        raise HTTPException(404, f"工序 {op_id} 没有现场图纸")
     return FileResponse(path)
 
 
@@ -188,9 +157,9 @@ def op_documents(op_id: str) -> dict[str, Any]:
     return documents.for_op(get_ctx(), op_id)
 
 
-# ------------------------------------------------------------------ 全局（跨设备 / 跨工艺）
+# ------------------------------------------------------------------ 全局（跨装置 / 跨工艺）
 def _scope(seg: Optional[str], op: Optional[str]) -> list[str]:
-    """筛选范围 → 画面列表（都不给 = 全装置）。"""
+    """筛选范围 → 工序列表（都不给 = 全车间）。"""
     h = get_ctx().hierarchy
     if op:
         if op not in h.ops:
@@ -205,7 +174,7 @@ def _scope(seg: Optional[str], op: Optional[str]) -> list[str]:
 
 @router.get("/scope/conditions")
 def scope_conditions(seg: Optional[str] = None, op: Optional[str] = None) -> dict[str, Any]:
-    """全局的工况与根因：范围内的现象 / 工况与导致关系；导致关系两端挂在不同对象上的标「跨设备」。"""
+    """全局的工况与根因：范围内的现象 / 工况与导致关系；导致关系两端挂在不同对象上的标「跨装置」。"""
     ctx = get_ctx()
     ops = set(_scope(seg, op))
     phen = [p for p in ctx.phen.phenomena.values() if ops & set(ctx.phenomenon_ops(p))]
@@ -247,6 +216,13 @@ def algorithms() -> dict[str, Any]:
                 for c in ctx.calcs.items.values() if c.get("algorithmId") == a["id"]]
         items.append({**a, "usedBy": used})
     return {"items": items, "note": ctx.algos.note}
+
+
+@router.get("/validation")
+def validation_run() -> dict[str, Any]:
+    """一致性校验（全量）：错误 / 警告 / 提示，每条带可跳转的目标对象。"""
+    from backend.v2 import validation
+    return validation.run(get_ctx())
 
 
 @router.get("/documents/{doc_id}")

@@ -511,7 +511,7 @@ def _limit_constraint(limit: dict[str, Any]) -> dict[str, Any]:
 
 
 def _version_summary(limit_id: str | None) -> dict[str, Any]:
-    """限值版本数与是否有条件化版本（限值版本.xlsx）；详情走 /process-limits/{id}/versions。"""
+    """限值版本数与是否有条件化版本（6APA_限值版本.xlsx）；详情走 /process-limits/{id}/versions。"""
     if not limit_id:
         return {}
     try:
@@ -631,7 +631,7 @@ def _attribute_relations(store: Any, property_ids: set[str], anchor_ids: set[str
 
 def _capabilities(store: Any, kind: str, object_id: str, tags: list[dict[str, Any]], rules: list[dict[str, Any]],
                   equipment_type: str | None = None) -> list[dict[str, Any]]:
-    """能力挂载：取能力登记表（能力.xlsx）中适用于本对象的能力，并在本对象上绑定参数。
+    """能力挂载：取能力登记表（6APA_能力.xlsx）中适用于本对象的能力，并在本对象上绑定参数。
 
     能力由外部系统实现，本体只给出能力描述、调用契约与参数绑定；不在这里按点位推断或编造能力。
     """
@@ -1022,7 +1022,7 @@ def _entity_profile(store: Any, index: AssetIndex, rid: str) -> dict[str, Any]:
             "code": brief.get("uri"),
             "area": index._area_label(entity.get("areaCode")) if entity.get("areaCode") else "未分工段",
             "badges": [brief.get("matchStatusLabel"), f"{entity['relationCount']} 条关系", f"{own['dataLinkTotal']} 个测点"],
-            "source": {"file": "工业关系.xlsx", "sheet": "实体字典"},
+            "source": {"file": "6APA_工业关系.xlsx", "sheet": "实体字典"},
         },
         "attributes": attrs,
         "relations": {
@@ -1246,7 +1246,7 @@ def _class_profile(store: Any, index: AssetIndex, cid: str) -> dict[str, Any]:
             "code": cid,
             "area": "、".join(sorted({f"{g.get('areaCode')}" for g in groups if g.get("areaCode")})) or None,
             "badges": [f"{len(groups)} 个设备组", f"{len(instances)} 台实例", f"{len(prop_groups)} 个属性模板"],
-            "source": {"file": "DCS.xlsx", "sheet": "设备主数据", "field": "设备类型"},
+            "source": {"file": "6APA_DCS.xlsx", "sheet": "设备主数据", "field": "设备类型"},
         },
         "instances": [{"id": g["id"], "name": g["name"], "tagCount": g["tagCount"], "station": g.get("areaCode"), "nature": "设备组"}
                       for g in sorted(groups, key=lambda g: g.get("areaCode") or "")]

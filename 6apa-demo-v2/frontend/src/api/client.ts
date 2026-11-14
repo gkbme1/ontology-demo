@@ -56,6 +56,7 @@ export const api = {
   scopeCalculations: (q: Query) => request<Any>('GET', '/scope/calculations', undefined, q),
   scopeDocuments: (q: Query) => request<Any>('GET', '/scope/documents', undefined, q),
   algorithms: () => request<Any>('GET', '/algorithms'),
+  validation: () => request<Any>('GET', '/validation'),
   search: (keyword: string) => request<Any>('GET', '/search', undefined, { keyword }),
   segment: (id: string) => request<Any>('GET', `/segments/${id}`),
   op: (id: string) => request<Any>('GET', `/ops/${id}`),

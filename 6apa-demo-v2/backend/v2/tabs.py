@@ -1,7 +1,7 @@
 """设备 / 设备组的 10 个页签。
 
 页签数据大多取自复制来的对象档案（asset_model.profile），按本 Demo 的页签口径重新组织；
-现象定义、根因影响关系、计算/指标来自本 Demo 新增的仓库。设备组在某道画面下只列本画面认领的成员。
+现象定义、根因影响关系、计算/指标来自本 Demo 新增的仓库。设备组在某道工序下只列本工序认领的成员。
 """
 from __future__ import annotations
 
@@ -13,8 +13,8 @@ from backend.v2.phenomena import rule_text
 TABS = [
     ("drawing", "图纸位置与外观"),
     ("parameters", "参数"),
-    ("topology", "拓扑关系"),
     ("constraints", "参数约束"),
+    ("topology", "拓扑关系"),
     ("phenomena", "现象/工况定义"),
     ("causal", "根因影响关系"),
     ("influence", "工艺影响关系"),
@@ -47,7 +47,7 @@ def link_view(ctx: AppContext, link: dict[str, Any]) -> dict[str, Any]:
     cause = ctx.phen.phenomena.get(link["cause"]) or {}
     effect = ctx.phen.phenomena.get(link["effect"]) or {}
     return {
-        **link,
+        **link, "inCycle": link.get("id") in ctx.phen.cyclic_links(),
         "causeName": cause.get("name", link["cause"]), "effectName": effect.get("name", link["effect"]),
         "causeAnchor": (cause.get("anchor") or {}).get("name", ""), "effectAnchor": (effect.get("anchor") or {}).get("name", ""),
     }
@@ -122,7 +122,7 @@ def _parameters(ctx: AppContext, object_id: str, prof: dict[str, Any], op_id: st
     dcs = ctx.store.dcs
     allowed: set[str] | None = None
     if object_id.startswith("egrp-"):
-        # 设备组在某道画面下只列本画面成员的测点（不属于任何成员的组级测点保留）
+        # 设备组在某道工序下只列本工序成员的测点（不属于任何成员的组级测点保留）
         members = set(_scope_members(ctx, object_id, op_id)) if op_id else set()
         if members:
             everyone = set(ctx.group_members(object_id))
@@ -144,7 +144,7 @@ def _parameters(ctx: AppContext, object_id: str, prof: dict[str, Any], op_id: st
                           # 共用设备 / 组级属性会关联到其他设备上的测点，前端淡化显示并标出所在设备
                           "own": object_id.startswith("egrp-") or tag.get("equipmentId") == object_id})
         if allowed is not None and a.get("dataLinks") and not links and group in ("测量", "状态", "控制"):
-            continue  # 该测点只在其他画面的成员上
+            continue  # 该测点只在其他工序的成员上
         items.append({"group": group, "name": a.get("name"), "valueType": a.get("valueType") or "",
                       "value": a.get("value"), "description": a.get("description") or "",
                       "note": a.get("note") or "", "links": links, "inheritedFrom": a.get("inheritedFrom"),
@@ -174,11 +174,18 @@ def header(ctx: AppContext, object_id: str, op_id: str | None) -> dict[str, Any]
     h = ctx.hierarchy
     ops = h.ops_of_object(ctx.store, object_id)
     op_id = op_id if op_id in ops else (ops[0] if ops else None)
+    # 页签上的条目数（需求 SW-041：页签上显示条目数）
     counts = {
         "phenomena": len(ctx.phenomena_for_object(object_id)),
         "procedures": len(prof.get("procedures") or []),
         "calc": len(_calcs_for(ctx, object_id)),
     }
+    for key in ("parameters", "constraints", "topology", "causal", "influence"):
+        try:
+            d = tab(ctx, object_id, key, op_id)
+        except Exception:  # noqa: BLE001
+            continue
+        counts[key] = len(d.get("items") or d.get("operating") or d.get("links") or [])
     group = None
     gid = (ctx.store.dcs.equipment.get(object_id) or {}).get("equipmentGroupId")
     if gid:
@@ -280,7 +287,7 @@ def calc_view(ctx: AppContext, c: dict[str, Any]) -> dict[str, Any]:
                      "required": inp.get("required"), "default": inp.get("default"),
                      "binding": b, "bindingText": binding_text(b, names) if b else (f"默认 {inp.get('default')}" if inp.get("default") is not None else "未绑定")})
     anchor = c.get("anchor") or {}
-    scope = {"segment": "单元", "group": "设备组", "equipment": "设备"}.get(anchor.get("kind"), anchor.get("kind") or "")
+    scope = {"segment": "工艺段", "group": "设备组", "equipment": "设备"}.get(anchor.get("kind"), anchor.get("kind") or "")
     cross = anchor.get("kind") == "segment" or any((b or {}).get("kind") == "groupParameter" for b in bindings.values())
     return {**c, "algorithm": {k: algo.get(k) for k in ("id", "name", "category", "version", "provider", "invoke", "output", "status")},
             "bindingRows": rows, "scopeText": scope, "crossDevice": cross,

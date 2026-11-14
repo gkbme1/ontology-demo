@@ -1,5 +1,6 @@
 <script setup lang="ts">
 /** 现象列表：判定规则、角色（原因 / 结果次数）、试算、编辑、删除、新增。 */
+import StatusPill from '@/components/StatusPill.vue'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { api } from '@/api/client'
 import { bump } from '@/composables/useNav'
@@ -85,7 +86,7 @@ function changed(): void {
     </div>
     <div v-if="!rows.length" class="empty">暂无现象定义</div>
     <table v-else class="tbl">
-      <thead><tr><th v-if="showInherit" class="w-12 !text-center">继承</th><th>现象</th><th>挂载对象</th><th>判定规则</th><th>角色</th><th>状态</th><th></th></tr></thead>
+      <thead><tr><th v-if="showInherit" class="w-16 !text-center">来源</th><th>现象</th><th>挂载对象</th><th>判定规则</th><th>角色</th><th>状态</th><th></th></tr></thead>
       <tbody>
         <tr v-for="p in rows" :id="`phen-row-${p.id}`" :key="p.id" :class="{ '!bg-brand/15 outline outline-2 outline-brand/60': flash === p.id }" @click="popup = p.id">
           <td v-if="showInherit" @click.stop><InheritBox :checked="p.inherited" :from="p.inheritedFrom" /></td>
@@ -101,7 +102,7 @@ function changed(): void {
             <span class="pill pill-plain" title="作为原因">因 {{ p.roles.asCause }}</span>
             <span class="pill pill-plain ml-1" title="作为结果">果 {{ p.roles.asEffect }}</span>
           </td>
-          <td><span class="pill" :class="p.status === '已确认' ? 'pill-ok' : 'pill-warn'">{{ p.status === '已确认' ? '已确认' : '草案' }}</span></td>
+          <td><StatusPill :status="p.status" /></td>
           <td class="whitespace-nowrap" @click.stop>
             <button class="ctl" :disabled="!p.hasRule" :class="{ 'opacity-40': !p.hasRule }" @click="p.hasRule && runEval(p)">试算</button>
             <button class="ctl ml-1" @click="editing = p">编辑</button>

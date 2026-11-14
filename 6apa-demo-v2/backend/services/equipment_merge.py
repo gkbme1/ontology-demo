@@ -7,7 +7,7 @@ DCS 点表按位号描述里的设备名前缀切设备，同一台现场设备�
 这里分两步处理，DCS Excel 本身不改：
 
 1. propose(ds)：按下面的规则在同一标准设备组内找出应归并的设备，生成归并表
-   （data/source/设备归并.xlsx，由 backend/tools/build_equipment_merge.py 写出）。
+   （data/source/6APA_设备归并.xlsx，由 backend/tools/build_equipment_merge.py 写出）。
    表可以直接编辑：「启用」改成 否 即不归并，也可以手工追加行。
 2. apply(ds, rows)：加载 DCS 点表时按归并表把设备合并成一台，统一名称；
    原设备的 ID、OWL Subject、名称都登记为别名，旧 ID 和旧名称仍能查到合并后的设备。
@@ -32,7 +32,7 @@ from typing import Any
 
 from backend.ontology import identifiers as ids
 
-MERGE_FILE_NAME = "设备归并.xlsx"
+MERGE_FILE_NAME = "6APA_设备归并.xlsx"
 SHEET = "设备归并"
 
 # 附属点位后缀：只认这些缩写，避免把「成品罐AB」（A、B 两个罐）之类误并

@@ -24,7 +24,7 @@ function removeChild(i: number): void { props.rule.children.splice(i, 1) }
 function onSubjectKind(c: Any, kind: string): void {
   if (kind === 'parameter') c.subject = { kind, name: '' }
   else if (kind === 'tag') c.subject = { kind, tag: '' }
-  else if (kind === 'context') c.subject = { kind, name: '分子筛程序阶段' }
+  else if (kind === 'context') c.subject = { kind, name: '换酶后批次数' }
   else c.subject = { kind, calcId: props.calcs[0]?.id ?? '' }
 }
 function onOperator(c: Any, op: string): void {
@@ -71,14 +71,14 @@ function limitHint(c: Any): string {
           <option value="context">运行上下文</option>
         </select>
         <template v-if="c.subject.kind === 'parameter'">
-          <input v-model="c.subject.name" class="inp w-40" list="v2-param-list" placeholder="属性名，如 顶部温度" />
+          <input v-model="c.subject.name" class="inp w-40" list="v2-param-list" placeholder="属性名，如 反应体系pH" />
           <select v-model="c.aggregate" class="inp" title="属性落到多个测点时如何合并">
             <option v-for="(t, k) in AGG_TEXT" :key="k" :value="k">{{ t }}</option>
           </select>
         </template>
         <input v-else-if="c.subject.kind === 'tag'" v-model="c.subject.tag" class="inp w-32 font-mono" placeholder="如 TI_1303" />
         <select v-else-if="c.subject.kind === 'context'" v-model="c.subject.name" class="inp w-36" title="来自 EBR / MOM 的运行上下文">
-          <option>分子筛程序阶段</option><option>运行工况</option><option>班次</option>
+          <option>换酶后批次数</option><option>工艺阶段</option><option>班次</option>
         </select>
         <select v-else v-model="c.subject.calcId" class="inp w-44">
           <option v-for="k in calcs" :key="k.id" :value="k.id">{{ k.name }}</option>

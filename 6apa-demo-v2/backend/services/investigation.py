@@ -1,6 +1,6 @@
 """调查知识：原因分类（人机料法环）与权重、化验项目、判定规则、漂移判定口径。
 
-数据源 data/source/调查知识.xlsx（backend/tools/build_investigation_knowledge.py 生成预填版），五个工作表：
+数据源 data/source/6APA_调查知识.xlsx（backend/tools/build_investigation_knowledge.py 生成预填版），五个工作表：
 - 「原因分类」：人 / 机 / 料 / 法 / 环 各自按对象类型、名称关键词怎么归类，默认权重；
 - 「原因权重」：具体原因对象的分类与权重（车间主任提出「各原因可设权重」）；
 - 「化验项目」：化验项目对应哪个工艺属性、哪些罐、对比哪个在线位号、怎么对齐时间；
@@ -18,7 +18,7 @@ from typing import Any
 
 from backend.ontology.models import Provenance
 
-KNOWLEDGE_FILE_NAME = "调查知识.xlsx"
+KNOWLEDGE_FILE_NAME = "6APA_调查知识.xlsx"
 SHEET_CATEGORIES = "原因分类"
 SHEET_WEIGHTS = "原因权重"
 SHEET_LAB = "化验项目"
@@ -184,7 +184,7 @@ def cause_profile(store: Any, q: dict[str, Any]) -> dict[str, Any]:
         out.append({"id": None, "name": name.strip(), **kn.classify(name.strip(), q.get("type") or None)})
     return {"items": out, "categories": [{k: c[k] for k in ("key", "name", "weight", "description")} for c in kn.categories],
             "available": kn.available, "source": kn.file,
-            "note": "分类与权重定义在本体（调查知识.xlsx），草案待工艺确认；候选方向的证据与排序由 Agent 计算。"}
+            "note": "分类与权重定义在本体（6APA_调查知识.xlsx），草案待工艺确认；候选方向的证据与排序由 Agent 计算。"}
 
 
 def _resolve_tpl(tpl: str, code: str, names: list[str]) -> dict[str, Any] | None:

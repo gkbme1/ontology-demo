@@ -1,5 +1,5 @@
 /**
- * 全局导航状态：当前分类、空间层级的模式（装置导航 / 单元内）、当前选中对象。
+ * 全局导航状态：当前分类、空间层级的模式（车间导航 / 工艺段内）、当前选中对象。
  * 右侧显示区按 selection.type 切换视图。
  */
 import { reactive } from 'vue'
@@ -8,11 +8,11 @@ import { api } from '@/api/client'
 export type SelType =
   | 'none' | 'workshop' | 'segment' | 'op' | 'drawing' | 'section:devices' | 'section:calc'
   | 'section:cond' | 'section:docs' | 'calc' | 'object' | 'domain-object' | 'domain-pending'
-  | 'global:calc' | 'global:algo' | 'global:cond' | 'global:docs'
+  | 'global:calc' | 'global:algo' | 'global:cond' | 'global:docs' | 'global:check'
 
 export interface Selection {
   type: SelType
-  id?: string // 对象 id / 单元 id / 画面 id / 计算组态 id
+  id?: string // 对象 id / 工艺段 id / 工序 id / 计算组态 id
   opId?: string
   label?: string
   tab?: string
@@ -33,7 +33,7 @@ export const nav = reactive({
   version: 0,
   // 顶层页面：本体浏览 / 全局图谱
   page: 'browse' as 'browse' | 'graph',
-  // 从设备 / 画面跳到全局图谱时的定位
+  // 从设备 / 工序跳到全局图谱时的定位
   graphFocus: null as { id: string; hops?: number } | null
 })
 

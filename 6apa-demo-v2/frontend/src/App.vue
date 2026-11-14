@@ -1,9 +1,9 @@
 <script setup lang="ts">
 /** 本体界面：左侧导航树，右侧显示区。 */
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { api } from '@/api/client'
 import { staticBackend } from '@/api/static'
-import { bump, enterSegment, loadMeta, nav, openObject, select } from '@/composables/useNav'
+import { bump, enterSegment, loadMeta, nav, openGlobalGraph, openObject, select } from '@/composables/useNav'
 import NavPanel from '@/components/NavPanel.vue'
 import Overview from '@/views/Overview.vue'
 import OpSections from '@/views/OpSections.vue'
@@ -11,19 +11,36 @@ import AssetPanel from '@/views/AssetPanel.vue'
 import GenericProfile from '@/views/GenericProfile.vue'
 import GlobalGraph from '@/views/GlobalGraph.vue'
 import GlobalSections from '@/views/GlobalSections.vue'
+import ConsistencyCheck from '@/views/ConsistencyCheck.vue'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any
 
 const keyword = ref('')
 const hits = ref<Any[]>([])
+const hitTotal = ref(0)
+const searched = ref(false)
+// 结果按类型分组（需求 SW-078）
+const KIND_LABEL: Record<string, string> = {
+  segment: '工艺段', op: '工序 / 画面', group: '设备组', equipment: '设备', tag: '位号', phenomenon: '现象', condition: '工况',
+  parameter: '工艺参数', stream: '物料流股', utility: '公用介质', quality: '质量指标'
+}
+const grouped = computed(() => {
+  const out: { kind: string; items: Any[] }[] = []
+  for (const h of hits.value) {
+    const last = out[out.length - 1]
+    if (last?.kind === h.kind) last.items.push(h)
+    else out.push({ kind: h.kind, items: [h] })
+  }
+  return out
+})
 const ready = ref(false)
 const error = ref('')
 
 onMounted(async () => {
   try {
     await loadMeta()
-    select({ type: 'workshop', id: 'PLANT-B12' }, 'PLANT-B12')
+    select({ type: 'workshop', id: 'WS-105' }, 'WS-105')
     ready.value = true
   } catch (e) {
     error.value = `连接后端失败：${(e as Error).message}。请先启动后端（python3 -m backend.main，端口 8710）。`
@@ -34,15 +51,26 @@ let timer: number | undefined
 function onSearch(): void {
   window.clearTimeout(timer)
   timer = window.setTimeout(async () => {
-    hits.value = keyword.value.trim() ? (await api.search(keyword.value.trim())).items : []
+    const kw = keyword.value.trim()
+    const r = kw ? await api.search(kw) : { items: [], total: 0 }
+    hits.value = r.items
+    hitTotal.value = r.total
+    searched.value = !!kw
   }, 200)
 }
 function go(h: Any): void {
   hits.value = []
+  searched.value = false
   keyword.value = ''
-  if (h.kind === 'op') enterSegment(h.segmentId, { type: 'op', id: h.opId, opId: h.opId })
-  else if (h.kind === 'phenomenon') select({ type: 'global:cond', opId: h.opId }, 'global:cond')
-  else {
+  nav.page = h.graph ? 'graph' : 'browse'
+  if (h.graph) openGlobalGraph(h.id, 1)
+  else if (h.kind === 'segment') enterSegment(h.segmentId)
+  else if (h.kind === 'op') enterSegment(h.segmentId, { type: 'op', id: h.opId, opId: h.opId })
+  else if (h.kind === 'phenomenon' || h.kind === 'condition') {
+    // 打开现象挂载对象的「现象/工况定义」页签
+    if (h.anchorId) { enterSegment(h.segmentId, { type: 'object', id: h.anchorId, opId: h.opId, tab: 'phenomena' }); openObject(h.anchorId, h.opId, 'phenomena') }
+    else select({ type: 'global:cond', opId: h.opId }, 'global:cond')
+  } else {
     enterSegment(h.segmentId, { type: 'object', id: h.id, opId: h.opId })
     openObject(h.id, h.opId)
   }
@@ -59,19 +87,24 @@ const kind = (): string => nav.selection.type
 <template>
   <div class="h-full flex flex-col">
     <header class="flex items-center gap-4 px-4 h-12 border-b border-line bg-ink-panel2 shrink-0">
-      <div class="font-semibold tracking-wide"><span class="text-brand">◆</span> 深冷装置本体 <span class="text-fg-mute text-xs font-normal">v2 · 北I-2深冷装置</span></div>
+      <div class="font-semibold tracking-wide"><span class="text-brand">◆</span> 6APA 本体 <span class="text-fg-mute text-xs font-normal">v2 · 105 车间</span></div>
       <div class="flex rounded-md border border-line overflow-hidden text-xs font-medium">
         <button class="px-3 py-1.5" :class="nav.page === 'browse' ? 'bg-brand text-white' : 'bg-white text-fg-dim hover:text-brand'" @click="nav.page = 'browse'">本体浏览</button>
         <button class="px-3 py-1.5 border-l border-line" :class="nav.page === 'graph' ? 'bg-brand text-white' : 'bg-white text-fg-dim hover:text-brand'" @click="nav.page = 'graph'">◎ 全局图谱</button>
       </div>
-      <div v-show="nav.page === 'browse'" class="relative w-[360px]">
-        <input v-model="keyword" class="inp w-full !py-1.5" placeholder="搜索画面 / 设备组 / 设备 / 位号 / 现象" @input="onSearch" @keydown.esc="hits = []" />
-        <div v-if="hits.length" class="absolute z-40 mt-1 w-full panel max-h-[420px] overflow-auto shadow-xl">
-          <div v-for="(h, i) in hits" :key="i" class="tree-row !py-1.5" @click="go(h)">
-            <span class="pill pill-plain">{{ ({ op: '画面', group: '设备组', equipment: '设备', tag: '位号', phenomenon: '现象' } as Record<string, string>)[h.kind] }}</span>
-            <span class="truncate flex-1">{{ h.label }}</span>
-            <span class="text-[11px] text-fg-mute truncate max-w-[140px]">{{ h.hint }}</span>
-          </div>
+      <div class="relative w-[380px]">
+        <input v-model="keyword" class="inp w-full !py-1.5" placeholder="搜索工艺段 / 工序 / 设备 / 位号 / 现象 / 参数（支持拼音首字母）"
+               @input="onSearch" @keydown.esc="hits = []; searched = false" />
+        <div v-if="searched" class="absolute z-40 mt-1 w-[520px] panel max-h-[480px] overflow-auto shadow-xl">
+          <div v-if="!hits.length" class="px-3 py-2 text-xs text-fg-mute">没有匹配的对象</div>
+          <div v-else class="px-3 pt-1.5 text-[11px] text-fg-mute">共 {{ hitTotal }} 条{{ hitTotal > hits.length ? `，每类显示前 12 条` : '' }} · 名称 / 编码 / 位号 / 拼音首字母匹配</div>
+          <template v-for="g in grouped" :key="g.kind">
+            <div class="px-3 pt-2 pb-0.5 text-[11px] font-semibold text-fg-dim">{{ KIND_LABEL[g.kind] ?? g.kind }}</div>
+            <div v-for="(h, i) in g.items" :key="i" class="tree-row !py-1.5" @click="go(h)">
+              <span class="truncate flex-1">{{ h.label }}</span>
+              <span class="text-[11px] text-fg-mute truncate max-w-[220px]">{{ h.hint }}</span>
+            </div>
+          </template>
         </div>
       </div>
       <span class="flex-1" />
@@ -94,6 +127,7 @@ const kind = (): string => nav.selection.type
                     :calc-id="kind() === 'calc' ? nav.selection.id : undefined" />
         <AssetPanel v-else-if="kind() === 'object'" :key="`${nav.selection.id}|${nav.selection.opId}`"
                     :object-id="nav.selection.id!" :op-id="nav.selection.opId" :initial-tab="nav.selection.tab" />
+        <ConsistencyCheck v-else-if="kind() === 'global:check'" />
         <GlobalSections v-else-if="kind().startsWith('global:')" :kind="kind()" :op-id="nav.selection.opId" />
         <GenericProfile v-else-if="kind() === 'domain-object'" :object-id="nav.selection.id!" />
         <div v-else-if="kind() === 'domain-pending'" class="empty m-6">「{{ nav.selection.label }}」待建：暂无数据源</div>

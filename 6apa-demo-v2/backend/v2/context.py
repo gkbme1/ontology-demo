@@ -51,6 +51,13 @@ class AppContext:
                 self._profile_cache[object_id] = asset_model.profile(self.store, object_id)
             return self._profile_cache[object_id]
 
+    def search_index(self) -> list[dict[str, Any]]:
+        """全局搜索的静态索引（不含现象），首次使用时建立。"""
+        if getattr(self, "_search_index", None) is None:
+            from backend.v2.search import search_index
+            self._search_index = search_index(self)
+        return self._search_index
+
     def object_name(self, object_id: str) -> str:
         dcs = self.store.dcs
         if object_id in dcs.equipment:
@@ -103,7 +110,7 @@ class AppContext:
         return out
 
     def scope_ops(self, object_id: str) -> list[str]:
-        """对象落在哪些画面：设备 / 设备组按层级归属，画面是自己，单元是它的全部画面，装置是全部。"""
+        """对象落在哪些工序：设备 / 设备组按层级归属，工序是自己，工艺段是它的全部工序，车间是全部。"""
         h = self.hierarchy
         if object_id in h.ops:
             return [object_id]

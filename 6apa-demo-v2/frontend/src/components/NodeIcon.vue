@@ -43,13 +43,13 @@ const EQUIP_RULES: [RegExp, string, string][] = [
   [/离心机/, 'centrifuge', '#0e8fa3'],
   [/泵/, 'pump', '#2563eb'],
   [/阀/, 'valve', '#7c3aed'],
-  [/换热器|冷凝器|加热|热水|冷却|沸器|过冷器|空冷器|蒸发器|锅炉|炉|散热片/, 'heat', '#dc2626'],
-  [/塔|吸附柱|色谱柱|吸附器|火炬|精馏柱/, 'tower', '#0f766e'],
-  [/过滤|除尘器|阻火器/, 'filter', '#0891b2'],
-  [/风机|压缩机|鼓风|排风|送风|膨胀|丙烷机|空压机|制氮机/, 'fan', '#475569'],
-  [/管网|管线|管道|总管|来气|调气|外输|返输|汇管|球筒|计量/, 'pipe', '#64748b'],
+  [/换热器|冷凝器|加热|热水|冷却/, 'heat', '#dc2626'],
+  [/塔|吸附柱|色谱柱/, 'tower', '#0f766e'],
+  [/过滤/, 'filter', '#0891b2'],
+  [/风机|压缩机|鼓风|排风|送风/, 'fan', '#475569'],
+  [/管网|管线|管道|总管/, 'pipe', '#64748b'],
   [/干燥/, 'thermo', '#ea580c'],
-  [/罐|槽|仓|釜|混合器|结晶器|分离器|除油器|水站|经济器|回油器|缸|水箱|水池|射流器/, 'tank', '#d97706']
+  [/罐|槽|仓|釜|混合器|蒸发器|结晶器/, 'tank', '#d97706']
 ]
 
 const spec = computed<[string, string]>(() => {
@@ -67,6 +67,7 @@ const spec = computed<[string, string]>(() => {
     case 'global:algo': return ['func', '#7c3aed']
     case 'global:cond': return ['activity', '#dc2626']
     case 'global:docs': return ['file', '#2563eb']
+    case 'global:check': return ['grid', '#15803d']
     case 'equipment': {
       const hit = EQUIP_RULES.find(([re]) => re.test(label))
       return hit ? [hit[1], hit[2]] : ['cube', '#78716c']

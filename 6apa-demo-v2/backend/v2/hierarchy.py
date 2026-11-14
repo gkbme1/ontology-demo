@@ -1,6 +1,6 @@
-"""空间层级：装置 → 单元 → 画面 → 设备组 / 设备（配置表沿用 车间 / 工艺段 / 工序 的表名）。
+"""空间层级：车间 → 工艺段 → 工序 → 装置（设备组 / 设备）。
 
-层级定义读 data/config/空间层级.xlsx；设备来自复制过来的点表加载结果（store.dcs）。
+层级定义读 data/config/6APA_空间层级.xlsx；设备来自复制过来的点表加载结果（store.dcs）。
 工序 = 一张流程画面。设备按「工段编号 + 设备匹配正则」归到工序，设备组像文件夹，
 成员可分属两道工序，各工序只列本工序认领的成员。
 """
@@ -14,11 +14,11 @@ from typing import Any
 from openpyxl import load_workbook
 
 ROOT = Path(__file__).resolve().parents[2]
-CONFIG_FILE = ROOT / "data" / "config" / "空间层级.xlsx"
+CONFIG_FILE = ROOT / "data" / "config" / "6APA_空间层级.xlsx"
 
 # 工序下固定挂 4 个节点
 OP_SECTIONS = [
-    ("devices", "设备", "设备组与设备"),
+    ("devices", "装置", "设备组与设备"),
     ("calc", "计算组态", "本工序的派生量 / 指标计算定义"),
     ("cond", "工况与根因", "现象定义与根因影响关系"),
     ("docs", "文档提取", "规程、SOP 等文档及从中提取的本体对象"),
@@ -39,7 +39,7 @@ def _rows(ws) -> list[dict[str, Any]]:
 class Hierarchy:
     def __init__(self, store: Any, config_file: Path = CONFIG_FILE) -> None:
         if not config_file.exists():
-            raise FileNotFoundError(f"缺少层级配置表 {config_file}，先运行 python3 -m backend.tools.build_cryo_sources")
+            raise FileNotFoundError(f"缺少层级配置表 {config_file}，先运行 python3 -m backend.tools.build_config")
         wb = load_workbook(config_file, read_only=True, data_only=True)
         source = config_file.name
         self.workshops = [

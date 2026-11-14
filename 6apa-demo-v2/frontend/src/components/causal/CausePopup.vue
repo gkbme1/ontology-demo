@@ -3,6 +3,7 @@
  * 现象详情弹窗：它由什么现象导致（逐层往上追溯），以及它会导致什么。
  * 图谱 + 按层列出的导致关系；可在这里直接给它补一条原因。
  */
+import StatusPill from '@/components/StatusPill.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { api } from '@/api/client'
 import { bump } from '@/composables/useNav'
@@ -84,7 +85,7 @@ async function onAdded(): Promise<void> {
           <dt>编号</dt><dd class="font-mono">{{ detail.id }}</dd>
           <dt>挂载对象</dt><dd>{{ detail.anchor?.name }}<span class="text-fg-mute">（{{ detail.anchor?.kind === 'group' ? '设备组，组内每台分别判定' : '设备' }}）</span></dd>
           <dt>类别 / 严重</dt><dd>{{ detail.category }} · {{ detail.severity }}</dd>
-          <dt>状态</dt><dd><span class="pill pill-warn">{{ detail.status }}</span></dd>
+          <dt>状态</dt><dd><StatusPill :status="detail.status" /></dd>
           <dt>来源</dt><dd>{{ detail.source?.kind }} {{ detail.source?.ref }}</dd>
           <dt>角色</dt><dd>作为原因 {{ detail.roles.asCause }} 次 · 作为结果 {{ detail.roles.asEffect }} 次</dd>
         </dl>
@@ -103,6 +104,9 @@ async function onAdded(): Promise<void> {
         <button class="ctl" :class="{ 'ctl-on': direction === 'down' }" @click="direction = 'down'">会导致什么（{{ detail.effects.length }}）</button>
         <span class="flex-1" />
         <button class="btn" @click="adding = true">+ 补一条{{ direction === 'up' ? '原因' : '结果' }}</button>
+      </div>
+      <div v-if="chain?.graph.links.some((l: Any) => l.inCycle)" class="text-xs text-err border border-err/30 bg-err/5 rounded px-2 py-1">
+        ⟳ 这条导致链上有因果环路（{{ chain.graph.links.filter((l: Any) => l.inCycle).map((l: Any) => `${l.causeName}→${l.effectName}`).join('、') }}），请确认是正反馈 / 控制回路还是方向登记错误
       </div>
       <CausalGraph v-if="chain" :graph="chain.graph" :height="320" @pick="go" />
       <div v-if="chain && !chain.links.length" class="empty">{{ direction === 'up' ? '还没有登记导致它的现象' : '还没有登记它会导致的现象' }}</div>

@@ -1,11 +1,11 @@
-"""画面图纸（P&ID 示意）：按本画面的设备组 / 设备和物理拓扑关系自动排布。
+"""工序图纸（P&ID 示意）：按本工序的设备组 / 设备和物理拓扑关系自动排布。
 
 仓库里没有 P&ID 原图，这里生成示意图的结构数据，前端画成 SVG：
-- 节点：本画面的设备组（内含本画面认领的成员）+ 未入组设备（汇总成一个框）；
-- 连线：工业关系表中「物理拓扑关系」里两端都在本画面的连接；
-- 进出物料：指向本画面设备组的物料流股 / 公用介质画在左侧，产出画在右侧；
+- 节点：本工序的设备组（内含本工序认领的成员）+ 未入组设备（汇总成一个框）；
+- 连线：工业关系表中「物理拓扑关系」里两端都在本工序的连接；
+- 进出物料：指向本工序设备组的物料流股 / 公用介质画在左侧，产出画在右侧；
 - 布局：按连线做最长路径分层（左 → 右），环路忽略回边。
-子流程写在图纸顶部（不单独成层）。有了真图纸后可换成图片 + 热区，接口结构不变。
+子工序写在图纸顶部（不单独成层）。有了真图纸后可换成图片 + 热区，接口结构不变。
 """
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ def _image_config(op_id: str) -> dict[str, Any] | None:
 
 
 def _resolve_name(ctx: AppContext, op_id: str, name: str) -> tuple[str | None, str]:
-    """热区名称 → 本体对象：优先本画面、其次同单元、再全厂；先设备后设备组。"""
+    """热区名称 → 本体对象：优先本工序、其次同工艺段、再全厂；先设备后设备组。"""
     h = ctx.hierarchy
     dcs = ctx.store.dcs
     seg_ops = set(h.segment_of_op(op_id)["opIds"])
@@ -146,7 +146,7 @@ def build(ctx: AppContext, op_id: str) -> dict[str, Any]:
             if a not in s["from"]:
                 s["from"].append(a)
 
-    # 既流入又产出的是本画面内部物料，不画在两侧
+    # 既流入又产出的是本工序内部物料，不画在两侧
     internal = set(inlets) & set(outlets)
     for name in internal:
         inlets.pop(name)

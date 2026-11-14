@@ -1,494 +1,50 @@
 {
- "note": "种子数据：由 backend/tools/build_cryo_seed.py 生成，全部为草案·待工艺确认（规程为旧版，阈值仅作参考）",
+ "note": "种子数据：由 backend/tools/build_seed.py 生成，全部为草案·待工艺确认",
  "items": [
   {
-   "id": "PH-01",
-   "name": "脱甲烷塔顶温度过低（CO2冻塔先兆）",
-   "anchor": {
-    "kind": "equipment",
-    "id": "equip-7dd066f1",
-    "name": "脱甲烷塔",
-    "areaCode": "S07"
-   },
-   "category": "工艺",
-   "severity": "警告",
-   "description": "104TT115 < -81 ℃（塔顶 1.35 MPa）",
-   "rule": {
-    "type": "group",
-    "op": "OR",
-    "children": [
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "顶部温度"
-      },
-      "operator": "<",
-      "aggregate": "any",
-      "durationSec": 300,
-      "threshold": {
-       "kind": "value",
-       "value": -81
-      }
-     }
-    ]
-   },
-   "note": "规程 4.1.2.1：塔顶 1.35 MPa 时低于 -81 ℃ 出现冻塔先兆",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 4.1.2.1"
-   }
-  },
-  {
-   "id": "PH-02",
-   "name": "一级贫富气换热器差压高",
-   "anchor": {
-    "kind": "equipment",
-    "id": "equip-5ba091a0",
-    "name": "一级贫富气换热器",
-    "areaCode": "S07"
-   },
-   "category": "工艺",
-   "severity": "警告",
-   "description": "104PDT101 > 30 kPa（操作点）/ > 50 kPa（报警）",
-   "rule": {
-    "type": "group",
-    "op": "OR",
-    "children": [
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "原料气压差"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 300,
-      "threshold": {
-       "kind": "value",
-       "value": 30
-      }
-     },
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "原料气压差"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 0,
-      "threshold": {
-       "kind": "limit",
-       "limitId": "PL-104PDT101",
-       "field": "high"
-      }
-     }
-    ]
-   },
-   "note": "30 kPa 为规程表 4-4 甲醇加注操作点",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 4.2.4.3/附录四"
-   }
-  },
-  {
-   "id": "PH-03",
-   "name": "二级贫富气换热器差压高",
-   "anchor": {
-    "kind": "equipment",
-    "id": "equip-8aa00e04",
-    "name": "二级贫富气换热器",
-    "areaCode": "S07"
-   },
-   "category": "工艺",
-   "severity": "警告",
-   "description": "104PDT102 > 30 kPa / > 50 kPa",
-   "rule": {
-    "type": "group",
-    "op": "OR",
-    "children": [
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "原料气压差"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 300,
-      "threshold": {
-       "kind": "value",
-       "value": 30
-      }
-     },
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "原料气压差"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 0,
-      "threshold": {
-       "kind": "limit",
-       "limitId": "PL-104PDT102",
-       "field": "high"
-      }
-     }
-    ]
-   },
-   "note": "30 kPa 为规程表 4-4 甲醇加注操作点",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 4.2.4.3/附录四"
-   }
-  },
-  {
-   "id": "PH-04",
-   "name": "冷箱Ⅰ差压高",
-   "anchor": {
-    "kind": "equipment",
-    "id": "equip-ff0ca63b",
-    "name": "冷箱Ⅰ·公共测点",
-    "areaCode": "S07"
-   },
-   "category": "工艺",
-   "severity": "警告",
-   "description": "104PDT103 > 30 kPa / > 50 kPa",
-   "rule": {
-    "type": "group",
-    "op": "OR",
-    "children": [
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "原料气压差"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 300,
-      "threshold": {
-       "kind": "value",
-       "value": 30
-      }
-     },
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "原料气压差"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 0,
-      "threshold": {
-       "kind": "limit",
-       "limitId": "PL-104PDT103",
-       "field": "high"
-      }
-     }
-    ]
-   },
-   "note": "30 kPa 为规程表 4-4 甲醇加注操作点",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 4.2.4.3/附录四"
-   }
-  },
-  {
-   "id": "PH-05",
-   "name": "脱甲烷塔填料段差压高",
-   "anchor": {
-    "kind": "equipment",
-    "id": "equip-7dd066f1",
-    "name": "脱甲烷塔",
-    "areaCode": "S07"
-   },
-   "category": "工艺",
-   "severity": "警告",
-   "description": "104PDT104 / 105 / 106 > 5 kPa（操作点）/ > 10 kPa（报警）",
-   "rule": {
-    "type": "group",
-    "op": "OR",
-    "children": [
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "一段压差"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 300,
-      "threshold": {
-       "kind": "value",
-       "value": 5
-      }
-     },
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "二段压差"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 300,
-      "threshold": {
-       "kind": "value",
-       "value": 5
-      }
-     },
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "三段压差"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 300,
-      "threshold": {
-       "kind": "value",
-       "value": 5
-      }
-     }
-    ]
-   },
-   "note": "5 kPa 为规程表 4-4 操作点（报警 10 kPa）",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 4.2.4.3/附录四"
-   }
-  },
-  {
-   "id": "PH-06",
-   "name": "冷冻系统冻堵",
+   "id": "PH-S11-01",
+   "name": "水解罐温度偏高",
    "anchor": {
     "kind": "group",
-    "id": "egrp-d4babb00",
-    "name": "冷箱Ⅱ",
-    "areaCode": "S07"
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
+    "areaCode": "S11"
    },
    "category": "工艺",
    "severity": "严重",
-   "description": "PH-02 / PH-03 / PH-04 / PH-05 任一成立且差压持续上升（判定规则待定义）",
+   "description": "罐温高于正常上限持续 10 分钟，或超过高限即时成立",
    "rule": {
     "type": "group",
-    "op": "AND",
+    "op": "OR",
     "children": [
      {
       "type": "condition",
       "subject": {
        "kind": "parameter",
-       "name": "原料气压差"
+       "name": "釜内反应温度"
       },
       "operator": ">",
       "aggregate": "any",
       "durationSec": 600,
       "threshold": {
-       "kind": "value",
-       "value": 30
+       "kind": "limit",
+       "limitId": "PL001",
+       "field": "normalHigh"
       }
      },
      {
       "type": "condition",
       "subject": {
-       "kind": "calc",
-       "calcId": "CALC-05"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 600,
-      "threshold": {
-       "kind": "value",
-       "value": 0.05
-      }
-     }
-    ]
-   },
-   "note": "差压超过加注操作点且持续上升；上升速率 0.05 kPa/min 为占位阈值，待现场提供",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 1.2.7.3"
-   }
-  },
-  {
-   "id": "PH-07",
-   "name": "制冷温度偏高",
-   "anchor": {
-    "kind": "equipment",
-    "id": "equip-7dd066f1",
-    "name": "脱甲烷塔",
-    "areaCode": "S07"
-   },
-   "category": "工艺",
-   "severity": "提示",
-   "description": "膨胀机出口温度 104TT124 > -76 ℃ 或塔顶温度 104TT115 > -75 ℃",
-   "rule": {
-    "type": "group",
-    "op": "OR",
-    "children": [
-     {
-      "type": "condition",
-      "subject": {
        "kind": "parameter",
-       "name": "顶部温度"
+       "name": "釜内反应温度"
       },
       "operator": ">",
       "aggregate": "any",
-      "durationSec": 600,
+      "durationSec": 0,
       "threshold": {
        "kind": "limit",
-       "limitId": "PL-104TT115",
-       "field": "normalHigh"
-      }
-     }
-    ]
-   },
-   "note": "塔顶温度高于运行范围上限",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 附录二"
-   }
-  },
-  {
-   "id": "PH-08",
-   "name": "J-T阀开启（气量旁路膨胀机）",
-   "anchor": {
-    "kind": "equipment",
-    "id": "equip-29d48d8f",
-    "name": "J-T阀",
-    "areaCode": "S07"
-   },
-   "category": "工况",
-   "severity": "提示",
-   "description": "104_PZT_107 > 0（阀位反馈）",
-   "rule": {
-    "type": "group",
-    "op": "OR",
-    "children": [
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "J-T阀反馈"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 120,
-      "threshold": {
-       "kind": "value",
-       "value": 5
-      }
-     }
-    ]
-   },
-   "note": "阀位反馈 > 5% 视为开启（占位阈值，待现场提供）",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 4.1.3.2"
-   }
-  },
-  {
-   "id": "PH-09",
-   "name": "脱水后露点偏高",
-   "anchor": {
-    "kind": "equipment",
-    "id": "equip-c5b73b4a",
-    "name": "原料气出脱水单元管线",
-    "areaCode": "S03"
-   },
-   "category": "质量",
-   "severity": "警告",
-   "description": "103AT101 > -85 ℃",
-   "rule": {
-    "type": "group",
-    "op": "OR",
-    "children": [
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "脱水后原料气露点"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 300,
-      "threshold": {
-       "kind": "value",
-       "value": -85
-      }
-     }
-    ]
-   },
-   "note": "规程 2.2.2.3：露点 < -85 ℃",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 2.2.2.3"
-   }
-  },
-  {
-   "id": "PH-10",
-   "name": "分子筛再生不合格",
-   "anchor": {
-    "kind": "equipment",
-    "id": "equip-1041941e",
-    "name": "分子筛吸附器组·公共测点",
-    "areaCode": "S03"
-   },
-   "category": "工艺",
-   "severity": "警告",
-   "description": "热吹结束时床层出口温度 103TE102 < 185 ℃",
-   "rule": null,
-   "note": "需结合分子筛程序阶段（热吹结束时床层出口 ≥ 185 ℃），判定规则待定义",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 2.2.4.3"
-   }
-  },
-  {
-   "id": "PH-11",
-   "name": "过滤分离器差压高",
-   "anchor": {
-    "kind": "equipment",
-    "id": "equip-c87ff5da",
-    "name": "过滤分离器",
-    "areaCode": "S03"
-   },
-   "category": "工艺",
-   "severity": "提示",
-   "description": "103PDT107 > 100 kPa",
-   "rule": {
-    "type": "group",
-    "op": "OR",
-    "children": [
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "进出口压差"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 300,
-      "threshold": {
-       "kind": "limit",
-       "limitId": "PL-103PDT107",
-       "field": "normalHigh"
+       "limitId": "PL001",
+       "field": "high"
       }
      }
     ]
@@ -496,62 +52,22 @@
    "note": "",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 附录二"
+    "kind": "规则 / 处置卡",
+    "ref": "R-S11-01；ARP-S11-01"
    }
   },
   {
-   "id": "PH-12",
-   "name": "干气粉尘过滤器差压高（需切换）",
+   "id": "PH-S11-02",
+   "name": "水解罐温度偏低",
    "anchor": {
-    "kind": "equipment",
-    "id": "equip-b0a5b64a",
-    "name": "干气粉尘过滤器组·公共测点",
-    "areaCode": "S03"
-   },
-   "category": "工艺",
-   "severity": "提示",
-   "description": "103PDT108 ≥ 100 kPa",
-   "rule": {
-    "type": "group",
-    "op": "OR",
-    "children": [
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "进出口差压"
-      },
-      "operator": ">=",
-      "aggregate": "any",
-      "durationSec": 300,
-      "threshold": {
-       "kind": "limit",
-       "limitId": "PL-103PDT108",
-       "field": "normalHigh"
-      }
-     }
-    ]
-   },
-   "note": "规程 4.2.3.3：差压 ≥ 0.1 MPa 切换备用过滤器",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 4.2.3.3"
-   }
-  },
-  {
-   "id": "PH-13",
-   "name": "压缩机三级出口压力高（憋压）",
-   "anchor": {
-    "kind": "equipment",
-    "id": "equip-718c8ca2",
-    "name": "原料气压缩机",
-    "areaCode": "S02"
+    "kind": "group",
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
+    "areaCode": "S11"
    },
    "category": "工艺",
    "severity": "警告",
-   "description": "102-PT-135（a102_PI135）> 3.65 MPa",
+   "description": "罐温低于正常下限持续 10 分钟，或低于低限即时成立",
    "rule": {
     "type": "group",
     "op": "OR",
@@ -560,705 +76,29 @@
       "type": "condition",
       "subject": {
        "kind": "parameter",
-       "name": "压缩机最终出口压力"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 120,
-      "threshold": {
-       "kind": "limit",
-       "limitId": "PL-a102_PI135",
-       "field": "normalHigh"
-      }
-     }
-    ]
-   },
-   "note": "",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 附录二/3.3.5.2"
-   }
-  },
-  {
-   "id": "PH-14",
-   "name": "压缩机轴振动高",
-   "anchor": {
-    "kind": "equipment",
-    "id": "equip-718c8ca2",
-    "name": "原料气压缩机",
-    "areaCode": "S02"
-   },
-   "category": "设备",
-   "severity": "警告",
-   "description": "102-VIA130～137 > 63.5 μm（停机 88.9）",
-   "rule": {
-    "type": "group",
-    "op": "OR",
-    "children": [
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "压缩机低压缸止推轴承振动"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 0,
-      "threshold": {
-       "kind": "limit",
-       "limitId": "PL-a102_VIA130",
-       "field": "high"
-      }
-     },
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "压缩机低压缸支撑轴承振动"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 0,
-      "threshold": {
-       "kind": "limit",
-       "limitId": "PL-a102_VIA132",
-       "field": "high"
-      }
-     },
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "压缩机高压缸止推轴承振动"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 0,
-      "threshold": {
-       "kind": "limit",
-       "limitId": "PL-a102_VIA134",
-       "field": "high"
-      }
-     },
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "压缩机高压缸支撑轴承振动"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 0,
-      "threshold": {
-       "kind": "limit",
-       "limitId": "PL-a102_VIA136",
-       "field": "high"
-      }
-     }
-    ]
-   },
-   "note": "低 / 高压缸止推与支撑轴承振动任一超过报警值",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 附录四"
-   }
-  },
-  {
-   "id": "PH-15",
-   "name": "压缩机轴承温度高",
-   "anchor": {
-    "kind": "equipment",
-    "id": "equip-718c8ca2",
-    "name": "原料气压缩机",
-    "areaCode": "S02"
-   },
-   "category": "设备",
-   "severity": "警告",
-   "description": "102-TISA144～159 > 105 ℃（停机 115）",
-   "rule": {
-    "type": "group",
-    "op": "OR",
-    "children": [
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "压缩机低压缸主推力侧轴承温度"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 0,
-      "threshold": {
-       "kind": "limit",
-       "limitId": "PL-a102_TISA144",
-       "field": "high"
-      }
-     },
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "压缩机低压缸副推力侧轴承温度"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 0,
-      "threshold": {
-       "kind": "limit",
-       "limitId": "PL-a102_TISA146",
-       "field": "high"
-      }
-     },
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "压缩机低压缸推力侧径向轴承温度"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 0,
-      "threshold": {
-       "kind": "limit",
-       "limitId": "PL-a102_TISA148",
-       "field": "high"
-      }
-     },
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "压缩机低压缸支撑侧径向轴承温度"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 0,
-      "threshold": {
-       "kind": "limit",
-       "limitId": "PL-a102_TISA150",
-       "field": "high"
-      }
-     },
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "压缩机高压缸主推力侧轴承温度"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 0,
-      "threshold": {
-       "kind": "limit",
-       "limitId": "PL-a102_TISA153",
-       "field": "high"
-      }
-     },
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "压缩机高压缸副推力侧轴承温度"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 0,
-      "threshold": {
-       "kind": "limit",
-       "limitId": "PL-a102_TISA152",
-       "field": "high"
-      }
-     },
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "压缩机高压缸推力侧径向轴承温度"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 0,
-      "threshold": {
-       "kind": "limit",
-       "limitId": "PL-a102_TISA156",
-       "field": "high"
-      }
-     },
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "压缩机高压缸支撑侧径向轴承温度"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 0,
-      "threshold": {
-       "kind": "limit",
-       "limitId": "PL-a102_TISA158",
-       "field": "high"
-      }
-     }
-    ]
-   },
-   "note": "低 / 高压缸各轴承温度任一超过报警值",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 附录四"
-   }
-  },
-  {
-   "id": "PH-16",
-   "name": "压缩机润滑油汇管压力低",
-   "anchor": {
-    "kind": "equipment",
-    "id": "equip-718c8ca2",
-    "name": "原料气压缩机",
-    "areaCode": "S02"
-   },
-   "category": "设备",
-   "severity": "警告",
-   "description": "102-PT171（a102_PINSA171）< 0.25 MPa（报警 0.15）",
-   "rule": {
-    "type": "group",
-    "op": "OR",
-    "children": [
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "润滑油总管压力"
+       "name": "釜内反应温度"
       },
       "operator": "<",
       "aggregate": "any",
-      "durationSec": 60,
+      "durationSec": 600,
       "threshold": {
        "kind": "limit",
-       "limitId": "PL-a102_PINSA171",
+       "limitId": "PL001",
        "field": "normalLow"
       }
-     }
-    ]
-   },
-   "note": "规程 4.2.2.2：0.25～0.30 MPa",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 4.2.2.2/附录四"
-   }
-  },
-  {
-   "id": "PH-17",
-   "name": "膨胀机振动高",
-   "anchor": {
-    "kind": "group",
-    "id": "egrp-c91b276c",
-    "name": "膨胀压缩机组",
-    "areaCode": "S08"
-   },
-   "category": "设备",
-   "severity": "警告",
-   "description": "104XE180/181 X/Y > 38 μm（停机 48）",
-   "rule": {
-    "type": "group",
-    "op": "OR",
-    "children": [
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "膨胀端X轴震动"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 0,
-      "threshold": {
-       "kind": "value",
-       "value": 38
-      }
      },
      {
       "type": "condition",
       "subject": {
        "kind": "parameter",
-       "name": "膨胀端Y轴震动"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 0,
-      "threshold": {
-       "kind": "value",
-       "value": 38
-      }
-     },
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "增压端X轴震动"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 0,
-      "threshold": {
-       "kind": "value",
-       "value": 38
-      }
-     },
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "增压端Y轴震动"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 0,
-      "threshold": {
-       "kind": "value",
-       "value": 38
-      }
-     }
-    ]
-   },
-   "note": "规程附录四：报警 > 38 μm，联锁 > 48 μm",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 附录四"
-   }
-  },
-  {
-   "id": "PH-18",
-   "name": "膨胀机轴承温度高",
-   "anchor": {
-    "kind": "group",
-    "id": "egrp-c91b276c",
-    "name": "膨胀压缩机组",
-    "areaCode": "S08"
-   },
-   "category": "设备",
-   "severity": "警告",
-   "description": "膨胀端 104TE180 > 70 ℃，增压端 104TE181 > 75 ℃",
-   "rule": {
-    "type": "group",
-    "op": "OR",
-    "children": [
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "膨胀端轴承温度"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 60,
-      "threshold": {
-       "kind": "value",
-       "value": 70
-      }
-     },
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "增压段轴承温度"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 60,
-      "threshold": {
-       "kind": "value",
-       "value": 75
-      }
-     }
-    ]
-   },
-   "note": "规程附录四：膨胀端 > 70 ℃、增压端 > 75 ℃ 报警",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 附录四"
-   }
-  },
-  {
-   "id": "PH-19",
-   "name": "膨胀机供油压差低",
-   "anchor": {
-    "kind": "group",
-    "id": "egrp-c91b276c",
-    "name": "膨胀压缩机组",
-    "areaCode": "S08"
-   },
-   "category": "设备",
-   "severity": "警告",
-   "description": "104PDT182 < 0.8 MPa（联锁 0.6）",
-   "rule": {
-    "type": "group",
-    "op": "OR",
-    "children": [
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "轴承油压差"
+       "name": "釜内反应温度"
       },
       "operator": "<",
       "aggregate": "any",
-      "durationSec": 30,
-      "threshold": {
-       "kind": "value",
-       "value": 800
-      }
-     }
-    ]
-   },
-   "note": "规程附录四：供油压差 < 0.8 MPa 报警（点表单位 kPa）",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 附录四"
-   }
-  },
-  {
-   "id": "PH-20",
-   "name": "膨胀机增压端流量低（喘振风险）",
-   "anchor": {
-    "kind": "group",
-    "id": "egrp-c91b276c",
-    "name": "膨胀压缩机组",
-    "areaCode": "S08"
-   },
-   "category": "设备",
-   "severity": "严重",
-   "description": "104FT180 < 8600 m³/h",
-   "rule": {
-    "type": "group",
-    "op": "OR",
-    "children": [
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "增压段入口流量"
-      },
-      "operator": "<",
-      "aggregate": "any",
-      "durationSec": 30,
-      "threshold": {
-       "kind": "value",
-       "value": 8600
-      }
-     }
-    ]
-   },
-   "note": "规程附录四：增压端入口流量 < 8600 m³/h 联锁",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 附录四"
-   }
-  },
-  {
-   "id": "PH-21",
-   "name": "膨胀机停机",
-   "anchor": {
-    "kind": "group",
-    "id": "egrp-c91b276c",
-    "name": "膨胀压缩机组",
-    "areaCode": "S08"
-   },
-   "category": "工况",
-   "severity": "严重",
-   "description": "104SI180A/B 由运行降至 < 2000 rpm 或 ESD 返回停机状态",
-   "rule": {
-    "type": "group",
-    "op": "OR",
-    "children": [
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "膨胀机转速"
-      },
-      "operator": "<",
-      "aggregate": "any",
-      "durationSec": 60,
-      "threshold": {
-       "kind": "value",
-       "value": 2000
-      }
-     }
-    ]
-   },
-   "note": "规程 2.2.5.3：不允许在 2000 r/min 以下长时间运行",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 3.3.5.2"
-   }
-  },
-  {
-   "id": "PH-22",
-   "name": "原料气压缩机停机",
-   "anchor": {
-    "kind": "equipment",
-    "id": "equip-718c8ca2",
-    "name": "原料气压缩机",
-    "areaCode": "S02"
-   },
-   "category": "工况",
-   "severity": "严重",
-   "description": "S102ZS220（压缩机停机状态）由 0 变 1",
-   "rule": {
-    "type": "group",
-    "op": "OR",
-    "children": [
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "压缩机停机状态指示记录"
-      },
-      "operator": "change",
-      "from": 0,
-      "to": 1,
-      "aggregate": "any",
-      "durationSec": 0
-     }
-    ]
-   },
-   "note": "ESD 记录点「压缩机停机状态」由 0 变 1",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 3.3.5.1"
-   }
-  },
-  {
-   "id": "PH-23",
-   "name": "丙烷机停机 / 报警",
-   "anchor": {
-    "kind": "equipment",
-    "id": "equip-4c71108a",
-    "name": "丙烷机",
-    "areaCode": "S10"
-   },
-   "category": "设备",
-   "severity": "警告",
-   "description": "104_UIC_161（机组报警）或 104_UIC_162（故障）= 1",
-   "rule": {
-    "type": "group",
-    "op": "OR",
-    "children": [
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "机组报警"
-      },
-      "operator": "=",
-      "aggregate": "any",
       "durationSec": 0,
-      "threshold": {
-       "kind": "value",
-       "value": 1
-      }
-     },
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "故障报警"
-      },
-      "operator": "=",
-      "aggregate": "any",
-      "durationSec": 0,
-      "threshold": {
-       "kind": "value",
-       "value": 1
-      }
-     }
-    ]
-   },
-   "note": "",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "点表 DI"
-   }
-  },
-  {
-   "id": "PH-24",
-   "name": "脱甲烷塔塔压高",
-   "anchor": {
-    "kind": "equipment",
-    "id": "equip-7dd066f1",
-    "name": "脱甲烷塔",
-    "areaCode": "S07"
-   },
-   "category": "工艺",
-   "severity": "警告",
-   "description": "104PT111 > 1.5 MPa（联锁 1.8）",
-   "rule": {
-    "type": "group",
-    "op": "OR",
-    "children": [
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "塔顶压力"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 60,
       "threshold": {
        "kind": "limit",
-       "limitId": "PL-104PT111",
-       "field": "high"
-      }
-     }
-    ]
-   },
-   "note": "附录四写「塔釜压力」，按点表取塔顶压力 104PT111",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 附录四"
-   }
-  },
-  {
-   "id": "PH-25",
-   "name": "脱甲烷塔底温度低",
-   "anchor": {
-    "kind": "equipment",
-    "id": "equip-7dd066f1",
-    "name": "脱甲烷塔",
-    "areaCode": "S07"
-   },
-   "category": "工艺",
-   "severity": "警告",
-   "description": "104TT114 < -10 ℃（联锁 -15）",
-   "rule": {
-    "type": "group",
-    "op": "OR",
-    "children": [
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "塔底温度"
-      },
-      "operator": "<",
-      "aggregate": "any",
-      "durationSec": 60,
-      "threshold": {
-       "kind": "limit",
-       "limitId": "PL-104TT114",
+       "limitId": "PL001",
        "field": "low"
       }
      }
@@ -1267,22 +107,22 @@
    "note": "",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 附录四"
+    "kind": "规则 / 处置卡",
+    "ref": "ARP-S11-02"
    }
   },
   {
-   "id": "PH-26",
-   "name": "塔底泵定子温度高",
+   "id": "PH-S11-03",
+   "name": "水解罐pH偏高",
    "anchor": {
     "kind": "group",
-    "id": "egrp-c9336b1d",
-    "name": "塔底泵组",
-    "areaCode": "S07"
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
+    "areaCode": "S11"
    },
-   "category": "设备",
+   "category": "工艺",
    "severity": "警告",
-   "description": "104TE125 / 126 > 150 ℃（联锁 165）",
+   "description": "两支 pH 计均值高于正常上限持续 1 分钟；或任一支超过高限",
    "rule": {
     "type": "group",
     "op": "OR",
@@ -1291,37 +131,53 @@
       "type": "condition",
       "subject": {
        "kind": "parameter",
-       "name": "定子温度"
+       "name": "反应体系pH"
+      },
+      "operator": ">",
+      "aggregate": "mean",
+      "durationSec": 60,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL002",
+       "field": "normalHigh"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "parameter",
+       "name": "反应体系pH"
       },
       "operator": ">",
       "aggregate": "any",
-      "durationSec": 60,
+      "durationSec": 0,
       "threshold": {
-       "kind": "value",
-       "value": 150
+       "kind": "limit",
+       "limitId": "PL002",
+       "field": "high"
       }
      }
     ]
    },
-   "note": "规程附录四：定子温度 > 150 ℃ 报警、> 165 ℃ 联锁",
+   "note": "",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 附录四"
+    "kind": "规则 / 处置卡",
+    "ref": "R-S11-02；ARP-S11-03"
    }
   },
   {
-   "id": "PH-27",
-   "name": "低温分离器液位高",
+   "id": "PH-S11-04",
+   "name": "水解罐pH偏低",
    "anchor": {
-    "kind": "equipment",
-    "id": "equip-0e996e47",
-    "name": "低温分离器",
-    "areaCode": "S07"
+    "kind": "group",
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
+    "areaCode": "S11"
    },
    "category": "工艺",
    "severity": "警告",
-   "description": "104LT101 > 30%（操作上限）；超高 S104LS201",
+   "description": "两支 pH 计均值低于正常下限持续 1 分钟；或任一支低于低限",
    "rule": {
     "type": "group",
     "op": "OR",
@@ -1330,14 +186,486 @@
       "type": "condition",
       "subject": {
        "kind": "parameter",
-       "name": "低温分离器液位"
+       "name": "反应体系pH"
       },
-      "operator": ">",
+      "operator": "<",
+      "aggregate": "mean",
+      "durationSec": 60,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL002",
+       "field": "normalLow"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "parameter",
+       "name": "反应体系pH"
+      },
+      "operator": "<",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL002",
+       "field": "low"
+      }
+     }
+    ]
+   },
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "规则 / 处置卡",
+    "ref": "R-S11-02；ARP-S11-04"
+   }
+  },
+  {
+   "id": "PH-S11-05",
+   "name": "pH双支偏差大",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
+    "areaCode": "S11"
+   },
+   "category": "仪表",
+   "severity": "警告",
+   "description": "同一罐两支 pH 计读数差 > 0.2 持续 5 分钟，提示电极漂移 / 污染",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "calc",
+     "calcId": "CALC-S11-01"
+    },
+    "operator": ">",
+    "aggregate": "any",
+    "durationSec": 300,
+    "threshold": {
+     "kind": "value",
+     "value": 0.2
+    }
+   },
+   "note": "0.2 pH 为规则表推断值，待确认",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "规则 / 处置卡",
+    "ref": "R-S11-03"
+   }
+  },
+  {
+   "id": "PH-S11-06",
+   "name": "反应期搅拌停止",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
+    "areaCode": "S11"
+   },
+   "category": "设备",
+   "severity": "严重",
+   "description": "搅拌运行反馈为 0 持续 2 分钟，且罐处于反应期（氨水进料阀开，或罐内有料）",
+   "rule": {
+    "type": "group",
+    "op": "AND",
+    "children": [
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "parameter",
+       "name": "搅拌运行状态"
+      },
+      "operator": "=",
+      "aggregate": "any",
+      "durationSec": 120,
+      "threshold": {
+       "kind": "value",
+       "value": 0
+      }
+     },
+     {
+      "type": "group",
+      "op": "OR",
+      "children": [
+       {
+        "type": "condition",
+        "subject": {
+         "kind": "parameter",
+         "name": "氨水进料阀"
+        },
+        "operator": "=",
+        "aggregate": "any",
+        "durationSec": 0,
+        "threshold": {
+         "kind": "value",
+         "value": 1
+        }
+       },
+       {
+        "type": "condition",
+        "subject": {
+         "kind": "parameter",
+         "name": "釜内反应液位"
+        },
+        "operator": ">",
+        "aggregate": "any",
+        "durationSec": 0,
+        "threshold": {
+         "kind": "value",
+         "value": 2
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "note": "「反应期」暂以氨水进料阀开或液位 > 2 m3 近似；液位阈值为占位阈值，待现场提供",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "规则 / 处置卡",
+    "ref": "R-S11-07；ARP-S11-07"
+   }
+  },
+  {
+   "id": "PH-S11-07",
+   "name": "搅拌非指令停机",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
+    "areaCode": "S11"
+   },
+   "category": "设备",
+   "severity": "警告",
+   "description": "有启动指令时运行反馈由 1 变 0，多为跳闸或保护动作",
+   "rule": {
+    "type": "group",
+    "op": "AND",
+    "children": [
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "parameter",
+       "name": "搅拌启停指令"
+      },
+      "operator": "=",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "value",
+       "value": 1
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "parameter",
+       "name": "搅拌运行"
+      },
+      "operator": "change",
+      "from": 1,
+      "to": 0,
+      "aggregate": "any",
+      "durationSec": 0
+     }
+    ]
+   },
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "规则 / 处置卡",
+    "ref": "R-G-02"
+   }
+  },
+  {
+   "id": "PH-S11-08",
+   "name": "搅拌电机故障",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
+    "areaCode": "S11"
+   },
+   "category": "设备",
+   "severity": "警告",
+   "description": "搅拌故障信号为 1",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "parameter",
+     "name": "搅拌故障"
+    },
+    "operator": "=",
+    "aggregate": "any",
+    "durationSec": 0,
+    "threshold": {
+     "kind": "value",
+     "value": 1
+    }
+   },
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "规则 / 处置卡",
+    "ref": "ARP-S11-07 可能原因 1"
+   }
+  },
+  {
+   "id": "PH-S11-09",
+   "name": "搅拌处于就地状态",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
+    "areaCode": "S11"
+   },
+   "category": "操作",
+   "severity": "警告",
+   "description": "远程信号为 0 持续 1 分钟，DCS 指令无效",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "parameter",
+     "name": "搅拌远程"
+    },
+    "operator": "=",
+    "aggregate": "any",
+    "durationSec": 60,
+    "threshold": {
+     "kind": "value",
+     "value": 0
+    }
+   },
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "规则 / 处置卡",
+    "ref": "ARP-S11-07 可能原因 2"
+   }
+  },
+  {
+   "id": "PH-S11-10",
+   "name": "加氨速率偏高",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-8e737067",
+    "name": "水解氨水计量罐组",
+    "areaCode": "S11"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "氨水计量罐液位下降速率（液位差法）> 10 L/min 持续 10 分钟",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "calc",
+     "calcId": "CALC-S11-02"
+    },
+    "operator": ">",
+    "aggregate": "any",
+    "durationSec": 600,
+    "threshold": {
+     "kind": "value",
+     "value": 10
+    }
+   },
+   "note": "10 L/min 为占位阈值，待现场提供",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "规则 / 处置卡",
+    "ref": "ARP-S11-03 可能原因 2"
+   }
+  },
+  {
+   "id": "PH-S11-11",
+   "name": "加氨无响应",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
+    "areaCode": "S11"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "氨水进料阀开着 5 分钟，pH 仍低于正常下限",
+   "rule": {
+    "type": "group",
+    "op": "AND",
+    "children": [
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "parameter",
+       "name": "氨水进料阀"
+      },
+      "operator": "=",
       "aggregate": "any",
       "durationSec": 300,
       "threshold": {
+       "kind": "value",
+       "value": 1
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "parameter",
+       "name": "反应体系pH"
+      },
+      "operator": "<",
+      "aggregate": "mean",
+      "durationSec": 300,
+      "threshold": {
        "kind": "limit",
-       "limitId": "PL-104LT101",
+       "limitId": "PL002",
+       "field": "normalLow"
+      }
+     }
+    ]
+   },
+   "note": "规则原文还要求「计量罐液位 5 min 内无下降」，计量罐是另一台设备，此处暂未纳入",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "规则 / 处置卡",
+    "ref": "R-S11-04；ARP-S11-04"
+   }
+  },
+  {
+   "id": "PH-S11-12",
+   "name": "氨水进料阀指令与反馈不一致",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
+    "areaCode": "S11"
+   },
+   "category": "设备",
+   "severity": "警告",
+   "description": "指令开而反馈关、或指令关而反馈开，持续 30 秒",
+   "rule": {
+    "type": "group",
+    "op": "OR",
+    "children": [
+     {
+      "type": "group",
+      "op": "AND",
+      "children": [
+       {
+        "type": "condition",
+        "subject": {
+         "kind": "parameter",
+         "name": "氨水进料阀指令"
+        },
+        "operator": "=",
+        "aggregate": "any",
+        "durationSec": 0,
+        "threshold": {
+         "kind": "value",
+         "value": 1
+        }
+       },
+       {
+        "type": "condition",
+        "subject": {
+         "kind": "parameter",
+         "name": "氨水进料阀"
+        },
+        "operator": "=",
+        "aggregate": "any",
+        "durationSec": 30,
+        "threshold": {
+         "kind": "value",
+         "value": 0
+        }
+       }
+      ]
+     },
+     {
+      "type": "group",
+      "op": "AND",
+      "children": [
+       {
+        "type": "condition",
+        "subject": {
+         "kind": "parameter",
+         "name": "氨水进料阀指令"
+        },
+        "operator": "=",
+        "aggregate": "any",
+        "durationSec": 0,
+        "threshold": {
+         "kind": "value",
+         "value": 0
+        }
+       },
+       {
+        "type": "condition",
+        "subject": {
+         "kind": "parameter",
+         "name": "氨水进料阀"
+        },
+        "operator": "=",
+        "aggregate": "any",
+        "durationSec": 30,
+        "threshold": {
+         "kind": "value",
+         "value": 1
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "规则 / 处置卡",
+    "ref": "ARP-S11-03 / 04 可能原因 3"
+   }
+  },
+  {
+   "id": "PH-S11-13",
+   "name": "热水阀关不小",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
+    "areaCode": "S11"
+   },
+   "category": "设备",
+   "severity": "警告",
+   "description": "罐温已高于正常上限，热水阀仍全开 5 分钟",
+   "rule": {
+    "type": "group",
+    "op": "AND",
+    "children": [
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "parameter",
+       "name": "热水阀"
+      },
+      "operator": "=",
+      "aggregate": "any",
+      "durationSec": 300,
+      "threshold": {
+       "kind": "value",
+       "value": 1
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "parameter",
+       "name": "釜内反应温度"
+      },
+      "operator": ">",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL001",
        "field": "normalHigh"
       }
      }
@@ -1346,100 +674,605 @@
    "note": "",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 附录二"
+    "kind": "规则 / 处置卡",
+    "ref": "ARP-S11-01 可能原因 4"
    }
   },
   {
-   "id": "PH-28",
-   "name": "轻烃储罐压力高",
+   "id": "PH-S11-14",
+   "name": "RB进料温度偏高",
+   "anchor": {
+    "kind": "equipment",
+    "id": "equip-f7eb6a8b",
+    "name": "公用测量管线",
+    "areaCode": "S01"
+   },
+   "category": "物料",
+   "severity": "警告",
+   "description": "RB 进料温度高于 35 ℃ 持续 2 分钟，且正在进料",
+   "rule": {
+    "type": "group",
+    "op": "AND",
+    "children": [
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "TI_1303"
+      },
+      "operator": ">",
+      "aggregate": "any",
+      "durationSec": 120,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL042",
+       "field": "normalHigh"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "FT_1302A"
+      },
+      "operator": ">",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "value",
+       "value": 0
+      }
+     }
+    ]
+   },
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "规则 / 处置卡",
+    "ref": "R-S11-10；ARP-S11-05"
+   }
+  },
+  {
+   "id": "PH-S11-15",
+   "name": "RB储罐液位低",
    "anchor": {
     "kind": "group",
-    "id": "egrp-1b68cab3",
-    "name": "轻烃储罐组",
+    "id": "egrp-dabfc384",
+    "name": "RB储罐A/B（水解进料）",
+    "areaCode": "S11"
+   },
+   "category": "物料",
+   "severity": "警告",
+   "description": "RB 储罐液位低于 5 m3 持续 2 分钟",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "parameter",
+     "name": "RB储罐液位"
+    },
+    "operator": "<",
+    "aggregate": "any",
+    "durationSec": 120,
+    "threshold": {
+     "kind": "value",
+     "value": 5
+    }
+   },
+   "note": "5 m3 为占位阈值，待现场提供",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "规则 / 处置卡",
+    "ref": "ARP-S11-06 可能原因 1"
+   }
+  },
+  {
+   "id": "PH-S11-16",
+   "name": "RB进料量异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
     "areaCode": "S11"
    },
    "category": "工艺",
    "severity": "警告",
-   "description": "105PT101～103 > 2.5 MPa",
+   "description": "进料流量与设定不符；PL011 尚无数值，判定规则待定义",
+   "rule": null,
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "规则 / 处置卡",
+    "ref": "ARP-S11-06"
+   }
+  },
+  {
+   "id": "PH-S11-17",
+   "name": "水解液缓冲罐高位",
+   "anchor": {
+    "kind": "equipment",
+    "id": "equip-39c0ce5f",
+    "name": "水解缓冲罐",
+    "areaCode": "S11"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "水解液缓冲罐液位 > 25 m3 持续 1 分钟",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "parameter",
+     "name": "水解液缓冲罐液位"
+    },
+    "operator": ">",
+    "aggregate": "any",
+    "durationSec": 60,
+    "threshold": {
+     "kind": "value",
+     "value": 25
+    }
+   },
+   "note": "PL043 无数值，25 m3 为占位阈值，待现场提供",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "规则 / 处置卡",
+    "ref": "R-S11-08；ARP-S11-10"
+   }
+  },
+  {
+   "id": "PH-S11-18",
+   "name": "下游萃取不接收",
+   "anchor": {
+    "kind": "equipment",
+    "id": "equip-39c0ce5f",
+    "name": "水解缓冲罐",
+    "areaCode": "S11"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "缓冲罐液位持续上涨 20 分钟（上升速率 > 0.02 m3/min），且液位已 > 15 m3",
    "rule": {
     "type": "group",
-    "op": "OR",
+    "op": "AND",
     "children": [
      {
       "type": "condition",
       "subject": {
-       "kind": "parameter",
-       "name": "轻烃储罐压力"
+       "kind": "calc",
+       "calcId": "CALC-S11-03"
       },
       "operator": ">",
       "aggregate": "any",
-      "durationSec": 60,
+      "durationSec": 1200,
       "threshold": {
        "kind": "value",
-       "value": 2.5
+       "value": 0.02
       }
-     }
-    ]
-   },
-   "note": "规程附录四：轻烃储罐压力 > 2.5 MPa 报警",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 附录四"
-   }
-  },
-  {
-   "id": "PH-29",
-   "name": "重烃储罐液位高（需倒罐）",
-   "anchor": {
-    "kind": "group",
-    "id": "egrp-14c678a7",
-    "name": "重烃储罐组",
-    "areaCode": "S11"
-   },
-   "category": "工况",
-   "severity": "提示",
-   "description": "105LT104 / 105LT109 ≥ 70%",
-   "rule": {
-    "type": "group",
-    "op": "OR",
-    "children": [
+     },
      {
       "type": "condition",
       "subject": {
        "kind": "parameter",
-       "name": "重烃储罐液位"
+       "name": "水解液缓冲罐液位"
       },
-      "operator": ">=",
+      "operator": ">",
       "aggregate": "any",
-      "durationSec": 60,
+      "durationSec": 0,
       "threshold": {
        "kind": "value",
-       "value": 70
+       "value": 15
       }
      }
     ]
    },
-   "note": "规程 4.2.5.3：液位达 70% 倒罐",
+   "note": "速率与液位阈值为占位阈值，待现场提供",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 4.2.5.3"
+    "kind": "规则 / 处置卡",
+    "ref": "ARP-S11-10 可能原因 1"
    }
   },
   {
-   "id": "PH-30",
-   "name": "导热油出炉温度高",
+   "id": "PH-S11-19",
+   "name": "泵/电机非指令停机（水解液泵）",
    "anchor": {
     "kind": "equipment",
-    "id": "equip-58dd6ef7",
-    "name": "导热油加热炉",
-    "areaCode": "S06"
+    "id": "equip-2a010ca6",
+    "name": "水解液泵",
+    "areaCode": "S11"
    },
    "category": "设备",
    "severity": "警告",
-   "description": "DRY_TT_CK > 290 ℃（联锁 300）",
+   "description": "a 泵或 b 泵：有启动指令时运行反馈由 1 变 0",
+   "rule": {
+    "type": "group",
+    "op": "OR",
+    "children": [
+     {
+      "type": "group",
+      "op": "AND",
+      "children": [
+       {
+        "type": "condition",
+        "subject": {
+         "kind": "parameter",
+         "name": "a启停指令"
+        },
+        "operator": "=",
+        "aggregate": "any",
+        "durationSec": 0,
+        "threshold": {
+         "kind": "value",
+         "value": 1
+        }
+       },
+       {
+        "type": "condition",
+        "subject": {
+         "kind": "parameter",
+         "name": "a运行"
+        },
+        "operator": "change",
+        "from": 1,
+        "to": 0,
+        "aggregate": "any",
+        "durationSec": 0
+       }
+      ]
+     },
+     {
+      "type": "group",
+      "op": "AND",
+      "children": [
+       {
+        "type": "condition",
+        "subject": {
+         "kind": "parameter",
+         "name": "b启停指令"
+        },
+        "operator": "=",
+        "aggregate": "any",
+        "durationSec": 0,
+        "threshold": {
+         "kind": "value",
+         "value": 1
+        }
+       },
+       {
+        "type": "condition",
+        "subject": {
+         "kind": "parameter",
+         "name": "b运行"
+        },
+        "operator": "change",
+        "from": 1,
+        "to": 0,
+        "aggregate": "any",
+        "durationSec": 0
+       }
+      ]
+     }
+    ]
+   },
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "规则 / 处置卡",
+    "ref": "R-G-02"
+   }
+  },
+  {
+   "id": "PH-S11-20",
+   "name": "压缩空气压力不足",
+   "anchor": {
+    "kind": "equipment",
+    "id": "equip-f7eb6a8b",
+    "name": "公用测量管线",
+    "areaCode": "S01"
+   },
+   "category": "公用工程",
+   "severity": "警告",
+   "description": "压缩空气总管压力 < 0.45 MPa 持续 1 分钟",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "tag",
+     "tag": "PT_1301"
+    },
+    "operator": "<",
+    "aggregate": "any",
+    "durationSec": 60,
+    "threshold": {
+     "kind": "value",
+     "value": 0.45
+    }
+   },
+   "note": "取自 ARP-S06-01 仪表气 0.45 MPa 报警值；PL044 尚无数值",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "规则 / 处置卡",
+    "ref": "R-S11-09；ARP-S11-09"
+   }
+  },
+  {
+   "id": "PH-S11-21",
+   "name": "水解罐出料缓慢",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
+    "areaCode": "S11"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "出料时间超过常规；判定规则待定义",
+   "rule": null,
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "规则 / 处置卡",
+    "ref": "ARP-S11-09"
+   }
+  },
+  {
+   "id": "PH-S11-22",
+   "name": "固定化酶活力下降",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
+    "areaCode": "S11"
+   },
+   "category": "物料",
+   "severity": "警告",
+   "description": "酶活无法在线检测：一般 1000 批次以上需换酶；调 pH 后检测计算值仍 > 5000 也需换酶。判定规则待定义",
+   "rule": null,
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "规则 / 处置卡",
+    "ref": "ARP-S11-08 可能原因 1；调研 BF-09"
+   }
+  },
+  {
+   "id": "PH-S11-23",
+   "name": "水解终点异常 / 氨耗偏低",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
+    "areaCode": "S11"
+   },
+   "category": "工艺",
+   "severity": "严重",
+   "description": "批次结束时氨水累计加量 < 理论氨耗 × 下限系数；需 RB 投料量，判定规则待定义",
+   "rule": null,
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "规则 / 处置卡",
+    "ref": "R-S11-06；ARP-S11-08"
+   }
+  },
+  {
+   "id": "PH-A001",
+   "name": "水解进料换热温度高",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-059537b1",
+    "name": "水解液换热器组",
+    "areaCode": "S12"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "TI_1006A、TI_1006B、TI_1006C、TI_1307D H 15.0 / HH 18.0 报警",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "parameter",
+     "name": "水解进料换热温度"
+    },
+    "operator": ">",
+    "aggregate": "any",
+    "durationSec": 0,
+    "threshold": {
+     "kind": "limit",
+     "limitId": "PL003",
+     "field": "high"
+    }
+   },
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡",
+    "ref": "ARP-S12-01"
+   }
+  },
+  {
+   "id": "PH-A002",
+   "name": "水解进料换热温度 测点故障或信号异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-059537b1",
+    "name": "水解液换热器组",
+    "areaCode": "S12"
+   },
+   "category": "仪表",
+   "severity": "提示",
+   "description": "假报警；看信号质量码、数值是否冻结或突变，与同一工艺量的其他测点对比；判据：质量码为坏 / 长时间不变 / 与其他测点偏差明显",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S12-01 #1"
+   }
+  },
+  {
+   "id": "PH-A003",
+   "name": "回流换热器出口温度偏高",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-059537b1",
+    "name": "水解液换热器组",
+    "areaCode": "S12"
+   },
+   "category": "工艺",
+   "severity": "提示",
+   "description": "查看「回流换热器出口温度」实时值与报警前趋势；判据：回流换热器出口温度偏高，且变化早于或同步于 水解进料换热温度",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S12-01 #2"
+   }
+  },
+  {
+   "id": "PH-A004",
+   "name": "冷盐水流量(水解液换热器)异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-059537b1",
+    "name": "水解液换热器组",
+    "areaCode": "S12"
+   },
+   "category": "工艺",
+   "severity": "提示",
+   "description": "冷却介质流量增大，进料温度下降；查看「冷盐水流量(水解液换热器)」实时值与报警前趋势；判据：冷盐水流量(水解液换热器) 偏离正常并早于或同步于 水解进料换热温度 变化",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S12-01 #3"
+   }
+  },
+  {
+   "id": "PH-A005",
+   "name": "冰盐水流量异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-059537b1",
+    "name": "水解液换热器组",
+    "areaCode": "S12"
+   },
+   "category": "工艺",
+   "severity": "提示",
+   "description": "全厂冷盐水供给波动传导至萃取进料温度；查看「冰盐水流量」实时值与报警前趋势；判据：冰盐水流量 偏离正常并早于或同步于 水解进料换热温度 变化",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S12-01 #4"
+   }
+  },
+  {
+   "id": "PH-A006",
+   "name": "去萃取换热器冷盐水调节阀HV_1016A/B/HV_1018 调节异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-059537b1",
+    "name": "水解液换热器组",
+    "areaCode": "S12"
+   },
+   "category": "设备",
+   "severity": "提示",
+   "description": "去萃取换热器冷盐水调节阀HV_1016A/B/HV_1018开度/频率变化直接改变水解进料换热温度；对比「去萃取换热器冷盐水调节阀HV_1016A/B/HV_1018」的开度 / 频率指令与反馈；判据：指令与反馈不一致，或已到限位仍无法拉回",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S12-01 #5"
+   }
+  },
+  {
+   "id": "PH-A007",
+   "name": "控制器 水解液去萃取温度控制器(TIC-1006) 未投自动或参数不当",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-059537b1",
+    "name": "水解液换热器组",
+    "areaCode": "S12"
+   },
+   "category": "仪表",
+   "severity": "提示",
+   "description": "核对 水解液去萃取温度控制器(TIC-1006) 的手自动状态与设定值",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S12-01 #6"
+   }
+  },
+  {
+   "id": "PH-A008",
+   "name": "水解进料换热温度低",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-059537b1",
+    "name": "水解液换热器组",
+    "areaCode": "S12"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "TI_1006A、TI_1006B、TI_1006C、TI_1307D L 4.0 / LL 2.0 报警",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "parameter",
+     "name": "水解进料换热温度"
+    },
+    "operator": "<",
+    "aggregate": "any",
+    "durationSec": 0,
+    "threshold": {
+     "kind": "limit",
+     "limitId": "PL003",
+     "field": "low"
+    }
+   },
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡",
+    "ref": "ARP-S12-02"
+   }
+  },
+  {
+   "id": "PH-A009",
+   "name": "回流换热器出口温度偏低",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-059537b1",
+    "name": "水解液换热器组",
+    "areaCode": "S12"
+   },
+   "category": "工艺",
+   "severity": "提示",
+   "description": "查看「回流换热器出口温度」实时值与报警前趋势；判据：回流换热器出口温度偏低，且变化早于或同步于 水解进料换热温度",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S12-02 #2"
+   }
+  },
+  {
+   "id": "PH-A010",
+   "name": "6APA结晶罐组R112–R125高",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-759b264c",
+    "name": "6APA结晶罐组R112–R125",
+    "areaCode": "S13"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "TI_1407_A1、TI_1407_A10、TI_1407_A11、TI_1407_A12、TI_1407_A13、TI_1407_A14 H 15.0 / HH 18.0 报警",
    "rule": {
     "type": "group",
     "op": "OR",
@@ -1447,15 +1280,120 @@
      {
       "type": "condition",
       "subject": {
-       "kind": "parameter",
-       "name": "导热油出口油温"
+       "kind": "tag",
+       "tag": "TI_1407_A1"
       },
       "operator": ">",
       "aggregate": "any",
-      "durationSec": 60,
+      "durationSec": 0,
       "threshold": {
        "kind": "limit",
-       "limitId": "PL-DRY_TT_CK",
+       "limitId": "PL004",
+       "field": "high"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "TI_1407_A10"
+      },
+      "operator": ">",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL004",
+       "field": "high"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "TI_1407_A11"
+      },
+      "operator": ">",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL004",
+       "field": "high"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "TI_1407_A12"
+      },
+      "operator": ">",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL004",
+       "field": "high"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "TI_1407_A13"
+      },
+      "operator": ">",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL004",
+       "field": "high"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "TI_1407_A14"
+      },
+      "operator": ">",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL004",
+       "field": "high"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "TI_1407_A2"
+      },
+      "operator": ">",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL004",
+       "field": "high"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "TI_1407_A3"
+      },
+      "operator": ">",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL004",
        "field": "high"
       }
      }
@@ -1464,81 +1402,42 @@
    "note": "",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 附录四"
+    "kind": "处置卡",
+    "ref": "ARP-S13-01"
    }
   },
   {
-   "id": "PH-31",
-   "name": "循环冷却水给水温度高",
-   "anchor": {
-    "kind": "equipment",
-    "id": "equip-84f521ae",
-    "name": "循环水系统·公共测点",
-    "areaCode": "S15"
-   },
-   "category": "公用",
-   "severity": "提示",
-   "description": "112TT101 > 32 ℃（设计出水）",
-   "rule": {
-    "type": "group",
-    "op": "OR",
-    "children": [
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "给水温度"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 600,
-      "threshold": {
-       "kind": "value",
-       "value": 32
-      }
-     }
-    ]
-   },
-   "note": "规程 1.2.7.2：设计出水温度 32 ℃",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 1.2.7.2/4.3.11"
-   }
-  },
-  {
-   "id": "PH-32",
-   "name": "循环水中断",
+   "id": "PH-A011",
+   "name": "6APA结晶罐组R112–R125 测点故障或信号异常",
    "anchor": {
     "kind": "group",
-    "id": "egrp-f84eb72c",
-    "name": "循环水系统",
-    "areaCode": "S15"
+    "id": "egrp-759b264c",
+    "name": "6APA结晶罐组R112–R125",
+    "areaCode": "S13"
    },
-   "category": "公用",
-   "severity": "严重",
-   "description": "循环水泵全部停运或供水压力 < 0.45 MPa（判定规则待定义）",
+   "category": "仪表",
+   "severity": "提示",
+   "description": "假报警；看信号质量码、数值是否冻结或突变，与同一工艺量的其他测点对比；判据：质量码为坏 / 长时间不变 / 与其他测点偏差明显",
    "rule": null,
-   "note": "需综合 3 台循环水泵运行状态与供水压力，判定规则待定义",
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 3.3.3"
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S13-01 #1"
    }
   },
   {
-   "id": "PH-33",
-   "name": "仪表风压力低",
+   "id": "PH-A012",
+   "name": "6APA结晶罐组R112–R125低",
    "anchor": {
-    "kind": "equipment",
-    "id": "equip-f4248757",
-    "name": "净化风储罐",
+    "kind": "group",
+    "id": "egrp-759b264c",
+    "name": "6APA结晶罐组R112–R125",
     "areaCode": "S13"
    },
-   "category": "公用",
-   "severity": "严重",
-   "description": "108PT101 < 0.50 MPa（108PT101_AL 已组态）",
+   "category": "工艺",
+   "severity": "警告",
+   "description": "TI_1407_A1、TI_1407_A10、TI_1407_A11、TI_1407_A12、TI_1407_A13、TI_1407_A14 L 3.0 / LL 0.0 报警",
    "rule": {
     "type": "group",
     "op": "OR",
@@ -1546,38 +1445,144 @@
      {
       "type": "condition",
       "subject": {
-       "kind": "parameter",
-       "name": "仪表风总管压力"
+       "kind": "tag",
+       "tag": "TI_1407_A1"
       },
       "operator": "<",
       "aggregate": "any",
-      "durationSec": 60,
+      "durationSec": 0,
       "threshold": {
-       "kind": "value",
-       "value": 0.5
+       "kind": "limit",
+       "limitId": "PL004",
+       "field": "low"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "TI_1407_A10"
+      },
+      "operator": "<",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL004",
+       "field": "low"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "TI_1407_A11"
+      },
+      "operator": "<",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL004",
+       "field": "low"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "TI_1407_A12"
+      },
+      "operator": "<",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL004",
+       "field": "low"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "TI_1407_A13"
+      },
+      "operator": "<",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL004",
+       "field": "low"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "TI_1407_A14"
+      },
+      "operator": "<",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL004",
+       "field": "low"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "TI_1407_A2"
+      },
+      "operator": "<",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL004",
+       "field": "low"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "TI_1407_A3"
+      },
+      "operator": "<",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL004",
+       "field": "low"
       }
      }
     ]
    },
-   "note": "规程 1.2.7.1：仪表风进站 0.50～0.60 MPa",
+   "note": "",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 1.2.7.1/2.1.2"
+    "kind": "处置卡",
+    "ref": "ARP-S13-02"
    }
   },
   {
-   "id": "PH-34",
-   "name": "润滑油温度升高",
+   "id": "PH-A013",
+   "name": "6APA结晶罐组R112–R125高",
    "anchor": {
     "kind": "group",
-    "id": "egrp-c91b276c",
-    "name": "膨胀压缩机组",
-    "areaCode": "S08"
+    "id": "egrp-759b264c",
+    "name": "6APA结晶罐组R112–R125",
+    "areaCode": "S13"
    },
-   "category": "设备",
+   "category": "工艺",
    "severity": "警告",
-   "description": "膨胀机油冷器出口 104TE184 > 43 ℃ 或压缩机润滑油冷却后 > 40 ℃",
+   "description": "AT_1401A10、AT_1401A11、AT_1401A12、AT_1401A13、AT_1401A14、AT_1401A1 H 4.5 / HH 4.8 报警",
    "rule": {
     "type": "group",
     "op": "OR",
@@ -1585,394 +1590,2951 @@
      {
       "type": "condition",
       "subject": {
-       "kind": "parameter",
-       "name": "润滑油油箱温度"
+       "kind": "tag",
+       "tag": "AT_1401A10"
       },
       "operator": ">",
       "aggregate": "any",
-      "durationSec": 300,
+      "durationSec": 0,
       "threshold": {
-       "kind": "value",
-       "value": 60
+       "kind": "limit",
+       "limitId": "PL005",
+       "field": "high"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "AT_1401A11"
+      },
+      "operator": ">",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL005",
+       "field": "high"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "AT_1401A12"
+      },
+      "operator": ">",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL005",
+       "field": "high"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "AT_1401A13"
+      },
+      "operator": ">",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL005",
+       "field": "high"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "AT_1401A14"
+      },
+      "operator": ">",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL005",
+       "field": "high"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "AT_1401A1"
+      },
+      "operator": ">",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL005",
+       "field": "high"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "AT_1401A2"
+      },
+      "operator": ">",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL005",
+       "field": "high"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "AT_1401A3"
+      },
+      "operator": ">",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL005",
+       "field": "high"
       }
      }
     ]
    },
-   "note": "规程附录四：油箱温度 > 60 ℃ 报警",
+   "note": "",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 附录二"
+    "kind": "处置卡",
+    "ref": "ARP-S13-03"
    }
   },
   {
-   "id": "PH-35",
-   "name": "再生气空冷器出口温度高",
+   "id": "PH-A014",
+   "name": "6APA结晶罐组R112–R125低",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-759b264c",
+    "name": "6APA结晶罐组R112–R125",
+    "areaCode": "S13"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "AT_1401A10、AT_1401A11、AT_1401A12、AT_1401A13、AT_1401A14、AT_1401A1 L 3.9 / LL 3.6 报警",
+   "rule": {
+    "type": "group",
+    "op": "OR",
+    "children": [
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "AT_1401A10"
+      },
+      "operator": "<",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL005",
+       "field": "low"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "AT_1401A11"
+      },
+      "operator": "<",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL005",
+       "field": "low"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "AT_1401A12"
+      },
+      "operator": "<",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL005",
+       "field": "low"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "AT_1401A13"
+      },
+      "operator": "<",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL005",
+       "field": "low"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "AT_1401A14"
+      },
+      "operator": "<",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL005",
+       "field": "low"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "AT_1401A1"
+      },
+      "operator": "<",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL005",
+       "field": "low"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "AT_1401A2"
+      },
+      "operator": "<",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL005",
+       "field": "low"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "AT_1401A3"
+      },
+      "operator": "<",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL005",
+       "field": "low"
+      }
+     }
+    ]
+   },
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡",
+    "ref": "ARP-S13-04"
+   }
+  },
+  {
+   "id": "PH-A015",
+   "name": "酸化体系pH高",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-486703e9",
+    "name": "萃取喷射器(酸化混合器)",
+    "areaCode": "S12"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "AT_1302 H 2.8 / HH 3.2 报警",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "parameter",
+     "name": "酸化体系pH"
+    },
+    "operator": ">",
+    "aggregate": "any",
+    "durationSec": 0,
+    "threshold": {
+     "kind": "limit",
+     "limitId": "PL006",
+     "field": "high"
+    }
+   },
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡",
+    "ref": "ARP-S12-03"
+   }
+  },
+  {
+   "id": "PH-A016",
+   "name": "酸化体系pH 测点故障或信号异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-486703e9",
+    "name": "萃取喷射器(酸化混合器)",
+    "areaCode": "S12"
+   },
+   "category": "仪表",
+   "severity": "提示",
+   "description": "假报警；看信号质量码、数值是否冻结或突变，与同一工艺量的其他测点对比；判据：质量码为坏 / 长时间不变 / 与其他测点偏差明显",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S12-03 #1"
+   }
+  },
+  {
+   "id": "PH-A017",
+   "name": "盐酸进料流量异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-486703e9",
+    "name": "萃取喷射器(酸化混合器)",
+    "areaCode": "S12"
+   },
+   "category": "工艺",
+   "severity": "提示",
+   "description": "加酸量增加，体系pH降低；查看「盐酸进料流量」实时值与报警前趋势；判据：盐酸进料流量 偏离正常并早于或同步于 酸化体系pH 变化",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S12-03 #2"
+   }
+  },
+  {
+   "id": "PH-A018",
+   "name": "盐酸流量调节阀HV_1305 调节异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-486703e9",
+    "name": "萃取喷射器(酸化混合器)",
+    "areaCode": "S12"
+   },
+   "category": "设备",
+   "severity": "提示",
+   "description": "盐酸流量调节阀HV_1305开度/频率变化直接改变酸化体系pH；对比「盐酸流量调节阀HV_1305」的开度 / 频率指令与反馈；判据：指令与反馈不一致，或已到限位仍无法拉回",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S12-03 #3"
+   }
+  },
+  {
+   "id": "PH-A019",
+   "name": "控制器 萃取酸化pH控制器(AIC-1302) 未投自动或参数不当",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-486703e9",
+    "name": "萃取喷射器(酸化混合器)",
+    "areaCode": "S12"
+   },
+   "category": "仪表",
+   "severity": "提示",
+   "description": "核对 萃取酸化pH控制器(AIC-1302) 的手自动状态与设定值",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S12-03 #4"
+   }
+  },
+  {
+   "id": "PH-A020",
+   "name": "酸化体系pH低",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-486703e9",
+    "name": "萃取喷射器(酸化混合器)",
+    "areaCode": "S12"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "AT_1302 L 1.8 / LL 1.2 报警",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "parameter",
+     "name": "酸化体系pH"
+    },
+    "operator": "<",
+    "aggregate": "any",
+    "durationSec": 0,
+    "threshold": {
+     "kind": "limit",
+     "limitId": "PL006",
+     "field": "low"
+    }
+   },
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡",
+    "ref": "ARP-S12-04"
+   }
+  },
+  {
+   "id": "PH-A021",
+   "name": "轻相出口压力高",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-09c4e266",
+    "name": "RSE300提取离心机组",
+    "areaCode": "S01"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "PT_1002A、PT_1002B、PT_1002C、PT_1002D、PT_1002E H 0.35 / HH 0.45 报警",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "parameter",
+     "name": "轻相出口压力"
+    },
+    "operator": ">",
+    "aggregate": "any",
+    "durationSec": 0,
+    "threshold": {
+     "kind": "limit",
+     "limitId": "PL007",
+     "field": "high"
+    }
+   },
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡",
+    "ref": "ARP-S01-01"
+   }
+  },
+  {
+   "id": "PH-A022",
+   "name": "轻相出口压力 测点故障或信号异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-09c4e266",
+    "name": "RSE300提取离心机组",
+    "areaCode": "S01"
+   },
+   "category": "仪表",
+   "severity": "提示",
+   "description": "假报警；看信号质量码、数值是否冻结或突变，与同一工艺量的其他测点对比；判据：质量码为坏 / 长时间不变 / 与其他测点偏差明显",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S01-01 #1"
+   }
+  },
+  {
+   "id": "PH-A023",
+   "name": "轻相出口压力低",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-09c4e266",
+    "name": "RSE300提取离心机组",
+    "areaCode": "S01"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "PT_1002A、PT_1002B、PT_1002C、PT_1002D、PT_1002E L 0.1 / LL 0.05 报警",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "parameter",
+     "name": "轻相出口压力"
+    },
+    "operator": "<",
+    "aggregate": "any",
+    "durationSec": 0,
+    "threshold": {
+     "kind": "limit",
+     "limitId": "PL007",
+     "field": "low"
+    }
+   },
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡",
+    "ref": "ARP-S01-02"
+   }
+  },
+  {
+   "id": "PH-A024",
+   "name": "热水罐出水温度高",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-cd8f2bdc",
+    "name": "薄膜蒸发器组",
+    "areaCode": "S09"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "TI_1310、TI_1311A、TI_1311B、TI_1311C、TI_1311D、TI_1303 H 65.0 / HH 70.0 报警",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "parameter",
+     "name": "热水罐出水温度"
+    },
+    "operator": ">",
+    "aggregate": "any",
+    "durationSec": 0,
+    "threshold": {
+     "kind": "limit",
+     "limitId": "PL008",
+     "field": "high"
+    }
+   },
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡",
+    "ref": "ARP-S09-01"
+   }
+  },
+  {
+   "id": "PH-A025",
+   "name": "热水罐出水温度 测点故障或信号异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-cd8f2bdc",
+    "name": "薄膜蒸发器组",
+    "areaCode": "S09"
+   },
+   "category": "仪表",
+   "severity": "提示",
+   "description": "假报警；看信号质量码、数值是否冻结或突变，与同一工艺量的其他测点对比；判据：质量码为坏 / 长时间不变 / 与其他测点偏差明显",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S09-01 #1"
+   }
+  },
+  {
+   "id": "PH-A026",
+   "name": "热水罐出水温度低",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-cd8f2bdc",
+    "name": "薄膜蒸发器组",
+    "areaCode": "S09"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "TI_1310、TI_1311A、TI_1311B、TI_1311C、TI_1311D、TI_1303 L 45.0 / LL 40.0 报警",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "parameter",
+     "name": "热水罐出水温度"
+    },
+    "operator": "<",
+    "aggregate": "any",
+    "durationSec": 0,
+    "threshold": {
+     "kind": "limit",
+     "limitId": "PL008",
+     "field": "low"
+    }
+   },
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡",
+    "ref": "ARP-S09-02"
+   }
+  },
+  {
+   "id": "PH-A027",
+   "name": "去萃取换热器冷盐水调节阀HV_1016A/B/HV_1018高",
    "anchor": {
     "kind": "equipment",
-    "id": "equip-4142c03a",
-    "name": "再生气空冷器",
+    "id": "equip-d788cdf8",
+    "name": "水解液缓冲罐",
+    "areaCode": "S12"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "HV_1016A_AO、HV_1016B_AO、HV_1018_AO、HV_1016A_FB、HV_1016B_FB、HV_1018_FB H 95.0 报警",
+   "rule": {
+    "type": "group",
+    "op": "OR",
+    "children": [
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "HV_1016A_AO"
+      },
+      "operator": ">",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL017",
+       "field": "high"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "HV_1016B_AO"
+      },
+      "operator": ">",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL017",
+       "field": "high"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "HV_1018_AO"
+      },
+      "operator": ">",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL017",
+       "field": "high"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "HV_1016A_FB"
+      },
+      "operator": ">",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL017",
+       "field": "high"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "HV_1016B_FB"
+      },
+      "operator": ">",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL017",
+       "field": "high"
+      }
+     },
+     {
+      "type": "condition",
+      "subject": {
+       "kind": "tag",
+       "tag": "HV_1018_FB"
+      },
+      "operator": ">",
+      "aggregate": "any",
+      "durationSec": 0,
+      "threshold": {
+       "kind": "limit",
+       "limitId": "PL017",
+       "field": "high"
+      }
+     }
+    ]
+   },
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡",
+    "ref": "ARP-S12-05"
+   }
+  },
+  {
+   "id": "PH-A028",
+   "name": "去萃取换热器冷盐水调节阀HV_1016A/B/HV_1018 测点故障或信号异常",
+   "anchor": {
+    "kind": "equipment",
+    "id": "equip-d788cdf8",
+    "name": "水解液缓冲罐",
+    "areaCode": "S12"
+   },
+   "category": "仪表",
+   "severity": "提示",
+   "description": "假报警；看信号质量码、数值是否冻结或突变，与同一工艺量的其他测点对比；判据：质量码为坏 / 长时间不变 / 与其他测点偏差明显",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S12-05 #1"
+   }
+  },
+  {
+   "id": "PH-A029",
+   "name": "水解液去萃取温度控制器(TIC-1006) 调节异常",
+   "anchor": {
+    "kind": "equipment",
+    "id": "equip-d788cdf8",
+    "name": "水解液缓冲罐",
+    "areaCode": "S12"
+   },
+   "category": "仪表",
+   "severity": "提示",
+   "description": "控制冷媒流量保证水解液进料充分冷却；对比「水解液去萃取温度控制器(TIC-1006)」的开度 / 频率指令与反馈；判据：指令与反馈不一致，或已到限位仍无法拉回",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S12-05 #2"
+   }
+  },
+  {
+   "id": "PH-A030",
+   "name": "一阶段酸化pH高",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-09c4e266",
+    "name": "RSE300提取离心机组",
+    "areaCode": "S01"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "AT_1105、AT_1107、AT_1109 H 2.5 / HH 2.8 报警",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "parameter",
+     "name": "一阶段酸化pH"
+    },
+    "operator": ">",
+    "aggregate": "any",
+    "durationSec": 0,
+    "threshold": {
+     "kind": "limit",
+     "limitId": "PL026",
+     "field": "high"
+    }
+   },
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡",
+    "ref": "ARP-S01-03"
+   }
+  },
+  {
+   "id": "PH-A031",
+   "name": "一阶段酸化pH 测点故障或信号异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-09c4e266",
+    "name": "RSE300提取离心机组",
+    "areaCode": "S01"
+   },
+   "category": "仪表",
+   "severity": "提示",
+   "description": "假报警；看信号质量码、数值是否冻结或突变，与同一工艺量的其他测点对比；判据：质量码为坏 / 长时间不变 / 与其他测点偏差明显",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S01-03 #1"
+   }
+  },
+  {
+   "id": "PH-A032",
+   "name": "稀硫酸注入流量异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-09c4e266",
+    "name": "RSE300提取离心机组",
+    "areaCode": "S01"
+   },
+   "category": "工艺",
+   "severity": "提示",
+   "description": "加酸量增加，体系pH降低；查看「稀硫酸注入流量」实时值与报警前趋势；判据：稀硫酸注入流量 偏离正常并早于或同步于 一阶段酸化pH 变化",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S01-03 #2"
+   }
+  },
+  {
+   "id": "PH-A033",
+   "name": "稀硫酸浓度异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-09c4e266",
+    "name": "RSE300提取离心机组",
+    "areaCode": "S01"
+   },
+   "category": "工艺",
+   "severity": "提示",
+   "description": "配酸浓度偏高导致同流量下pH偏低；查看「稀硫酸浓度」实时值与报警前趋势；判据：稀硫酸浓度 偏离正常并早于或同步于 一阶段酸化pH 变化",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S01-03 #3"
+   }
+  },
+  {
+   "id": "PH-A034",
+   "name": "稀硫酸泵变频器PB_1015A–F 调节异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-09c4e266",
+    "name": "RSE300提取离心机组",
+    "areaCode": "S01"
+   },
+   "category": "设备",
+   "severity": "提示",
+   "description": "稀硫酸泵变频器PB_1015A–F开度/频率变化直接改变一阶段酸化pH；对比「稀硫酸泵变频器PB_1015A–F」的开度 / 频率指令与反馈；判据：指令与反馈不一致，或已到限位仍无法拉回",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S01-03 #4"
+   }
+  },
+  {
+   "id": "PH-A035",
+   "name": "控制器 提取酸化pH控制器(AIC-1105) 未投自动或参数不当",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-09c4e266",
+    "name": "RSE300提取离心机组",
+    "areaCode": "S01"
+   },
+   "category": "仪表",
+   "severity": "提示",
+   "description": "核对 提取酸化pH控制器(AIC-1105) 的手自动状态与设定值",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S01-03 #5"
+   }
+  },
+  {
+   "id": "PH-A036",
+   "name": "一阶段酸化pH低",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-09c4e266",
+    "name": "RSE300提取离心机组",
+    "areaCode": "S01"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "AT_1105、AT_1107、AT_1109 L 1.8 / LL 1.6 报警",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "parameter",
+     "name": "一阶段酸化pH"
+    },
+    "operator": "<",
+    "aggregate": "any",
+    "durationSec": 0,
+    "threshold": {
+     "kind": "limit",
+     "limitId": "PL026",
+     "field": "low"
+    }
+   },
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡",
+    "ref": "ARP-S01-04"
+   }
+  },
+  {
+   "id": "PH-A037",
+   "name": "二阶段酸化pH高",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-09c4e266",
+    "name": "RSE300提取离心机组",
+    "areaCode": "S01"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "AT_1106、AT_1108、AT_1110 H 2.5 / HH 2.8 报警",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "parameter",
+     "name": "二阶段酸化pH"
+    },
+    "operator": ">",
+    "aggregate": "any",
+    "durationSec": 0,
+    "threshold": {
+     "kind": "limit",
+     "limitId": "PL027",
+     "field": "high"
+    }
+   },
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡",
+    "ref": "ARP-S01-05"
+   }
+  },
+  {
+   "id": "PH-A038",
+   "name": "二阶段酸化pH 测点故障或信号异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-09c4e266",
+    "name": "RSE300提取离心机组",
+    "areaCode": "S01"
+   },
+   "category": "仪表",
+   "severity": "提示",
+   "description": "假报警；看信号质量码、数值是否冻结或突变，与同一工艺量的其他测点对比；判据：质量码为坏 / 长时间不变 / 与其他测点偏差明显",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S01-05 #1"
+   }
+  },
+  {
+   "id": "PH-A039",
+   "name": "二阶段酸化pH低",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-09c4e266",
+    "name": "RSE300提取离心机组",
+    "areaCode": "S01"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "AT_1106、AT_1108、AT_1110 L 1.8 / LL 1.6 报警",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "parameter",
+     "name": "二阶段酸化pH"
+    },
+    "operator": "<",
+    "aggregate": "any",
+    "durationSec": 0,
+    "threshold": {
+     "kind": "limit",
+     "limitId": "PL027",
+     "field": "low"
+    }
+   },
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡",
+    "ref": "ARP-S01-06"
+   }
+  },
+  {
+   "id": "PH-A040",
+   "name": "RSE200萃取pH高",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-17521e7a",
+    "name": "RSE200提取离心机组(三萃)",
+    "areaCode": "S02"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "AT_1101、AT_1102、AT_1103、AT_1104 H 2.5 / HH 2.8 报警",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "parameter",
+     "name": "RSE200萃取pH"
+    },
+    "operator": ">",
+    "aggregate": "any",
+    "durationSec": 0,
+    "threshold": {
+     "kind": "limit",
+     "limitId": "PL028",
+     "field": "high"
+    }
+   },
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡",
+    "ref": "ARP-S02-01"
+   }
+  },
+  {
+   "id": "PH-A041",
+   "name": "RSE200萃取pH 测点故障或信号异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-17521e7a",
+    "name": "RSE200提取离心机组(三萃)",
+    "areaCode": "S02"
+   },
+   "category": "仪表",
+   "severity": "提示",
+   "description": "假报警；看信号质量码、数值是否冻结或突变，与同一工艺量的其他测点对比；判据：质量码为坏 / 长时间不变 / 与其他测点偏差明显",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S02-01 #1"
+   }
+  },
+  {
+   "id": "PH-A042",
+   "name": "RSE200萃取pH低",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-17521e7a",
+    "name": "RSE200提取离心机组(三萃)",
+    "areaCode": "S02"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "AT_1101、AT_1102、AT_1103、AT_1104 L 1.8 / LL 1.6 报警",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "parameter",
+     "name": "RSE200萃取pH"
+    },
+    "operator": "<",
+    "aggregate": "any",
+    "durationSec": 0,
+    "threshold": {
+     "kind": "limit",
+     "limitId": "PL028",
+     "field": "low"
+    }
+   },
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡",
+    "ref": "ARP-S02-02"
+   }
+  },
+  {
+   "id": "PH-A043",
+   "name": "滤液温度高",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-e05bb657",
+    "name": "发酵滤液储罐组",
+    "areaCode": "S01"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "TI_1101 H 12.0 / HH 15.0 报警",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "parameter",
+     "name": "滤液温度"
+    },
+    "operator": ">",
+    "aggregate": "any",
+    "durationSec": 0,
+    "threshold": {
+     "kind": "limit",
+     "limitId": "PL029",
+     "field": "high"
+    }
+   },
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡",
+    "ref": "ARP-S01-07"
+   }
+  },
+  {
+   "id": "PH-A044",
+   "name": "滤液温度 测点故障或信号异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-e05bb657",
+    "name": "发酵滤液储罐组",
+    "areaCode": "S01"
+   },
+   "category": "仪表",
+   "severity": "提示",
+   "description": "假报警；看信号质量码、数值是否冻结或突变，与同一工艺量的其他测点对比；判据：质量码为坏 / 长时间不变 / 与其他测点偏差明显",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S01-07 #1"
+   }
+  },
+  {
+   "id": "PH-A045",
+   "name": "滤液温度低",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-e05bb657",
+    "name": "发酵滤液储罐组",
+    "areaCode": "S01"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "TI_1101 L 2.0 报警",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "parameter",
+     "name": "滤液温度"
+    },
+    "operator": "<",
+    "aggregate": "any",
+    "durationSec": 0,
+    "threshold": {
+     "kind": "limit",
+     "limitId": "PL029",
+     "field": "low"
+    }
+   },
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡",
+    "ref": "ARP-S01-08"
+   }
+  },
+  {
+   "id": "PH-A046",
+   "name": "废酸水中和pH高",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-ae7a6c3f",
+    "name": "三级废酸水罐/废酸水中和罐V2124",
+    "areaCode": "S01"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "AT_1111 H 9.0 / HH 10.0 报警",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "parameter",
+     "name": "废酸水中和pH"
+    },
+    "operator": ">",
+    "aggregate": "any",
+    "durationSec": 0,
+    "threshold": {
+     "kind": "limit",
+     "limitId": "PL030",
+     "field": "high"
+    }
+   },
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡",
+    "ref": "ARP-S01-09"
+   }
+  },
+  {
+   "id": "PH-A047",
+   "name": "废酸水中和pH 测点故障或信号异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-ae7a6c3f",
+    "name": "三级废酸水罐/废酸水中和罐V2124",
+    "areaCode": "S01"
+   },
+   "category": "仪表",
+   "severity": "提示",
+   "description": "假报警；看信号质量码、数值是否冻结或突变，与同一工艺量的其他测点对比；判据：质量码为坏 / 长时间不变 / 与其他测点偏差明显",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S01-09 #1"
+   }
+  },
+  {
+   "id": "PH-A048",
+   "name": "废酸水中和罐液碱调节阀HV_1101 调节异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-ae7a6c3f",
+    "name": "三级废酸水罐/废酸水中和罐V2124",
+    "areaCode": "S01"
+   },
+   "category": "设备",
+   "severity": "提示",
+   "description": "废酸水中和罐液碱调节阀HV_1101开度/频率变化直接改变废酸水中和pH；对比「废酸水中和罐液碱调节阀HV_1101」的开度 / 频率指令与反馈；判据：指令与反馈不一致，或已到限位仍无法拉回",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S01-09 #2"
+   }
+  },
+  {
+   "id": "PH-A049",
+   "name": "控制器 废酸水中和pH控制器(AIC-1111) 未投自动或参数不当",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-ae7a6c3f",
+    "name": "三级废酸水罐/废酸水中和罐V2124",
+    "areaCode": "S01"
+   },
+   "category": "仪表",
+   "severity": "提示",
+   "description": "核对 废酸水中和pH控制器(AIC-1111) 的手自动状态与设定值",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S01-09 #3"
+   }
+  },
+  {
+   "id": "PH-A050",
+   "name": "废酸水中和pH低",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-ae7a6c3f",
+    "name": "三级废酸水罐/废酸水中和罐V2124",
+    "areaCode": "S01"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "AT_1111 L 6.0 / LL 5.0 报警",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "parameter",
+     "name": "废酸水中和pH"
+    },
+    "operator": "<",
+    "aggregate": "any",
+    "durationSec": 0,
+    "threshold": {
+     "kind": "limit",
+     "limitId": "PL030",
+     "field": "low"
+    }
+   },
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡",
+    "ref": "ARP-S01-10"
+   }
+  },
+  {
+   "id": "PH-A051",
+   "name": "一离出口pH(RB液pH)高",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-3ec89f52",
+    "name": "抽提一级离心机组(CT1)",
+    "areaCode": "S07"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "AT_1206 H 7.5 / HH 8.0 报警",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "parameter",
+     "name": "一离出口pH(RB液pH)"
+    },
+    "operator": ">",
+    "aggregate": "any",
+    "durationSec": 0,
+    "threshold": {
+     "kind": "limit",
+     "limitId": "PL036",
+     "field": "high"
+    }
+   },
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡",
+    "ref": "ARP-S07-01"
+   }
+  },
+  {
+   "id": "PH-A052",
+   "name": "一离出口pH(RB液pH) 测点故障或信号异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-3ec89f52",
+    "name": "抽提一级离心机组(CT1)",
+    "areaCode": "S07"
+   },
+   "category": "仪表",
+   "severity": "提示",
+   "description": "假报警；看信号质量码、数值是否冻结或突变，与同一工艺量的其他测点对比；判据：质量码为坏 / 长时间不变 / 与其他测点偏差明显",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S07-01 #1"
+   }
+  },
+  {
+   "id": "PH-A053",
+   "name": "一离碳酸钾流量偏高",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-3ec89f52",
+    "name": "抽提一级离心机组(CT1)",
+    "areaCode": "S07"
+   },
+   "category": "工艺",
+   "severity": "提示",
+   "description": "碳酸钾量增大pH升高；查看「一离碳酸钾流量」实时值与报警前趋势；判据：一离碳酸钾流量偏高，且变化早于或同步于 一离出口pH(RB液pH)",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S07-01 #2"
+   }
+  },
+  {
+   "id": "PH-A054",
+   "name": "一次离心机pH控制输出HV_1202 调节异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-3ec89f52",
+    "name": "抽提一级离心机组(CT1)",
+    "areaCode": "S07"
+   },
+   "category": "设备",
+   "severity": "提示",
+   "description": "一次离心机pH控制输出HV_1202开度/频率变化直接改变一离出口pH(RB液pH)；对比「一次离心机pH控制输出HV_1202」的开度 / 频率指令与反馈；判据：指令与反馈不一致，或已到限位仍无法拉回",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S07-01 #3"
+   }
+  },
+  {
+   "id": "PH-A055",
+   "name": "控制器 一次离心机pH控制器(AIC-1206) 未投自动或参数不当",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-3ec89f52",
+    "name": "抽提一级离心机组(CT1)",
+    "areaCode": "S07"
+   },
+   "category": "仪表",
+   "severity": "提示",
+   "description": "核对 一次离心机pH控制器(AIC-1206) 的手自动状态与设定值",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S07-01 #4"
+   }
+  },
+  {
+   "id": "PH-A056",
+   "name": "一离出口pH(RB液pH)低",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-3ec89f52",
+    "name": "抽提一级离心机组(CT1)",
+    "areaCode": "S07"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "AT_1206 L 6.5 / LL 6.2 报警",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "parameter",
+     "name": "一离出口pH(RB液pH)"
+    },
+    "operator": "<",
+    "aggregate": "any",
+    "durationSec": 0,
+    "threshold": {
+     "kind": "limit",
+     "limitId": "PL036",
+     "field": "low"
+    }
+   },
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡",
+    "ref": "ARP-S07-02"
+   }
+  },
+  {
+   "id": "PH-A057",
+   "name": "一离碳酸钾流量偏低",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-3ec89f52",
+    "name": "抽提一级离心机组(CT1)",
+    "areaCode": "S07"
+   },
+   "category": "工艺",
+   "severity": "提示",
+   "description": "碳酸钾量增大pH升高；查看「一离碳酸钾流量」实时值与报警前趋势；判据：一离碳酸钾流量偏低，且变化早于或同步于 一离出口pH(RB液pH)",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S07-02 #2"
+   }
+  },
+  {
+   "id": "PH-A058",
+   "name": "二级结晶pH高",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-1ae3b1c7",
+    "name": "二级结晶罐C102(南罐)",
+    "areaCode": "S14"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "JJG_NPHJ H 4.5 / HH 4.8 报警",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "parameter",
+     "name": "二级结晶pH"
+    },
+    "operator": ">",
+    "aggregate": "any",
+    "durationSec": 0,
+    "threshold": {
+     "kind": "limit",
+     "limitId": "PL052",
+     "field": "high"
+    }
+   },
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡",
+    "ref": "ARP-S14-01"
+   }
+  },
+  {
+   "id": "PH-A059",
+   "name": "二级结晶pH 测点故障或信号异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-1ae3b1c7",
+    "name": "二级结晶罐C102(南罐)",
+    "areaCode": "S14"
+   },
+   "category": "仪表",
+   "severity": "提示",
+   "description": "假报警；看信号质量码、数值是否冻结或突变，与同一工艺量的其他测点对比；判据：质量码为坏 / 长时间不变 / 与其他测点偏差明显",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S14-01 #1"
+   }
+  },
+  {
+   "id": "PH-A060",
+   "name": "氨水调节阀2#JJG_ASB 调节异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-1ae3b1c7",
+    "name": "二级结晶罐C102(南罐)",
+    "areaCode": "S14"
+   },
+   "category": "设备",
+   "severity": "提示",
+   "description": "氨水调节阀2#JJG_ASB开度/频率变化直接改变二级结晶pH；对比「氨水调节阀2#JJG_ASB」的开度 / 频率指令与反馈；判据：指令与反馈不一致，或已到限位仍无法拉回",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S14-01 #2"
+   }
+  },
+  {
+   "id": "PH-A061",
+   "name": "控制器 二级结晶pH控制器 未投自动或参数不当",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-1ae3b1c7",
+    "name": "二级结晶罐C102(南罐)",
+    "areaCode": "S14"
+   },
+   "category": "仪表",
+   "severity": "提示",
+   "description": "核对 二级结晶pH控制器 的手自动状态与设定值",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S14-01 #3"
+   }
+  },
+  {
+   "id": "PH-A062",
+   "name": "二级结晶pH低",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-1ae3b1c7",
+    "name": "二级结晶罐C102(南罐)",
+    "areaCode": "S14"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "JJG_NPHJ L 3.9 / LL 3.6 报警",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "parameter",
+     "name": "二级结晶pH"
+    },
+    "operator": "<",
+    "aggregate": "any",
+    "durationSec": 0,
+    "threshold": {
+     "kind": "limit",
+     "limitId": "PL052",
+     "field": "low"
+    }
+   },
+   "note": "",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡",
+    "ref": "ARP-S14-02"
+   }
+  },
+  {
+   "id": "PH-A063",
+   "name": "浓硫酸罐高位报警",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-9d65254d",
+    "name": "浓硫酸储罐组",
     "areaCode": "S03"
    },
    "category": "工艺",
-   "severity": "提示",
-   "description": "103TT104 > 40 ℃（报警 45）",
-   "rule": {
-    "type": "group",
-    "op": "OR",
-    "children": [
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "出口温度"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 300,
-      "threshold": {
-       "kind": "limit",
-       "limitId": "PL-103TT104",
-       "field": "high"
-      }
-     }
-    ]
-   },
-   "note": "",
+   "severity": "警告",
+   "description": "",
+   "rule": null,
+   "note": "处置卡未给出可用的限值，判定规则待定义",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "规程（旧版）/ 点表",
-    "ref": "北I-2装置操作规程（旧版） 附录四"
+    "kind": "处置卡",
+    "ref": "ARP-S03-01"
    }
   },
   {
-   "id": "PH-36",
-   "name": "重烃收集罐烃室液位持续上涨",
+   "id": "PH-A064",
+   "name": "浓硫酸罐液位 测点故障或信号异常",
    "anchor": {
-    "kind": "equipment",
-    "id": "equip-d8ac1bb7",
-    "name": "重烃收集罐",
-    "areaCode": "S02"
+    "kind": "group",
+    "id": "egrp-9d65254d",
+    "name": "浓硫酸储罐组",
+    "areaCode": "S03"
+   },
+   "category": "仪表",
+   "severity": "提示",
+   "description": "假报警；看信号质量码、数值是否冻结或突变，与同一工艺量的其他测点对比；判据：质量码为坏 / 长时间不变 / 与其他测点偏差明显",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S03-01 #1"
+   }
+  },
+  {
+   "id": "PH-A065",
+   "name": "破乳剂低位报警",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-51ddf544",
+    "name": "破乳剂缓冲罐(出料缓冲罐)",
+    "areaCode": "S04"
    },
    "category": "工艺",
    "severity": "警告",
-   "description": "烃室液位 102LT102 上升速率 > 0.1 %/min 持续 10 分钟，且液位高于运行值 30%",
-   "rule": {
-    "type": "group",
-    "op": "AND",
-    "children": [
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "calc",
-       "calcId": "CALC-07"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 600,
-      "threshold": {
-       "kind": "value",
-       "value": 0.1
-      }
-     },
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "烃室液位"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 600,
-      "threshold": {
-       "kind": "value",
-       "value": 30
-      }
-     }
-    ]
-   },
-   "note": "运行值 30% 取自排查表；上升速率 0.1 %/min 为占位阈值，待现场提供",
+   "description": "",
+   "rule": null,
+   "note": "处置卡未给出可用的限值，判定规则待定义",
    "status": "草案·待工艺确认",
    "source": {
-    "kind": "现场异常排查表",
-    "ref": "现场异常排查表（用户提供，重烃收集罐烃室液位）"
+    "kind": "处置卡",
+    "ref": "ARP-S04-01"
    }
   },
   {
-   "id": "PH-37",
-   "name": "重烃泵均未运行",
-   "anchor": {
-    "kind": "equipment",
-    "id": "equip-d8ac1bb7",
-    "name": "重烃收集罐",
-    "areaCode": "S02"
-   },
-   "category": "设备",
-   "severity": "警告",
-   "description": "1#、2# 重烃泵运行状态 102_Z_101、102_Z_102 均为 0 持续 2 分钟",
-   "rule": {
-    "type": "group",
-    "op": "AND",
-    "children": [
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "tag",
-       "tag": "102_Z_101"
-      },
-      "operator": "=",
-      "aggregate": "any",
-      "durationSec": 120,
-      "threshold": {
-       "kind": "value",
-       "value": 0
-      }
-     },
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "tag",
-       "tag": "102_Z_102"
-      },
-      "operator": "=",
-      "aggregate": "any",
-      "durationSec": 120,
-      "threshold": {
-       "kind": "value",
-       "value": 0
-      }
-     }
-    ]
-   },
-   "note": "排查 1：两台泵都不在运行（一用一备时只有一台停属正常）",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "现场异常排查表",
-    "ref": "现场异常排查表（用户提供，重烃收集罐烃室液位） 排查 1"
-   }
-  },
-  {
-   "id": "PH-38",
-   "name": "变频重烃泵输出与反馈不匹配或已全开",
+   "id": "PH-A066",
+   "name": "破乳剂缓冲罐液位 测点故障或信号异常",
    "anchor": {
     "kind": "group",
-    "id": "egrp-89eb688c",
-    "name": "重烃泵组",
-    "areaCode": "S02"
+    "id": "egrp-51ddf544",
+    "name": "破乳剂缓冲罐(出料缓冲罐)",
+    "areaCode": "S04"
+   },
+   "category": "仪表",
+   "severity": "提示",
+   "description": "假报警；看信号质量码、数值是否冻结或突变，与同一工艺量的其他测点对比；判据：质量码为坏 / 长时间不变 / 与其他测点偏差明显",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S04-01 #1"
+   }
+  },
+  {
+   "id": "PH-A067",
+   "name": "水洗重相罐高位报警",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-ebfd5a80",
+    "name": "水洗重相罐",
+    "areaCode": "S05"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "",
+   "rule": null,
+   "note": "处置卡未给出可用的限值，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡",
+    "ref": "ARP-S05-01"
+   }
+  },
+  {
+   "id": "PH-A068",
+   "name": "水洗重相罐液位 测点故障或信号异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-ebfd5a80",
+    "name": "水洗重相罐",
+    "areaCode": "S05"
+   },
+   "category": "仪表",
+   "severity": "提示",
+   "description": "假报警；看信号质量码、数值是否冻结或突变，与同一工艺量的其他测点对比；判据：质量码为坏 / 长时间不变 / 与其他测点偏差明显",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S05-01 #1"
+   }
+  },
+  {
+   "id": "PH-A069",
+   "name": "水洗重相罐泵后调节阀HV_1007 调节异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-ebfd5a80",
+    "name": "水洗重相罐",
+    "areaCode": "S05"
    },
    "category": "设备",
+   "severity": "提示",
+   "description": "水洗重相罐泵后调节阀HV_1007开度/频率变化直接改变水洗重相罐液位；对比「水洗重相罐泵后调节阀HV_1007」的开度 / 频率指令与反馈；判据：指令与反馈不一致，或已到限位仍无法拉回",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S05-01 #2"
+   }
+  },
+  {
+   "id": "PH-A070",
+   "name": "控制器 水洗重相外送控制器(LIC-SXZ) 未投自动或参数不当",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-ebfd5a80",
+    "name": "水洗重相罐",
+    "areaCode": "S05"
+   },
+   "category": "仪表",
+   "severity": "提示",
+   "description": "核对 水洗重相外送控制器(LIC-SXZ) 的手自动状态与设定值",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S05-01 #3"
+   }
+  },
+  {
+   "id": "PH-A071",
+   "name": "仪表气压力低于0.45报警",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
+    "areaCode": "S11"
+   },
+   "category": "工艺",
    "severity": "警告",
-   "description": "本台 变频控制（输出）与 变频反馈 偏差 > 10% 持续 5 分钟，或输出 ≥ 95%（已全开 / 正在开大）",
+   "description": "",
+   "rule": null,
+   "note": "处置卡未给出可用的限值，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡",
+    "ref": "ARP-S06-01"
+   }
+  },
+  {
+   "id": "PH-A072",
+   "name": "压缩空气总管压力 测点故障或信号异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
+    "areaCode": "S11"
+   },
+   "category": "仪表",
+   "severity": "提示",
+   "description": "假报警；看信号质量码、数值是否冻结或突变，与同一工艺量的其他测点对比；判据：质量码为坏 / 长时间不变 / 与其他测点偏差明显",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S06-01 #1"
+   }
+  },
+  {
+   "id": "PH-A073",
+   "name": "芬特高压报警",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-993783b1",
+    "name": "芬特过滤器组",
+    "areaCode": "S06"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "",
+   "rule": null,
+   "note": "处置卡未给出可用的限值，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡",
+    "ref": "ARP-S06-02"
+   }
+  },
+  {
+   "id": "PH-A074",
+   "name": "芬特罐压力 测点故障或信号异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-993783b1",
+    "name": "芬特过滤器组",
+    "areaCode": "S06"
+   },
+   "category": "仪表",
+   "severity": "提示",
+   "description": "假报警；看信号质量码、数值是否冻结或突变，与同一工艺量的其他测点对比；判据：质量码为坏 / 长时间不变 / 与其他测点偏差明显",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S06-02 #1"
+   }
+  },
+  {
+   "id": "PH-A075",
+   "name": "芬特滤液浊度高",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-993783b1",
+    "name": "芬特过滤器组",
+    "areaCode": "S06"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "",
+   "rule": null,
+   "note": "处置卡未给出可用的限值，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡",
+    "ref": "ARP-S06-03"
+   }
+  },
+  {
+   "id": "PH-A076",
+   "name": "滤液浊度 测点故障或信号异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-993783b1",
+    "name": "芬特过滤器组",
+    "areaCode": "S06"
+   },
+   "category": "仪表",
+   "severity": "提示",
+   "description": "假报警；看信号质量码、数值是否冻结或突变，与同一工艺量的其他测点对比；判据：质量码为坏 / 长时间不变 / 与其他测点偏差明显",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S06-03 #1"
+   }
+  },
+  {
+   "id": "PH-A077",
+   "name": "RB高液位回流提示",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-dabfc384",
+    "name": "RB储罐A/B（水解进料）",
+    "areaCode": "S11"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "",
+   "rule": null,
+   "note": "处置卡未给出可用的限值，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡",
+    "ref": "ARP-S09-03"
+   }
+  },
+  {
+   "id": "PH-A078",
+   "name": "RB储罐液位 测点故障或信号异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-dabfc384",
+    "name": "RB储罐A/B（水解进料）",
+    "areaCode": "S11"
+   },
+   "category": "仪表",
+   "severity": "提示",
+   "description": "假报警；看信号质量码、数值是否冻结或突变，与同一工艺量的其他测点对比；判据：质量码为坏 / 长时间不变 / 与其他测点偏差明显",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S09-03 #1"
+   }
+  },
+  {
+   "id": "PH-A079",
+   "name": "重液阀全关报警",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-759b264c",
+    "name": "6APA结晶罐组R112–R125",
+    "areaCode": "S13"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "",
+   "rule": null,
+   "note": "处置卡未给出可用的限值，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡",
+    "ref": "ARP-S13-05"
+   }
+  },
+  {
+   "id": "PH-A080",
+   "name": "重液进料流量 测点故障或信号异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-759b264c",
+    "name": "6APA结晶罐组R112–R125",
+    "areaCode": "S13"
+   },
+   "category": "仪表",
+   "severity": "提示",
+   "description": "假报警；看信号质量码、数值是否冻结或突变，与同一工艺量的其他测点对比；判据：质量码为坏 / 长时间不变 / 与其他测点偏差明显",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S13-05 #1"
+   }
+  },
+  {
+   "id": "PH-A081",
+   "name": "结晶罐结晶液进口调节阀HV_1027 调节异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-759b264c",
+    "name": "6APA结晶罐组R112–R125",
+    "areaCode": "S13"
+   },
+   "category": "设备",
+   "severity": "提示",
+   "description": "结晶罐结晶液进口调节阀HV_1027开度/频率变化直接改变重液进料流量；对比「结晶罐结晶液进口调节阀HV_1027」的开度 / 频率指令与反馈；判据：指令与反馈不一致，或已到限位仍无法拉回",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S13-05 #2"
+   }
+  },
+  {
+   "id": "PH-A082",
+   "name": "控制器 结晶重液进料流量控制器(FIC-1005) 未投自动或参数不当",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-759b264c",
+    "name": "6APA结晶罐组R112–R125",
+    "areaCode": "S13"
+   },
+   "category": "仪表",
+   "severity": "提示",
+   "description": "核对 结晶重液进料流量控制器(FIC-1005) 的手自动状态与设定值",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S13-05 #3"
+   }
+  },
+  {
+   "id": "PH-A083",
+   "name": "盐酸储罐低液位报警",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-74363d52",
+    "name": "室外盐酸储罐组",
+    "areaCode": "S15"
+   },
+   "category": "工艺",
+   "severity": "警告",
+   "description": "",
+   "rule": null,
+   "note": "处置卡未给出可用的限值，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡",
+    "ref": "ARP-S15-01"
+   }
+  },
+  {
+   "id": "PH-A084",
+   "name": "盐酸储罐液位 测点故障或信号异常",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-74363d52",
+    "name": "室外盐酸储罐组",
+    "areaCode": "S15"
+   },
+   "category": "仪表",
+   "severity": "提示",
+   "description": "假报警；看信号质量码、数值是否冻结或突变，与同一工艺量的其他测点对比；判据：质量码为坏 / 长时间不变 / 与其他测点偏差明显",
+   "rule": null,
+   "note": "由处置卡「可能原因」生成，判定规则待定义",
+   "status": "草案·待工艺确认",
+   "source": {
+    "kind": "处置卡·可能原因",
+    "ref": "ARP-S15-01 #1"
+   }
+  },
+  {
+   "id": "PH-W001",
+   "name": "工况·水解反应期",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
+    "areaCode": "S11"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S11:水解反应期",
+   "description": "阶段「反应」或「终点判定」：搅拌运行，氨水进料阀开（滴加氨水）或已关（氨耗趋零）",
    "rule": {
     "type": "group",
     "op": "OR",
     "children": [
      {
-      "type": "condition",
-      "subject": {
-       "kind": "calc",
-       "calcId": "CALC-08"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 300,
-      "threshold": {
-       "kind": "value",
-       "value": 10
-      }
+      "type": "group",
+      "op": "AND",
+      "children": [
+       {
+        "type": "condition",
+        "subject": {
+         "kind": "parameter",
+         "name": "搅拌运行"
+        },
+        "operator": "=",
+        "aggregate": "any",
+        "durationSec": 0,
+        "threshold": {
+         "kind": "value",
+         "value": 1
+        }
+       },
+       {
+        "type": "condition",
+        "subject": {
+         "kind": "parameter",
+         "name": "氨水进料阀"
+        },
+        "operator": "=",
+        "aggregate": "any",
+        "durationSec": 0,
+        "threshold": {
+         "kind": "value",
+         "value": 1
+        }
+       }
+      ]
      },
+     {
+      "type": "group",
+      "op": "AND",
+      "children": [
+       {
+        "type": "condition",
+        "subject": {
+         "kind": "parameter",
+         "name": "搅拌运行"
+        },
+        "operator": "=",
+        "aggregate": "any",
+        "durationSec": 0,
+        "threshold": {
+         "kind": "value",
+         "value": 1
+        }
+       },
+       {
+        "type": "condition",
+        "subject": {
+         "kind": "parameter",
+         "name": "氨水进料阀"
+        },
+        "operator": "=",
+        "aggregate": "any",
+        "durationSec": 0,
+        "threshold": {
+         "kind": "value",
+         "value": 0
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "status": "草案·待工艺确认",
+   "note": "按 6APA_工序与阶段.xlsx 的 DCS 识别条件",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL001、PL002、PL009、PL010"
+   }
+  },
+  {
+   "id": "PH-W002",
+   "name": "换酶后第 801～∞ 批",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
+    "areaCode": "S11"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "batch:S11:801-",
+   "description": "本罐自上次换酶以来的批次数在此区间（来自 EBR 换酶记录）",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "context",
+     "name": "换酶后批次数"
+    },
+    "operator": ">=",
+    "aggregate": "any",
+    "durationSec": 0,
+    "threshold": {
+     "kind": "value",
+     "value": 801.0
+    }
+   },
+   "status": "草案·待工艺确认",
+   "note": "运行上下文取自 EBR，本 Demo 未接入，试算显示无法判定",
+   "source": {
+    "kind": "限值版本·适用条件",
+    "ref": "PL001、PL002"
+   }
+  },
+  {
+   "id": "PH-W003",
+   "name": "换酶后第 1～800 批",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
+    "areaCode": "S11"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "batch:S11:1-800",
+   "description": "本罐自上次换酶以来的批次数在此区间（来自 EBR 换酶记录）",
+   "rule": {
+    "type": "group",
+    "op": "AND",
+    "children": [
      {
       "type": "condition",
       "subject": {
-       "kind": "parameter",
-       "name": "变频控制"
+       "kind": "context",
+       "name": "换酶后批次数"
       },
       "operator": ">=",
       "aggregate": "any",
-      "durationSec": 300,
+      "durationSec": 0,
       "threshold": {
        "kind": "value",
-       "value": 95
-      }
-     }
-    ]
-   },
-   "note": "排查 2：偏差 10%、全开 95% 为占位阈值，待现场提供",
-   "status": "草案·待工艺确认",
-   "source": {
-    "kind": "现场异常排查表",
-    "ref": "现场异常排查表（用户提供，重烃收集罐烃室液位） 排查 2"
-   }
-  },
-  {
-   "id": "PH-39",
-   "name": "重烃储罐入口阀均未开启",
-   "anchor": {
-    "kind": "equipment",
-    "id": "equip-66990edb",
-    "name": "重烃储罐组·公共测点",
-    "areaCode": "S11"
-   },
-   "category": "工况",
-   "severity": "警告",
-   "description": "1#、2# 重烃储罐倒罐（入口）阀开反馈 HZO_106、HZO_111A 均为 0 持续 1 分钟",
-   "rule": {
-    "type": "group",
-    "op": "AND",
-    "children": [
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "tag",
-       "tag": "HZO_106"
-      },
-      "operator": "=",
-      "aggregate": "any",
-      "durationSec": 60,
-      "threshold": {
-       "kind": "value",
-       "value": 0
+       "value": 1.0
       }
      },
      {
       "type": "condition",
       "subject": {
-       "kind": "tag",
-       "tag": "HZO_111A"
+       "kind": "context",
+       "name": "换酶后批次数"
       },
-      "operator": "=",
+      "operator": "<=",
       "aggregate": "any",
-      "durationSec": 60,
+      "durationSec": 0,
       "threshold": {
        "kind": "value",
-       "value": 0
+       "value": 800.0
       }
      }
     ]
    },
-   "note": "排查 3：入口阀即画面上的倒罐阀 105HV106A / 105HV111A，按开反馈判断",
    "status": "草案·待工艺确认",
+   "note": "运行上下文取自 EBR，本 Demo 未接入，试算显示无法判定",
    "source": {
-    "kind": "现场异常排查表",
-    "ref": "现场异常排查表（用户提供，重烃收集罐烃室液位） 排查 3"
+    "kind": "限值版本·适用条件",
+    "ref": "PL002"
    }
   },
   {
-   "id": "PH-40",
-   "name": "重烃进罐总阀未开启",
+   "id": "PH-W004",
+   "name": "工况·进萃取前",
    "anchor": {
-    "kind": "equipment",
-    "id": "equip-fa6856f4",
-    "name": "重烃进罐管线总阀",
+    "kind": "group",
+    "id": "egrp-059537b1",
+    "name": "水解液换热器组",
+    "areaCode": "S12"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S12:进萃取前",
+   "description": "萃取与反萃（苯乙酸分离） 处于「进萃取前」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL003"
+   }
+  },
+  {
+   "id": "PH-W005",
+   "name": "工况·结晶期",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-759b264c",
+    "name": "6APA结晶罐组R112–R125",
+    "areaCode": "S13"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S13:结晶期",
+   "description": "6APA批次结晶与离心 处于「结晶期」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL004"
+   }
+  },
+  {
+   "id": "PH-W006",
+   "name": "工况·结晶终点",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-759b264c",
+    "name": "6APA结晶罐组R112–R125",
+    "areaCode": "S13"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S13:结晶终点",
+   "description": "6APA批次结晶与离心 处于「结晶终点」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL005"
+   }
+  },
+  {
+   "id": "PH-W007",
+   "name": "工况·酸化萃取期",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-486703e9",
+    "name": "萃取喷射器(酸化混合器)",
+    "areaCode": "S12"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S12:酸化萃取期",
+   "description": "萃取与反萃（苯乙酸分离） 处于「酸化萃取期」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL006、PL025、PL047"
+   }
+  },
+  {
+   "id": "PH-W008",
+   "name": "工况·离心机运行期",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-09c4e266",
+    "name": "RSE300提取离心机组",
+    "areaCode": "S01"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S01:离心机运行期",
+   "description": "提取·RSE300一/二萃 处于「离心机运行期」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL007"
+   }
+  },
+  {
+   "id": "PH-W009",
+   "name": "工况·常态",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-cd8f2bdc",
+    "name": "薄膜蒸发器组",
+    "areaCode": "S09"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S09:常态",
+   "description": "薄膜蒸发（RB脱溶） 处于「常态」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL008"
+   }
+  },
+  {
+   "id": "PH-W010",
+   "name": "工况·进料过程",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
     "areaCode": "S11"
    },
    "category": "工况",
-   "severity": "警告",
-   "description": "重烃进罐管线总阀开反馈 105_LZO_104 为 0 持续 1 分钟",
+   "severity": "提示",
+   "conditionKey": "mode:S11:进料过程",
+   "description": "阶段「进料」：RB 进料阀开（XV_1302x_VAL2 = 1）",
    "rule": {
-    "type": "group",
-    "op": "OR",
-    "children": [
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "开反馈"
-      },
-      "operator": "=",
-      "aggregate": "any",
-      "durationSec": 60,
-      "threshold": {
-       "kind": "value",
-       "value": 0
-      }
-     }
-    ]
+    "type": "condition",
+    "subject": {
+     "kind": "parameter",
+     "name": "RB进料阀"
+    },
+    "operator": "=",
+    "aggregate": "any",
+    "durationSec": 0,
+    "threshold": {
+     "kind": "value",
+     "value": 1
+    }
    },
-   "note": "排查 4：按开反馈判断",
    "status": "草案·待工艺确认",
+   "note": "按 6APA_工序与阶段.xlsx 的 DCS 识别条件",
    "source": {
-    "kind": "现场异常排查表",
-    "ref": "现场异常排查表（用户提供，重烃收集罐烃室液位） 排查 4"
+    "kind": "工艺限值·适用工况",
+    "ref": "PL011、PL012、PL042"
    }
   },
   {
-   "id": "PH-41",
-   "name": "重烃储罐压力异常",
+   "id": "PH-W011",
+   "name": "工况·中和过程",
    "anchor": {
     "kind": "group",
-    "id": "egrp-14c678a7",
-    "name": "重烃储罐组",
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
     "areaCode": "S11"
    },
-   "category": "工艺",
-   "severity": "警告",
-   "description": "本台重烃储罐压力 > 1.4 MPa 持续 2 分钟（入口阀开启的那台有意义；1.4 MPa 取规程附录四重烃储罐压力高报警）",
-   "rule": {
-    "type": "group",
-    "op": "OR",
-    "children": [
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "重烃储罐压力"
-      },
-      "operator": ">",
-      "aggregate": "any",
-      "durationSec": 120,
-      "threshold": {
-       "kind": "value",
-       "value": 1.4
-      }
-     }
-    ]
-   },
-   "note": "排查 5：1.4 MPa 取规程（旧版）附录四重烃储罐压力高报警；只有入口阀开启的那台有意义",
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S11:中和过程",
+   "description": "酶法水解 处于「中和过程」工况",
+   "rule": null,
    "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
    "source": {
-    "kind": "现场异常排查表",
-    "ref": "现场异常排查表（用户提供，重烃收集罐烃室液位） 排查 5"
+    "kind": "工艺限值·适用工况",
+    "ref": "PL013"
    }
   },
   {
-   "id": "PH-42",
-   "name": "重烃收集罐压力过低",
+   "id": "PH-W012",
+   "name": "工况·进料过程",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-1afb05b9",
+    "name": "一萃离心机组",
+    "areaCode": "S12"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S12:进料过程",
+   "description": "萃取与反萃（苯乙酸分离） 处于「进料过程」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL014"
+   }
+  },
+  {
+   "id": "PH-W013",
+   "name": "工况·离心分离",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-09c4e266",
+    "name": "RSE300提取离心机组",
+    "areaCode": "S01"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S01:离心分离",
+   "description": "提取·RSE300一/二萃 处于「离心分离」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL015"
+   }
+  },
+  {
+   "id": "PH-W014",
+   "name": "工况·加酸过程",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-7c9a7776",
+    "name": "稀硫酸在线混合器M2123",
+    "areaCode": "S01"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S01:加酸过程",
+   "description": "提取·RSE300一/二萃 处于「加酸过程」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL016"
+   }
+  },
+  {
+   "id": "PH-W015",
+   "name": "工况·换热过程",
    "anchor": {
     "kind": "equipment",
-    "id": "equip-d8ac1bb7",
-    "name": "重烃收集罐",
+    "id": "equip-d788cdf8",
+    "name": "水解液缓冲罐",
+    "areaCode": "S12"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S12:换热过程",
+   "description": "萃取与反萃（苯乙酸分离） 处于「换热过程」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL017"
+   }
+  },
+  {
+   "id": "PH-W016",
+   "name": "工况·三萃模式",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-17521e7a",
+    "name": "RSE200提取离心机组(三萃)",
     "areaCode": "S02"
    },
-   "category": "工艺",
-   "severity": "警告",
-   "description": "重烃收集罐压力 102PT102 低于正常下限（正常 0.3 MPa 左右）持续 5 分钟",
-   "rule": {
-    "type": "group",
-    "op": "OR",
-    "children": [
-     {
-      "type": "condition",
-      "subject": {
-       "kind": "parameter",
-       "name": "重烃收集罐压力"
-      },
-      "operator": "<",
-      "aggregate": "any",
-      "durationSec": 300,
-      "threshold": {
-       "kind": "limit",
-       "limitId": "PL-102PT102",
-       "field": "normalLow"
-      }
-     }
-    ]
-   },
-   "note": "排查 6：排查表写「正常 0.3 左右」",
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S02:三萃模式",
+   "description": "提取·RSE200三萃及溶媒周转 处于「三萃模式」工况",
+   "rule": null,
    "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
    "source": {
-    "kind": "现场异常排查表",
-    "ref": "现场异常排查表（用户提供，重烃收集罐烃室液位） 排查 6"
+    "kind": "工艺限值·适用工况",
+    "ref": "PL024"
+   }
+  },
+  {
+   "id": "PH-W017",
+   "name": "工况·提取萃取期",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-09c4e266",
+    "name": "RSE300提取离心机组",
+    "areaCode": "S01"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S01:提取萃取期",
+   "description": "提取·RSE300一/二萃 处于「提取萃取期」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL026、PL027"
+   }
+  },
+  {
+   "id": "PH-W018",
+   "name": "工况·提取萃取期",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-17521e7a",
+    "name": "RSE200提取离心机组(三萃)",
+    "areaCode": "S02"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S02:提取萃取期",
+   "description": "提取·RSE200三萃及溶媒周转 处于「提取萃取期」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL028"
+   }
+  },
+  {
+   "id": "PH-W019",
+   "name": "工况·进料过程",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-e05bb657",
+    "name": "发酵滤液储罐组",
+    "areaCode": "S01"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S01:进料过程",
+   "description": "提取·RSE300一/二萃 处于「进料过程」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL029"
+   }
+  },
+  {
+   "id": "PH-W020",
+   "name": "工况·外送前",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-ae7a6c3f",
+    "name": "三级废酸水罐/废酸水中和罐V2124",
+    "areaCode": "S01"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S01:外送前",
+   "description": "提取·RSE300一/二萃 处于「外送前」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL030"
+   }
+  },
+  {
+   "id": "PH-W021",
+   "name": "工况·常态",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-51ddf544",
+    "name": "破乳剂缓冲罐(出料缓冲罐)",
+    "areaCode": "S04"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S04:常态",
+   "description": "破乳剂配制 处于「常态」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL031"
+   }
+  },
+  {
+   "id": "PH-W022",
+   "name": "工况·配制完成",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-d452abc0",
+    "name": "稀硫酸配置罐组",
+    "areaCode": "S03"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S03:配制完成",
+   "description": "稀硫酸配制 处于「配制完成」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL032"
+   }
+  },
+  {
+   "id": "PH-W023",
+   "name": "工况·过滤期",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-993783b1",
+    "name": "芬特过滤器组",
+    "areaCode": "S06"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S06:过滤期",
+   "description": "活性炭脱色与芬特过滤 处于「过滤期」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL033、PL034"
+   }
+  },
+  {
+   "id": "PH-W024",
+   "name": "工况·抽提期",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-3ec89f52",
+    "name": "抽提一级离心机组(CT1)",
+    "areaCode": "S07"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S07:抽提期",
+   "description": "6APA抽提（碳酸钾反萃） 处于「抽提期」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL036、PL037、PL038"
+   }
+  },
+  {
+   "id": "PH-W025",
+   "name": "工况·蒸发期",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-cd8f2bdc",
+    "name": "薄膜蒸发器组",
+    "areaCode": "S09"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S09:蒸发期",
+   "description": "薄膜蒸发（RB脱溶） 处于「蒸发期」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL039、PL040"
+   }
+  },
+  {
+   "id": "PH-W026",
+   "name": "工况·常态",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-c08fc9a1",
+    "name": "水解热水罐",
+    "areaCode": "S10"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S10:常态",
+   "description": "水解辅料配制 处于「常态」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL041"
+   }
+  },
+  {
+   "id": "PH-W027",
+   "name": "工况·常态",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-97598723",
+    "name": "水解液缓冲罐",
+    "areaCode": "S11"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S11:常态",
+   "description": "酶法水解 处于「常态」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL043"
+   }
+  },
+  {
+   "id": "PH-W028",
+   "name": "工况·出料过程",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
+    "areaCode": "S11"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S11:出料过程",
+   "description": "阶段「出料」：出料流量检测有信号（XV_1308x_FT = 1）",
+   "rule": {
+    "type": "condition",
+    "subject": {
+     "kind": "parameter",
+     "name": "出料流量检测"
+    },
+    "operator": "=",
+    "aggregate": "any",
+    "durationSec": 0,
+    "threshold": {
+     "kind": "value",
+     "value": 1
+    }
+   },
+   "status": "草案·待工艺确认",
+   "note": "按 6APA_工序与阶段.xlsx 的 DCS 识别条件",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL044"
+   }
+  },
+  {
+   "id": "PH-W029",
+   "name": "工况·输送期",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-41838baf",
+    "name": "重液缓冲罐/萃取离心机重相缓冲罐",
+    "areaCode": "S12"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S12:输送期",
+   "description": "萃取与反萃（苯乙酸分离） 处于「输送期」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL045"
+   }
+  },
+  {
+   "id": "PH-W030",
+   "name": "工况·反萃期",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-f6e9368f",
+    "name": "反萃离心机组",
+    "areaCode": "S12"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S12:反萃期",
+   "description": "萃取与反萃（苯乙酸分离） 处于「反萃期」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL046"
+   }
+  },
+  {
+   "id": "PH-W031",
+   "name": "工况·加氨期",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-759b264c",
+    "name": "6APA结晶罐组R112–R125",
+    "areaCode": "S13"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S13:加氨期",
+   "description": "6APA批次结晶与离心 处于「加氨期」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL048"
+   }
+  },
+  {
+   "id": "PH-W032",
+   "name": "工况·离心洗涤期",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-f5258a09",
+    "name": "1600离心机组",
+    "areaCode": "S13"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S13:离心洗涤期",
+   "description": "6APA批次结晶与离心 处于「离心洗涤期」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL049、PL050"
+   }
+  },
+  {
+   "id": "PH-W033",
+   "name": "工况·连续结晶",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-95ebf1f5",
+    "name": "一级结晶罐C101(北罐)",
+    "areaCode": "S14"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S14:连续结晶",
+   "description": "6APA连续结晶 处于「连续结晶」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL051、PL052、PL053、PL054"
+   }
+  },
+  {
+   "id": "PH-W034",
+   "name": "工况·常态",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-74363d52",
+    "name": "室外盐酸储罐组",
+    "areaCode": "S15"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S15:常态",
+   "description": "结晶辅料储运（氨水/盐酸/软水） 处于「常态」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL055、PL056"
+   }
+  },
+  {
+   "id": "PH-W035",
+   "name": "工况·干燥期",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-c0651c7c",
+    "name": "6APA干燥系统(双锥/二合一)",
+    "areaCode": "S16"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S16:干燥期",
+   "description": "6APA干燥 处于「干燥期」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL057"
+   }
+  },
+  {
+   "id": "PH-W036",
+   "name": "工况·批次",
+   "anchor": {
+    "kind": "group",
+    "id": "egrp-1ccb86ab",
+    "name": "RB缓冲罐A/B（薄膜出料）",
+    "areaCode": "S09"
+   },
+   "category": "工况",
+   "severity": "提示",
+   "conditionKey": "mode:S09:批次",
+   "description": "薄膜蒸发（RB脱溶） 处于「批次」工况",
+   "rule": null,
+   "status": "草案·待工艺确认",
+   "note": "工况识别条件待定义",
+   "source": {
+    "kind": "工艺限值·适用工况",
+    "ref": "PL062、PL063、PL064"
    }
   }
  ]

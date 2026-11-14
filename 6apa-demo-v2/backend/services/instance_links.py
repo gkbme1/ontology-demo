@@ -11,7 +11,7 @@
 - 不展开：只保留组间关系。
 物料 / 公用介质与设备组的关系，落到组内每台主体实例。
 
-连接方式写在 data/source/实例连接.xlsx 的「组连接方式」工作表（backend/tools/build_instance_links.py 生成，
+连接方式写在 data/source/6APA_实例连接.xlsx 的「组连接方式」工作表（backend/tools/build_instance_links.py 生成，
 可改「连接方式」「指定连接」两列）；表不存在时按规则自动判断。由此推出的实例关系都标「推导」，
 汇管与对不全的按台号标「待确认」，和工业关系表里原本写好的实例关系区分开。
 
@@ -27,7 +27,7 @@ from typing import Any
 
 from backend.services.equipment_merge import _norm, _split_instance
 
-LINK_FILE_NAME = "实例连接.xlsx"
+LINK_FILE_NAME = "6APA_实例连接.xlsx"
 SHEET_MODES = "组连接方式"
 SHEET_LINKS = "实例连接（推导结果）"
 MODE_COLUMNS = ["关系编号", "关系类别", "主体", "谓词", "客体", "主体实例", "客体实例", "自动判断", "连接方式", "指定连接",

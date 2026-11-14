@@ -117,10 +117,10 @@ function fmtBand(c: Any): string {
           <span v-if="head.className" class="pill pill-plain">{{ head.className }}</span>
           <span class="text-[11px] text-fg-mute truncate" :title="head.badges.join(' · ')">{{ head.badges.join(' · ') }}</span>
           <span class="flex-1" />
-          <button class="ctl !py-0.5" title="在全局图谱中以本对象为中心查看 2 跳邻域" @click="openGlobalGraph(objectId, 2)">◎ 全局图谱定位</button>
+          <button class="ctl !py-0.5" title="在全局图谱中以本对象为中心查看 1 跳邻域（可再扩到 2 / 3 跳）" @click="openGlobalGraph(objectId, 1)">◎ 全局图谱定位</button>
           <span class="text-[11px] text-fg-mute whitespace-nowrap truncate max-w-[40%]">
             <span v-for="(p, i) in head.path" :key="p.id">{{ p.name }}<span v-if="i < head.path.length - 1"> › </span></span>
-            <span v-if="head.opIds.length > 1" class="ml-1 text-info">（成员分属 {{ head.opIds.length }} 道画面）</span>
+            <span v-if="head.opIds.length > 1" class="ml-1 text-info">（成员分属 {{ head.opIds.length }} 道工序）</span>
           </span>
         </div>
         <div class="flex flex-wrap gap-1.5 mt-2">
@@ -139,7 +139,7 @@ function fmtBand(c: Any): string {
           <!-- 图纸位置与外观 -->
           <div v-if="tab === 'drawing'" class="space-y-3">
             <DrawingView v-if="drawing" :drawing="drawing" :highlight="data.highlight" :caption="`所在图纸：${drawing.name}`" @pick="pick" />
-            <div v-else class="empty">该对象不在导航树的画面内，没有图纸位置</div>
+            <div v-else class="empty">该对象不在导航树的工序内，没有图纸位置</div>
             <div class="grid grid-cols-2 gap-4">
               <div class="card">
                 <div class="sec-title">外观与固有属性</div>
@@ -151,7 +151,7 @@ function fmtBand(c: Any): string {
                 <div class="text-[11px] text-fg-mute mt-2">{{ data.note }}</div>
               </div>
               <div v-if="data.members.length" class="card">
-                <div class="sec-title">本画面内的成员（{{ data.members.length }}）</div>
+                <div class="sec-title">本工序内的成员（{{ data.members.length }}）</div>
                 <div class="flex flex-wrap gap-1.5">
                   <button v-for="m in data.members" :key="m.id" class="ctl" @click="openObject(m.id, opId ?? head.opId)">{{ m.name }} <span class="text-fg-mute">{{ m.tagCount }}</span></button>
                 </div>
@@ -171,7 +171,7 @@ function fmtBand(c: Any): string {
               <span class="text-[11px] text-fg-mute">{{ data.scope }} {{ data.tagTotal }} 个 DCS 测点<template v-if="data.designPending"> · 设计参数 {{ data.designPending }} 项待补充</template></span>
             </div>
             <table class="tbl">
-              <thead><tr><th class="w-12 !text-center">继承</th><th class="w-[84px]">类别</th><th>参数</th><th class="w-[110px]">类型 · 单位</th><th>值 / 数据关联（DCS 位号）</th></tr></thead>
+              <thead><tr><th class="w-16 !text-center">来源</th><th class="w-[84px]">类别</th><th>参数</th><th class="w-[110px]">类型 · 单位</th><th>值 / 数据关联（DCS 位号）</th></tr></thead>
               <tbody>
                 <tr v-for="(a, i) in params" :key="i" class="!cursor-default">
                   <td><InheritBox :checked="a.inherited" :from="a.inheritedFrom" /></td>
@@ -200,7 +200,7 @@ function fmtBand(c: Any): string {
               </tbody>
             </table>
             <div class="text-[11px] text-fg-mute mt-2">
-              设计参数来自 data/config/设备设计参数.xlsx（模板「{{ data.designTemplate ?? '无匹配模板' }}」），按设备档案 / 铭牌填写后重新导出即可显示；灰色位号表示测点在其他设备上（共用设备或组级属性）。
+              设计参数来自 data/config/6APA_设备设计参数.xlsx（模板「{{ data.designTemplate ?? '无匹配模板' }}」），按设备档案 / 铭牌填写后重新导出即可显示；灰色位号表示测点在其他设备上（共用设备或组级属性）。
             </div>
           </div>
 
@@ -209,7 +209,7 @@ function fmtBand(c: Any): string {
             <div class="text-xs text-fg-mute">{{ data.note }}</div>
             <div v-if="!data.operating.length" class="empty">暂无工艺限值</div>
             <table v-else class="tbl">
-              <thead><tr><th class="w-12 !text-center">继承</th><th>编号</th><th>适用参数</th><th>工况</th><th>LL / L / 正常 / H / HH</th><th>单位</th><th>版本</th><th>状态</th></tr></thead>
+              <thead><tr><th class="w-16 !text-center">来源</th><th>编号</th><th>适用参数</th><th>工况</th><th>LL / L / 正常 / H / HH</th><th>单位</th><th>版本</th><th>状态</th></tr></thead>
               <tbody>
                 <template v-for="c in data.operating" :key="c.id">
                   <tr class="!cursor-default">
@@ -275,7 +275,7 @@ function fmtBand(c: Any): string {
             <TopologyGraph v-if="topoView === 'graph'" :items="data.items" :center-name="head.name" :center-kind="head.kind"
                            @open="(id: string) => openObject(id, opId ?? head.opId)" />
             <table v-else class="tbl">
-              <thead><tr><th class="w-12 !text-center">继承</th><th>层</th><th>类别</th><th>方向</th><th>关系</th><th>对象</th><th>说明</th><th>来源</th></tr></thead>
+              <thead><tr><th class="w-16 !text-center">来源</th><th>层</th><th>类别</th><th>方向</th><th>关系</th><th>对象</th><th>说明</th><th>来源</th></tr></thead>
               <tbody>
                 <tr v-for="(r, i) in data.items" :key="i" class="!cursor-default">
                   <td><InheritBox :checked="r.inherited" :from="r.inheritedFrom" /></td>
@@ -293,7 +293,7 @@ function fmtBand(c: Any): string {
 
           <!-- 现象定义 -->
           <div v-else-if="tab === 'phenomena'">
-            <div class="text-xs text-fg-mute mb-2">现象 = 当前情况的描述 + 判定规则；设备组上定义的现象对组内每台设备生效（「继承」列勾选）。类别为「工况」的现象被参数约束引用。点一行查看它由什么导致。</div>
+            <div class="text-xs text-fg-mute mb-2">现象 = 当前情况的描述 + 判定规则；设备组上定义的现象对组内每台设备生效（「来源」列标「设备组」）。类别为「工况」的现象被参数约束引用。点一行查看它由什么导致。</div>
             <PhenomenaPanel :items="data.items" :anchor-options="anchorOptions" :op-id="opId ?? head.opId" show-inherit :focus-id="focusPhen" @changed="loadTab" />
           </div>
 
@@ -310,7 +310,7 @@ function fmtBand(c: Any): string {
             <div v-if="!data.items.length" class="empty">暂无工艺影响关系</div>
             <InfluenceGraph v-else-if="inflView === 'graph'" :items="data.items" :own="data.own" />
             <table v-else class="tbl">
-              <thead><tr><th class="w-12 !text-center">继承</th><th>影响方</th><th>关系</th><th>被影响方</th><th>机理</th><th>测点</th><th>来源</th></tr></thead>
+              <thead><tr><th class="w-16 !text-center">来源</th><th>影响方</th><th>关系</th><th>被影响方</th><th>机理</th><th>测点</th><th>来源</th></tr></thead>
               <tbody>
                 <tr v-for="(r, i) in data.items" :key="i" class="!cursor-default">
                   <td><InheritBox :checked="r.inherited" :from="r.inheritedFrom" /></td>

@@ -31,6 +31,8 @@ async function save(): Promise<void> {
   error.value = ''
   try {
     const saved = props.link ? await api.updateLink(props.link.id, form) : await api.createLink(form)
+    // 形成因果环路时提示（需求 SW-048：形成因果环路时提示），关系照常保存
+    if (saved.warnings?.length) alert(saved.warnings.join('\n'))
     emit('saved', saved)
   } catch (e) {
     error.value = String((e as Error).message)

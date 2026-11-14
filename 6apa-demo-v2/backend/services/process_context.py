@@ -4,7 +4,7 @@
 运行上下文由哪个系统提供。批次、排班这些事实在外部系统（EBR、MOM），本体按对象代为查询，
 和实时值 / 历史值的代调方式一样，并在返回里标明数据来源与是否模拟。
 
-数据源 data/source/工序与阶段.xlsx（backend/tools/build_process_steps.py 生成预填版）。
+数据源 data/source/6APA_工序与阶段.xlsx（backend/tools/build_process_steps.py 生成预填版）。
 """
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from typing import Any
 
 from backend.ontology.models import Provenance
 
-PROCESS_FILE_NAME = "工序与阶段.xlsx"
+PROCESS_FILE_NAME = "6APA_工序与阶段.xlsx"
 SHEET_STEPS = "工序"
 SHEET_STAGES = "工艺阶段"
 SHEET_CONTEXTS = "运行上下文"

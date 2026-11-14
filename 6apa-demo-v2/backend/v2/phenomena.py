@@ -49,9 +49,54 @@ LIMIT_FIELDS = {
 }
 AGGREGATES = {"any": "任一测点", "all": "全部测点", "mean": "测点均值"}
 CATEGORIES = ["工况", "工艺", "设备", "仪表", "操作", "物料", "公用工程", "环境"]
-STATUSES = ["草案·待工艺确认", "已确认", "停用"]
+# 状态口径同需求 ONTO-SR-SW-062：草案 / 生效 / 停用（草案统一写「草案·待工艺确认」）；旧数据的「已确认」读入时转为「生效」
+STATUSES = ["草案·待工艺确认", "生效", "停用"]
+LEGACY_STATUS = {"已确认": "生效"}
 CONFIDENCE = ["高", "中", "低"]
 DRAFT = "草案·待工艺确认"
+
+
+def strongly_connected(nodes: set[str], edges: list[tuple[str, str]]) -> dict[str, int]:
+    """Tarjan 强连通分量（迭代版）：节点 → 分量编号。"""
+    adj: dict[str, list[str]] = defaultdict(list)
+    for a, b in edges:
+        adj[a].append(b)
+    index: dict[str, int] = {}
+    low: dict[str, int] = {}
+    comp: dict[str, int] = {}
+    stack: list[str] = []
+    on: set[str] = set()
+    counter = 0
+    for root in nodes:
+        if root in index:
+            continue
+        work = [(root, 0)]
+        while work:
+            v, i = work.pop()
+            if i == 0:
+                index[v] = low[v] = counter
+                counter += 1
+                stack.append(v)
+                on.add(v)
+            if i < len(adj[v]):
+                work.append((v, i + 1))
+                w = adj[v][i]
+                if w not in index:
+                    work.append((w, 0))
+                elif w in on:
+                    low[v] = min(low[v], index[w])
+                continue
+            if low[v] == index[v]:
+                while True:
+                    w = stack.pop()
+                    on.discard(w)
+                    comp[w] = index[v]
+                    if w == v:
+                        break
+            if work:
+                parent = work[-1][0]
+                low[parent] = min(low[parent], low[v])
+    return comp
 
 
 class ValidationError(ValueError):
@@ -214,7 +259,7 @@ class PhenomenonStore:
                 if not target.exists():
                     seed = self.seed_dir / name
                     if not seed.exists():
-                        raise FileNotFoundError(f"缺少种子数据 {seed}，先运行 python3 -m backend.tools.build_cryo_seed")
+                        raise FileNotFoundError(f"缺少种子数据 {seed}，先运行 python3 -m backend.tools.build_seed")
                     shutil.copyfile(seed, target)
             self.phenomena: dict[str, dict[str, Any]] = {
                 p["id"]: p for p in json.loads(self._path("phenomena").read_text("utf-8"))["items"]
@@ -222,6 +267,8 @@ class PhenomenonStore:
             self.links: dict[str, dict[str, Any]] = {
                 l["id"]: l for l in json.loads(self._path("links").read_text("utf-8"))["items"]
             }
+            for x in [*self.phenomena.values(), *self.links.values()]:
+                x["status"] = LEGACY_STATUS.get(x.get("status"), x.get("status"))
 
     def reset_to_seed(self) -> None:
         with self._lock:
@@ -333,13 +380,18 @@ class PhenomenonStore:
     def create_link(self, body: dict[str, Any], user: str = "演示用户") -> dict[str, Any]:
         with self._lock:
             data = self._clean_link(body)
+            loop = self.cycle_path(data["cause"], data["effect"])
             data["id"] = self._next_id("CL-U-", self.links)
             data["source"] = {"kind": "人工新增", "ref": user}
             data["createdAt"] = data["updatedAt"] = _now()
             data["updatedBy"] = user
             self.links[data["id"]] = data
             self._save("links")
-            return data
+            return {**data, "warnings": [self._loop_text(loop)]} if loop else data
+
+    def _loop_text(self, path: list[str]) -> str:
+        names = [self.phenomena.get(p, {}).get("name", p) for p in path]
+        return "形成因果环路：" + " → ".join(names + [names[0]]) + "（请确认是否为正反馈 / 控制回路，否则检查关系方向）"
 
     def update_link(self, lid: str, body: dict[str, Any], user: str = "演示用户") -> dict[str, Any]:
         with self._lock:
@@ -387,6 +439,36 @@ class PhenomenonStore:
                     nodes[other] = nodes[cur] + 1
                     queue.append(other)
         return {"root": pid, "direction": direction, "levels": nodes, "links": edges}
+
+    def cyclic_links(self) -> set[str]:
+        """处在因果环路上的导致关系（两端在同一个强连通分量里）。"""
+        sig = tuple(sorted((l["cause"], l["effect"]) for l in self.links.values()))
+        if getattr(self, "_cyc_sig", None) == sig:
+            return self._cyc
+        comp = strongly_connected({l["cause"] for l in self.links.values()} | {l["effect"] for l in self.links.values()},
+                                  [(l["cause"], l["effect"]) for l in self.links.values()])
+        self._cyc_sig, self._cyc = sig, {lid for lid, l in self.links.items() if comp[l["cause"]] == comp[l["effect"]]}
+        return self._cyc
+
+    def cycle_path(self, cause: str, effect: str) -> list[str]:
+        """新增「cause 导致 effect」后会不会形成环路：返回 effect → … → cause 的已有路径（没有则空）。"""
+        by_cause: dict[str, list[str]] = defaultdict(list)
+        for l in self.links.values():
+            by_cause[l["cause"]].append(l["effect"])
+        prev: dict[str, str | None] = {effect: None}
+        queue = deque([effect])
+        while queue:
+            cur = queue.popleft()
+            if cur == cause:
+                path = [cur]
+                while prev[path[-1]] is not None:
+                    path.append(prev[path[-1]])  # type: ignore[arg-type]
+                return list(reversed(path))
+            for nxt in by_cause[cur]:
+                if nxt not in prev:
+                    prev[nxt] = cur
+                    queue.append(nxt)
+        return []
 
     def roles(self, pid: str) -> dict[str, int]:
         return {"asCause": len(self.effects_of(pid)), "asEffect": len(self.causes_of(pid))}

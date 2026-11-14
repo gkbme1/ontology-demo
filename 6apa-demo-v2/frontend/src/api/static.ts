@@ -23,7 +23,7 @@ interface Snapshot {
     equipGroup: Record<string, string>
     limits: Record<string, Any>
     calcNames: Record<string, string>
-    search: { ops: Any[]; groups: Any[]; equipment: Any[]; tags: Record<string, Any>; opSegment: Record<string, string> }
+    search: { index: Any[]; phenPy: Record<string, string>; opSegment: Record<string, string> }
   }
   evals: Record<string, Any>
   calcRuns: Record<string, Any>
@@ -34,6 +34,43 @@ const OPS: Record<string, string> = { '>': '大于', '>=': '大于等于', '<': 
 const LIMIT_FIELDS: Record<string, string> = { lowLow: '低低限', low: '低限', normalLow: '正常下限', normalHigh: '正常上限', high: '高限', highHigh: '高高限' }
 const AGG: Record<string, string> = { any: '任一测点', all: '全部测点', mean: '测点均值' }
 const DRAFT = '草案·待工艺确认'
+const LEGACY_STATUS: Record<string, string> = { 已确认: '生效' }
+const KIND_ORDER = ['segment', 'op', 'group', 'equipment', 'tag', 'phenomenon', 'condition', 'parameter', 'stream', 'utility', 'quality']
+
+/** 与后端 backend/v2/search.py 的 score() 一致。 */
+function score(e: Any, kw: string): number {
+  const low = kw.toLowerCase()
+  const label: string = e.label
+  const code: string = (e.code ?? '').toLowerCase()
+  if (kw.toUpperCase() === label.toUpperCase() || kw.toUpperCase() === code.toUpperCase()) return 5
+  if (e.kind === 'tag') return code.startsWith(low) ? 4 : kw.length >= 2 && label.includes(kw) ? 3 : 0
+  if (label.includes(kw) || (low && code.includes(low)) || low === String(e.id).toLowerCase()) return 4
+  if (/^[a-zA-Z]{2,}$/.test(kw)) {
+    const py: string = e.py ?? ''
+    if (py.startsWith(low)) return 2
+    if (py.includes(low)) return 1
+  }
+  return 0
+}
+
+/** 导致关系所在的强连通分量（处在因果环路上的关系）。 */
+function cyclicLinks(links: Any[]): Set<string> {
+  const adj: Record<string, string[]> = {}
+  for (const l of links) (adj[l.cause] ??= []).push(l.effect)
+  const reach = (from: string, to: string): boolean => {
+    const seen = new Set([from])
+    const stack = [from]
+    while (stack.length) {
+      const cur = stack.pop()!
+      for (const n of adj[cur] ?? []) {
+        if (n === to) return true
+        if (!seen.has(n)) { seen.add(n); stack.push(n) }
+      }
+    }
+    return false
+  }
+  return new Set(links.filter((l) => reach(l.effect, l.cause)).map((l) => l.id))
+}
 
 function canon(v: Any): string {
   if (Array.isArray(v)) return `[${v.map(canon).join(',')}]`
@@ -77,8 +114,10 @@ export class StaticBackend {
     const src = saved?.generatedAt === this.snap.info.generatedAt ? saved : null
     this.phen = Object.fromEntries((src?.phenomena ?? clone(this.snap.base.phenomena)).map((p: Any) => [p.id, p]))
     this.links = Object.fromEntries((src?.links ?? clone(this.snap.base.links)).map((l: Any) => [l.id, l]))
+    for (const x of [...Object.values(this.phen), ...Object.values(this.links)]) x.status = LEGACY_STATUS[x.status] ?? x.status
   }
   private save(): void {
+    this.cyc = null
     try {
       localStorage.setItem(STORE_KEY, JSON.stringify({
         generatedAt: this.snap.info.generatedAt, phenomena: Object.values(this.phen), links: Object.values(this.links)
@@ -133,10 +172,12 @@ export class StaticBackend {
     return { ...p, ruleText: this.ruleText(p.rule), hasRule: !!p.rule, roles: this.roles(p.id), opIds: this.ops(p), origin,
              inherited, inheritedFrom: inherited ? `设备组 ${p.anchor?.name ?? ''}` : null }
   }
+  private cyc: Set<string> | null = null
   private linkView(l: Any): Any {
     const c = this.phen[l.cause] ?? {}
     const e = this.phen[l.effect] ?? {}
-    return { ...l, causeName: c.name ?? l.cause, effectName: e.name ?? l.effect,
+    this.cyc ??= cyclicLinks(Object.values(this.links))
+    return { ...l, inCycle: this.cyc.has(l.id), causeName: c.name ?? l.cause, effectName: e.name ?? l.effect,
              causeAnchor: c.anchor?.name ?? '', effectAnchor: e.anchor?.name ?? '' }
   }
   private graph(scope: Set<string>, links: Any[], focus?: Set<string>): Any {
@@ -299,7 +340,9 @@ export class StaticBackend {
       d.createdAt = d.updatedAt = now()
       this.links[d.id] = d
       this.save()
-      return this.linkView(d)
+      const v = this.linkView(d)
+      if (v.inCycle) v.warnings = [`形成因果环路：${v.causeName} → ${v.effectName} → … → ${v.causeName}（请确认是否为正反馈 / 控制回路，否则检查关系方向）`]
+      return v
     }
     if ((m = path.match(/^\/causal-links\/([^/]+)$/))) {
       const id = m[1]
@@ -319,7 +362,7 @@ export class StaticBackend {
     }
     // 依赖现象 / 关系的视图
     if (path === '/scope/conditions') {
-      // 全局工况与根因：范围（画面 / 单元 / 全装置）内的现象与导致关系，跨设备的标出
+      // 全局工况与根因：范围（工序 / 工艺段 / 全车间）内的现象与导致关系，跨装置的标出
       const opSeg = this.snap.base.search.opSegment
       const inScope = (p: Any) => this.ops(p).some((o) => (q.op ? o === q.op : q.seg ? opSeg[o] === q.seg : true))
       const phen = Object.values(this.phen).filter(inScope)
@@ -383,7 +426,11 @@ export class StaticBackend {
     if (hit === undefined) throw new ApiError(404, `单文件版未包含该数据：${path}`)
     const out = clone(hit)
     const om = path.match(/^\/objects\/([^/]+)$/)
-    if (om && out.counts) out.counts.phenomena = this.forObject(om[1]).length
+    if (om && out.counts) {
+      const own = new Set(this.forObject(om[1]).map(([p]) => p.id))
+      out.counts.phenomena = own.size
+      out.counts.causal = this.touching(own).length
+    }
     if (path.match(/^\/(ops|segments)\/[^/]+$/)) this.patchCounts(out)
     return out
   }
@@ -396,21 +443,26 @@ export class StaticBackend {
 
   private search(kw: string): Any {
     kw = kw.trim()
-    if (!kw) return { items: [] }
+    if (!kw) return { items: [], total: 0 }
     const s = this.snap.base.search
     const items: Any[] = []
-    for (const o of s.ops) if (o.label.includes(kw) || (o.screen ?? '').includes(kw)) items.push(o)
-    for (const x of s.groups) if (x.label.includes(kw)) items.push(x)
-    for (const x of s.equipment) if (x.label.includes(kw)) items.push(x)
-    const tag = s.tags[kw.toUpperCase()] ?? s.tags[kw]
-    if (tag) items.unshift(tag)
+    for (const e of s.index) { const sc = score(e, kw); if (sc) items.push({ ...e, score: sc }) }
     for (const p of Object.values(this.phen)) {
       const ops = this.ops(p)
-      if (p.name.includes(kw) && ops.length) {
-        items.push({ kind: 'phenomenon', id: p.id, label: p.name, hint: p.anchor?.name, segmentId: s.opSegment[ops[0]], opId: ops[0] })
-      }
+      if (!ops.length) continue
+      const e = { kind: p.category === '工况' ? 'condition' : 'phenomenon', id: p.id, label: p.name, hint: p.anchor?.name ?? '',
+                  py: s.phenPy[p.id] ?? '', segmentId: s.opSegment[ops[0]], opId: ops[0], anchorId: p.anchor?.id }
+      const sc = score(e, kw)
+      if (sc) items.push({ ...e, score: sc })
     }
-    return { items: items.slice(0, 30), total: items.length }
+    items.sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind) || b.score - a.score)
+    const per: Record<string, number> = {}
+    const shown: Any[] = []
+    for (const e of items) {
+      per[e.kind] = (per[e.kind] ?? 0) + 1
+      if (per[e.kind] <= 12) { const { py: _py, score: _sc, ...rest } = e; shown.push(rest) }
+    }
+    return { items: shown.slice(0, 80), total: items.length, counts: per }
   }
 }
 

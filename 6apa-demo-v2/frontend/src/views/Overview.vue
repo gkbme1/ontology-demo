@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
- * 装置 / 单元 / 画面 概览。
- * 装置：单元卡片（双击进入单元）；单元：画面卡片（单击选中，双击或「进入」打开图纸）；
- * 画面：概要 + 4 个节点入口 + 「进入图纸」。
+ * 车间 / 工艺段 / 工序 概览。
+ * 车间：工艺段卡片（双击进入工艺段）；工艺段：工序卡片（单击选中，双击或「进入」打开图纸）；
+ * 工序：概要 + 4 个节点入口 + 「进入图纸」。
  */
 import { ref, watch } from 'vue'
 import { api } from '@/api/client'
@@ -29,16 +29,16 @@ function enterOp(o: Any): void {
   else openDrawing(o.id)
 }
 const SECTIONS = [
-  { key: 'section:devices', label: '设备', hint: '设备组与设备', count: 'equipmentCount' },
-  { key: 'global:calc', label: '计算组态 ↗', hint: '全局视图，已筛选到本画面', count: 'calcCount' },
-  { key: 'global:cond', label: '工况与根因 ↗', hint: '全局视图，已筛选到本画面', count: 'phenomenonCount' },
-  { key: 'global:docs', label: '文档提取 ↗', hint: '全局视图，已筛选到本画面', count: '' }
+  { key: 'section:devices', label: '装置', hint: '设备组与设备', count: 'equipmentCount' },
+  { key: 'global:calc', label: '计算组态 ↗', hint: '全局视图，已筛选到本工序', count: 'calcCount' },
+  { key: 'global:cond', label: '工况与根因 ↗', hint: '全局视图，已筛选到本工序', count: 'phenomenonCount' },
+  { key: 'global:docs', label: '文档提取 ↗', hint: '全局视图，已筛选到本工序', count: '' }
 ]
 </script>
 
 <template>
   <div class="p-6 space-y-5 overflow-auto h-full">
-    <!-- 装置 -->
+    <!-- 车间 -->
     <template v-if="kind === 'workshop' && space">
       <div v-for="ws in space.items" :key="ws.id">
         <h2 class="text-[20px] font-semibold">{{ ws.label }}</h2>
@@ -46,9 +46,9 @@ const SECTIONS = [
         <div class="grid grid-cols-3 gap-3 mt-4">
           <div v-for="s in ws.children.filter((c: Any) => c.kind === 'segment')" :key="s.id" class="card cursor-pointer hover:border-brand"
                @click="select({ type: 'segment', id: s.id }, s.id)" @dblclick="enterSegment(s.id)">
-            <div class="flex items-center gap-2"><span class="font-semibold text-[15px]">{{ s.label }}</span><span class="text-fg-mute text-xs">{{ s.count }} 道画面</span></div>
+            <div class="flex items-center gap-2"><span class="font-semibold text-[15px]">{{ s.label }}</span><span class="text-fg-mute text-xs">{{ s.count }} 道工序</span></div>
             <p class="text-xs text-fg-dim mt-1">{{ s.description }}</p>
-            <button class="btn mt-3" @click.stop="enterSegment(s.id)">进入单元 →</button>
+            <button class="btn mt-3" @click.stop="enterSegment(s.id)">进入工艺段 →</button>
           </div>
         </div>
       </div>
@@ -60,14 +60,14 @@ const SECTIONS = [
       </div>
     </template>
 
-    <!-- 单元 -->
+    <!-- 工艺段 -->
     <template v-if="kind === 'segment' && seg">
       <div class="flex items-center gap-3">
         <h2 class="text-[20px] font-semibold">{{ seg.name }}</h2>
-        <button v-if="nav.mode === 'root'" class="btn" @click="enterSegment(seg.id)">进入单元 →</button>
+        <button v-if="nav.mode === 'root'" class="btn" @click="enterSegment(seg.id)">进入工艺段 →</button>
       </div>
       <p class="text-fg-dim">{{ seg.description }}</p>
-      <div class="text-xs text-fg-mute">每道画面对应一张流程画面（P&ID）。单击选中画面，双击或点「进入」打开图纸。</div>
+      <div class="text-xs text-fg-mute">每道工序对应一张流程画面（P&ID）。单击选中工序，双击或点「进入」打开图纸。</div>
       <div class="grid grid-cols-2 gap-3">
         <div v-for="o in seg.ops" :key="o.id" class="card cursor-pointer"
              :class="picked === o.id ? 'border-brand' : 'hover:border-line'"
@@ -79,7 +79,7 @@ const SECTIONS = [
             <span class="flex-1" />
             <button class="btn btn-primary" @click.stop="enterOp(o)">进入</button>
           </div>
-          <div class="text-xs text-fg-dim mt-2">子流程：{{ o.subSteps.join(' → ') }}</div>
+          <div class="text-xs text-fg-dim mt-2">子工序：{{ o.subSteps.join(' → ') }}</div>
           <div class="flex gap-4 mt-2 text-xs text-fg-mute">
             <span>设备组 {{ o.groupCount }}</span><span>设备 {{ o.equipmentCount }}</span>
             <span>现象 {{ o.phenomenonCount }}</span><span>计算组态 {{ o.calcCount }}</span>
@@ -89,7 +89,7 @@ const SECTIONS = [
       </div>
     </template>
 
-    <!-- 画面 -->
+    <!-- 工序 -->
     <template v-if="kind === 'op' && op">
       <div class="text-[11px] text-fg-mute"><span v-for="(p, i) in op.path" :key="p.id">{{ p.name }}<span v-if="i < op.path.length - 1"> › </span></span></div>
       <div class="flex items-center gap-3">
@@ -99,7 +99,7 @@ const SECTIONS = [
         <span class="flex-1" />
         <button class="btn btn-primary" @click="openDrawing(op.id)">进入图纸</button>
       </div>
-      <div class="text-xs text-fg-dim">子流程（写在图纸上）：{{ op.subSteps.join(' → ') }}</div>
+      <div class="text-xs text-fg-dim">子工序（写在图纸上）：{{ op.subSteps.join(' → ') }}</div>
       <div v-if="op.note" class="text-xs text-warn">{{ op.note }}</div>
       <div class="grid grid-cols-4 gap-3">
         <div v-for="s in SECTIONS" :key="s.key" class="card cursor-pointer hover:border-brand" @click="select({ type: s.key as Any, id: op.id, opId: op.id }, `${op.id}|${s.key.split(':')[1]}`)">

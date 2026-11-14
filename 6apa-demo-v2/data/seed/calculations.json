@@ -1,196 +1,152 @@
 {
- "note": "种子数据：由 backend/tools/build_cryo_seed.py 生成，全部为草案·待工艺确认（规程为旧版，阈值仅作参考）",
+ "note": "种子数据：由 backend/tools/build_seed.py 生成，全部为草案·待工艺确认",
  "items": [
   {
-   "id": "CALC-01",
-   "name": "塔顶温度变化速率",
+   "id": "CALC-S11-01",
+   "name": "pH双支偏差",
    "anchor": {
-    "kind": "equipment",
-    "id": "equip-7dd066f1",
-    "name": "脱甲烷塔",
-    "areaCode": "S07"
+    "kind": "group",
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
+    "areaCode": "S11"
    },
-   "algorithmId": "ALG-RATE",
+   "algorithmId": "ALG-ABS-DIFF",
    "bindings": {
-    "series": {
+    "a": {
      "kind": "parameter",
-     "name": "顶部温度"
+     "name": "反应体系pH",
+     "index": 0
     },
-    "windowMin": {
-     "kind": "const",
-     "value": 30
+    "b": {
+     "kind": "parameter",
+     "name": "反应体系pH",
+     "index": 1
     }
    },
-   "unit": "℃/min",
-   "description": "脱甲烷塔顶部温度 30 分钟平均变化速率；规程要求降温速度 ≤ 20 ℃/h（-60 ℃ 以下 ≤ 10 ℃/h）",
-   "basis": "北I-2装置操作规程（旧版） 2.2.5.3",
+   "unit": "pH",
+   "description": "同一罐两支 pH 计（AT_1301x1 / x2）读数差的绝对值",
+   "basis": "R-S11-03",
    "status": "草案·待工艺确认"
   },
   {
-   "id": "CALC-02",
-   "name": "重烃储罐液位上升速率",
+   "id": "CALC-S11-02",
+   "name": "加氨速率（液位差法）",
    "anchor": {
     "kind": "group",
-    "id": "egrp-14c678a7",
-    "name": "重烃储罐组",
+    "id": "egrp-8e737067",
+    "name": "水解氨水计量罐组",
+    "areaCode": "S11"
+   },
+   "algorithmId": "ALG-LEVEL-CONSUMPTION",
+   "bindings": {
+    "level": {
+     "kind": "parameter",
+     "name": "氨水计量罐液位"
+    },
+    "windowMin": {
+     "kind": "const",
+     "value": 10
+    },
+    "deadbandRatio": {
+     "kind": "const",
+     "value": 0.01
+    }
+   },
+   "unit": "L/min",
+   "description": "计量罐液位只累计下降量（上升视为补液），按 10 分钟滑动时间窗折算速率",
+   "basis": "R-S11-04 / R-S11-05；关系「计量罐液位下降量即加氨量」",
+   "status": "草案·待工艺确认"
+  },
+  {
+   "id": "CALC-S11-03",
+   "name": "缓冲罐液位上升速率",
+   "anchor": {
+    "kind": "equipment",
+    "id": "equip-39c0ce5f",
+    "name": "水解缓冲罐",
     "areaCode": "S11"
    },
    "algorithmId": "ALG-RATE",
    "bindings": {
     "series": {
      "kind": "parameter",
-     "name": "重烃储罐液位"
-    },
-    "windowMin": {
-     "kind": "const",
-     "value": 30
-    }
-   },
-   "unit": "%/min",
-   "description": "逐台计算；判断何时到 70% 需倒罐",
-   "basis": "北I-2装置操作规程（旧版） 4.2.5.3",
-   "status": "草案·待工艺确认"
-  },
-  {
-   "id": "CALC-03",
-   "name": "两台膨胀机转速差",
-   "anchor": {
-    "kind": "segment",
-    "id": "SEG-04",
-    "name": "冷冻分离单元"
-   },
-   "algorithmId": "ALG-RANGE",
-   "bindings": {
-    "series": {
-     "kind": "groupParameter",
-     "groupId": "egrp-c91b276c",
-     "name": "膨胀机转速"
-    }
-   },
-   "unit": "rpm",
-   "description": "1#/2# 膨胀机转速逐时刻 最高 − 最低，看两台负荷是否均衡（跨装置统计示例）",
-   "basis": "跨装置统计示例",
-   "status": "草案·待工艺确认"
-  },
-  {
-   "id": "CALC-04",
-   "name": "压缩机电机定子平均温度",
-   "anchor": {
-    "kind": "equipment",
-    "id": "equip-718c8ca2",
-    "name": "原料气压缩机",
-    "areaCode": "S02"
-   },
-   "algorithmId": "ALG-MEAN",
-   "bindings": {
-    "series": {
-     "kind": "parameter",
-     "name": "电机定子温度"
-    }
-   },
-   "unit": "℃",
-   "description": "电机定子 3 支温度（a102_TISA136～138）的均值",
-   "basis": "点表",
-   "status": "草案·待工艺确认"
-  },
-  {
-   "id": "CALC-05",
-   "name": "换热器原料气差压上升速率",
-   "anchor": {
-    "kind": "group",
-    "id": "egrp-d4babb00",
-    "name": "冷箱Ⅱ",
-    "areaCode": "S07"
-   },
-   "algorithmId": "ALG-RATE",
-   "bindings": {
-    "series": {
-     "kind": "parameter",
-     "name": "原料气压差"
-    },
-    "windowMin": {
-     "kind": "const",
-     "value": 60
-    }
-   },
-   "unit": "kPa/min",
-   "description": "一级 / 二级贫富气换热器原料气差压 60 分钟平均上升速率，冻堵时持续上升",
-   "basis": "北I-2装置操作规程（旧版） 1.2.7.3",
-   "status": "草案·待工艺确认"
-  },
-  {
-   "id": "CALC-06",
-   "name": "膨胀机膨胀端 / 增压端振动差",
-   "anchor": {
-    "kind": "group",
-    "id": "egrp-c91b276c",
-    "name": "膨胀压缩机组",
-    "areaCode": "S08"
-   },
-   "algorithmId": "ALG-ABS-DIFF",
-   "bindings": {
-    "a": {
-     "kind": "parameter",
-     "name": "膨胀端X轴震动"
-    },
-    "b": {
-     "kind": "parameter",
-     "name": "增压端X轴震动"
-    }
-   },
-   "unit": "μm",
-   "description": "逐台计算膨胀端与增压端 X 轴振动之差",
-   "basis": "点表",
-   "status": "草案·待工艺确认"
-  },
-  {
-   "id": "CALC-07",
-   "name": "重烃收集罐烃室液位上升速率",
-   "anchor": {
-    "kind": "equipment",
-    "id": "equip-d8ac1bb7",
-    "name": "重烃收集罐",
-    "areaCode": "S02"
-   },
-   "algorithmId": "ALG-RATE",
-   "bindings": {
-    "series": {
-     "kind": "parameter",
-     "name": "烃室液位"
+     "name": "水解液缓冲罐液位"
     },
     "windowMin": {
      "kind": "const",
      "value": 10
     }
    },
-   "unit": "%/min",
-   "description": "烃室液位 102LT102 在 10 分钟时间窗内的平均变化速率（正为上涨），判「持续上涨」用",
-   "basis": "现场异常排查表",
+   "unit": "m3/min",
+   "description": "水解液缓冲罐液位在 10 分钟时间窗内的平均变化速率（正为上涨）",
+   "basis": "ARP-S11-10",
    "status": "草案·待工艺确认"
   },
   {
-   "id": "CALC-08",
-   "name": "变频重烃泵输出与反馈偏差",
+   "id": "CALC-S11-04",
+   "name": "水解罐平均温度",
    "anchor": {
     "kind": "group",
-    "id": "egrp-89eb688c",
-    "name": "重烃泵组",
-    "areaCode": "S02"
+    "id": "egrp-fffaa62d",
+    "name": "水解反应釜组(水解罐A–K)",
+    "areaCode": "S11"
    },
-   "algorithmId": "ALG-ABS-DIFF",
+   "algorithmId": "ALG-MEAN",
    "bindings": {
-    "a": {
+    "series": {
      "kind": "parameter",
-     "name": "变频控制"
-    },
-    "b": {
-     "kind": "parameter",
-     "name": "变频反馈"
+     "name": "釜内反应温度"
     }
    },
-   "unit": "%",
-   "description": "逐台：变频控制（输出）与变频反馈之差的绝对值",
-   "basis": "现场异常排查表 排查 2",
+   "unit": "℃",
+   "description": "本台全部温度测点的均值",
+   "basis": "PL001",
+   "status": "草案·待工艺确认"
+  },
+  {
+   "id": "CALC-G-01",
+   "name": "水解工段总加氨速率",
+   "anchor": {
+    "kind": "segment",
+    "id": "SEG-04",
+    "name": "6A_水解"
+   },
+   "algorithmId": "ALG-LEVEL-CONSUMPTION",
+   "bindings": {
+    "level": {
+     "kind": "groupParameter",
+     "groupId": "egrp-8e737067",
+     "name": "氨水计量罐液位"
+    },
+    "windowMin": {
+     "kind": "const",
+     "value": 30
+    }
+   },
+   "unit": "L/min",
+   "description": "全部氨水计量罐（A–L）液位下降量合计，按 30 分钟时间窗折算，反映整个水解工段的耗氨强度",
+   "basis": "跨装置统计示例",
+   "status": "草案·待工艺确认"
+  },
+  {
+   "id": "CALC-G-02",
+   "name": "水解罐罐温极差（A–K）",
+   "anchor": {
+    "kind": "segment",
+    "id": "SEG-04",
+    "name": "6A_水解"
+   },
+   "algorithmId": "ALG-RANGE",
+   "bindings": {
+    "series": {
+     "kind": "groupParameter",
+     "groupId": "egrp-fffaa62d",
+     "name": "釜内反应温度"
+    }
+   },
+   "unit": "℃",
+   "description": "11 台水解罐罐温逐时刻 最高 − 最低，看并联罐之间温度是否一致",
+   "basis": "跨装置统计示例",
    "status": "草案·待工艺确认"
   }
  ]
