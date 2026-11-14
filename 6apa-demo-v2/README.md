@@ -160,6 +160,7 @@ python3 -m backend.tools.build_seed --force     # 覆盖 data/seed/*.json（不�
 | `POST/PUT/DELETE /api/v2/classlib/class[/{id}]` · `PUT/DELETE /classlib/class/{id}/{part}/{code}` · `PUT/DELETE /classlib/section/{sec}/{code}` · `POST /classlib/publish` · `/classlib/versions` · `/classlib/import` | 开发态类库（写，只允许改「编辑中」的版本） |
 | `GET /api/v2/classlib/binding` · `GET /classlib/upgrade-impact?to=` | 工程使用的类库版本、切换前的升级影响分析（演示：确认切换不改数据） |
 | `POST /api/v2/classlib/class/{id}/params/{code}/test` · `GET /classlib/class/{id}/phenomena/{code}/preview` · `POST /classlib/mapping-test` · `POST /classlib/algorithms/{id}/test` | 开发态试验（位号匹配 / 现象实例化预览 / 映射规则 / 算法） |
+| `POST /api/v2/objects/{id}/edits/{parameters\|constraints}` · `PUT/DELETE /objects/{id}/edits/{tab}/{key}` · `POST /objects/{id}/edits/{tab}/restore` · `PUT /relations/{id}` | 工程态对象编辑：参数 / 约束新增、修改、移除与恢复，拓扑推导关系移除，人工关系修改 |
 | `GET /api/v2/live/values?tags=` · `GET /live/op/{工序}` | 运行态实时值（模拟）、工序内现象 / 工况当前状态（逐台） |
 | `GET /api/v2/runtime/status` · `POST /runtime/evaluate` · `GET /runtime/causes/{pid}?target=` · `GET /runtime/bindings` | 运行态 |
 | `GET/POST /api/v2/knowledge` · `POST /knowledge/{id}/review` | 知识沉淀提交与审核 |

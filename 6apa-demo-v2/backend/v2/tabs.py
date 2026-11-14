@@ -232,6 +232,15 @@ def _parameters(ctx: AppContext, object_id: str, prof: dict[str, Any], op_id: st
                     "DCS 位号与绑定状态直接列在行里"}
 
 
+def tag_info(ctx: AppContext, name: str) -> dict[str, Any] | None:
+    """手动绑定位号时的位号信息（点表中没有则返回 None → 绑定状态「失效」）。"""
+    t = ctx.tag_by_name.get(str(name).upper()) or ctx.tag_by_name.get(name)
+    if not t:
+        return None
+    return {"desc": t.get("rawDescription") or "", "unit": t.get("unit") or "", "block": t.get("blockType") or "",
+            "equipment": t.get("equipmentName") or "", "limit": (ctx.limit_of_tag.get(t["name"]) or {}).get("id")}
+
+
 def header(ctx: AppContext, object_id: str, op_id: str | None) -> dict[str, Any]:
     prof = ctx.profile(object_id)
     h = ctx.hierarchy
@@ -332,10 +341,11 @@ def _constraints(ctx: AppContext, object_id: str, prof: dict[str, Any]) -> dict[
         inherited = object_id.startswith("equip-") and c.get("appliesTo") in inherited_attrs
         row = _inherit({**c, "modePhenomenon": _condition_phen(ctx, f"mode:{code}:{mode}") if mode else None,
                         "versions": versions}, inherited, f"设备组 {group_name}")
-        ov = ctx.overrides.limit(object_id, c["id"]) if inherited else None
+        ov = ctx.overrides.limit(object_id, c["id"])
         if ov:
-            # 本台覆盖限值（需求 SW-045）：alarm / normal 换成覆盖值，template 保留设备组（类）的值以便对比
-            row["inheritState"] = "已禁用" if ov.get("disabled") else "已覆盖"
+            # 本台覆盖限值（需求 SW-045）：alarm / normal 换成覆盖值，template 保留设备组（类）的值以便对比；
+            # 本对象自己的限值被修改时同样记在 overrides 里（标「已修改」），判定规则按修改后的值
+            row["inheritState"] = ("已禁用" if ov.get("disabled") else "已覆盖") if inherited else "已修改"
             row["override"] = ov
             row["template"] = {"alarm": c.get("alarm"), "normal": c.get("normal")}
             v = ov.get("values") or {}
@@ -352,7 +362,7 @@ def _constraints(ctx: AppContext, object_id: str, prof: dict[str, Any]) -> dict[
                 row["hasValues"] = True
         row["limitValues"] = {f: limit.get(f) for f in ("lowLow", "low", "normalLow", "normalHigh", "high", "highHigh")}
         items.append(row)
-    return {"operating": items, "safety": cons.get("safety") or [], "canOverride": object_id.startswith("equip-") and bool(group_name),
+    return {"operating": items, "safety": cons.get("safety") or [], "canOverride": True,
             "note": "工况与版本适用条件都是「工况」类现象，点击可跳到现象定义；判断历史数据时按当时生效的版本"}
 
 
@@ -431,10 +441,11 @@ def tab(ctx: AppContext, object_id: str, key: str, op_id: str | None = None) -> 
         return {"opId": op, "opIds": ops, "highlight": [x for x in (object_id, group_id) if x],
                 "appearance": appearance, "header": prof.get("header"), "members": members,
                 "note": "外观照片 / 三维模型暂无数据源，这里列出设备的固有属性"}
+    from backend.v2 import object_edits as oe
     if key == "parameters":
-        return _parameters(ctx, object_id, prof, op_id)
+        return oe.merge_parameters(_parameters(ctx, object_id, prof, op_id), ctx.object_edits.get(object_id, key), lambda t: tag_info(ctx, t))
     if key == "constraints":
-        return _constraints(ctx, object_id, prof)
+        return oe.merge_constraints(_constraints(ctx, object_id, prof), ctx.object_edits.get(object_id, key))
     if key == "topology":
         rel = prof.get("relations") or {}
         items = [r for r in (rel.get("classRelations") or []) + (rel.get("groupRelations") or [])
@@ -442,8 +453,8 @@ def tab(ctx: AppContext, object_id: str, key: str, op_id: str | None = None) -> 
         gname = _group_name(ctx, object_id)
         items = [_inherit(dict(r), r.get("layer") == "所属组", f"设备组 {gname}") for r in items]
         items += _user_topology(ctx, object_id, gname)
-        return {"items": items, "instances": prof.get("instances") or [],
-                "relationTypes": ["物理拓扑", "工艺流向", "供应"], "canEdit": True}
+        return oe.merge_topology({"items": items, "instances": prof.get("instances") or [],
+                                  "relationTypes": ["物理拓扑", "工艺流向", "供应"], "canEdit": True}, ctx.object_edits.get(object_id, key))
     if key == "phenomena":
         gname = _group_name(ctx, object_id)
         items = []

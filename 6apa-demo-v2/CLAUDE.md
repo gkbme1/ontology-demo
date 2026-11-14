@@ -44,6 +44,7 @@
 | `release.py` | 发布 / 版本列表 / 对比 / 回滚 / 批量状态（`data/store/releases/`）；只有生效的现象、导致关系、计算组态计入发布内容 |
 | `export.py` | Excel 导出（openpyxl）、TTL 导出（手写 Turtle，rdflib 可选自检）；命名空间前缀 `NS` 为占位 |
 | `classlib.py` | 开发态可编辑类库（需求 4.2）：元模型 / 层级类型与模板 / 类（单继承，`effective` 由根到本类合并，`_src` 标本类 / 继承 / 覆盖）/ 关系类型 / 映射规则 / 能力；版本（编辑中可改，发布后只读，`diff`）；种子 `data/seed/classlib.json` 由 `build_classlib.py` 生成，编辑存 `data/store/classlib.json`；接口 `/api/v2/classlib/*`，前端 `views/dev/*` |
+| `object_edits.py` | 工程态对象手动编辑（`object_edits.json`）：参数 / 参数约束的新增（UP- / UC-）、修改、移除（可恢复），拓扑关系的推导关系移除；`tabs.tab()` 里 `merge_*` 合并；单文件版 `api/objEditsLocal.ts` 同一套逻辑 |
 | `devtime.py` | （旧，仅后端保留，前端已改用 classlib）开发态：类树（元类 设备 → 资产大类 → 设备类型）、类详情（由实例归纳的模板）、元模型、层级类型、关系类型（附录 B）、映射规则与位号解析测试 |
 | `runtime.py` | 运行态：服务状态、现象状态评估（发布版本中生效的，或全部 + 工艺段）、原因链状态、绑定状态汇总（缓存） |
 | `procedures.py` | 处置规程视图：按现象 / 导致关系的 source.ref、basis（`ARP-xx 可能原因 n` 或 `ARP-xx #n`）匹配拆分状态；拆分可能原因；步骤 / 检查项 / 执行边界 |
@@ -92,7 +93,11 @@
 - 三态：`nav.stage`（dev / eng / run），`App.vue` 顶栏切换；`DevStudio.vue`（左侧元模型在最前；类库写操作只允许「编辑中」版本，`useClassLib.canEdit`）、`RuntimeView.vue`；从开发态 / 运行态打开对象用 `openInEngineering`。
 - 知识沉淀 `userdata.KnowledgeStore`（`knowledge.json`），审核在 `ReleaseCenter.vue` 的「知识审核」页。
 - 一致性校验每条带 `draft` / `blocking`：生效对象上的错误才阻止发布（`publishable`）。
-- 写操作都经 `routes._audit` / `ctx.audit.record` 记变更；新写接口要记一条。单文件版对覆盖 / 人工关系只读（`static.ts` 把 `canEdit / canOverride` 置 false）。
+- 工程态对象编辑（需求 SW-042～044）：参数（名称 / 类别 / 类型单位 / 值 / 说明 / 手动绑定位号，位号不在点表→「失效」）、
+  参数约束（人工新增为草案；本对象自有限值「修改」走 overrides.json 的限值覆盖，参与判定，标「已修改」可撤销；禁用只针对继承来的限值）、
+  拓扑关系（人工关系可新增 / 修改名称与说明 / 删除，推导关系可移除 / 恢复，`PUT /relations/{id}`）；接口 `/objects/{id}/edits/{tab}[/{key}|/restore]`。
+  单文件版这三个页签同样可编辑（`objEditsLocal.ts`，存 localStorage；新增拓扑关系的端点候选来自导出的 `endpoints`）。
+- 写操作都经 `routes._audit` / `ctx.audit.record` 记变更；新写接口要记一条。单文件版对工艺影响关系 / 处置规程 / 计算组态只读（`static.ts` 把 `canEdit / canOverride` 置 false）。
 - 状态口径：现象 / 导致关系 / 计算组态 = 草案·待工艺确认 / 生效 / 停用（旧数据「已确认」读入时转「生效」）；层级配置表的「已确认」不变。
 - 页签顺序同需求 SW-041：图纸位置与外观、参数、参数约束、拓扑关系、现象/工况定义、根因影响关系、工艺影响关系、计算组态、处置规程；
   页头 `counts` 给出全部页签条目数。「继承」列改为「来源」（类 / 设备组 / 本对象），`InheritBox.vue`。

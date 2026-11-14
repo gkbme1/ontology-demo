@@ -24,12 +24,13 @@ async function save(): Promise<void> {
 </script>
 
 <template>
-  <Modal :title="`在「${objectName}」上覆盖限值 · ${limit.id} ${limit.appliesTo}`" @close="emit('close')">
-    <template #actions><button class="btn btn-primary" @click="save">保存覆盖</button></template>
+  <Modal :title="`在「${objectName}」上${limit.inherited ? '覆盖' : '修改'}限值 · ${limit.id} ${limit.appliesTo}`" @close="emit('close')">
+    <template #actions><button class="btn btn-primary" @click="save">保存{{ limit.inherited ? '覆盖' : '修改' }}</button></template>
     <div class="space-y-3 text-sm">
-      <div class="text-xs text-fg-mute">限值继承自设备组；只填需要改的字段，空着的沿用设备组的值。本台的判定规则引用该限值时按覆盖值判定。</div>
+      <div class="text-xs text-fg-mute">{{ limit.inherited ? '限值继承自设备组；只填需要改的字段，空着的沿用设备组的值。本台的判定规则引用该限值时按覆盖值判定。'
+        : '修改本对象的限值：只填需要改的字段，空着的沿用原值；判定规则引用该限值时按修改后的值，可「撤销」恢复原值。' }}</div>
       <table class="tbl">
-        <thead><tr><th>字段</th><th>设备组（模板）</th><th>本台覆盖值（{{ limit.unit }}）</th></tr></thead>
+        <thead><tr><th>字段</th><th>{{ limit.inherited ? '设备组（模板）' : '原值' }}</th><th>{{ limit.inherited ? '本台覆盖值' : '修改为' }}（{{ limit.unit }}）</th></tr></thead>
         <tbody>
           <tr v-for="(t, k) in LIMIT_TEXT" :key="k" class="!cursor-default">
             <td>{{ t }}</td>
@@ -38,7 +39,7 @@ async function save(): Promise<void> {
           </tr>
         </tbody>
       </table>
-      <label class="block text-xs text-fg-dim">覆盖原因 <input v-model="note" class="inp w-full mt-1" placeholder="如：该罐容积不同，液位高限按现场" /></label>
+      <label class="block text-xs text-fg-dim">{{ limit.inherited ? '覆盖原因' : '修改原因' }} <input v-model="note" class="inp w-full mt-1" placeholder="如：该罐容积不同，液位高限按现场" /></label>
       <div v-if="error" class="text-err text-xs">{{ error }}</div>
     </div>
   </Modal>

@@ -19,6 +19,9 @@ import CausalPanel from '@/components/causal/CausalPanel.vue'
 import LimitOverrideEditor from '@/components/LimitOverrideEditor.vue'
 import RelationEditor from '@/components/RelationEditor.vue'
 import ObjectInfo from '@/components/ObjectInfo.vue'
+import ObjectParamEditor from '@/components/ObjectParamEditor.vue'
+import ObjectConstraintEditor from '@/components/ObjectConstraintEditor.vue'
+import Modal from '@/components/Modal.vue'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any
@@ -173,6 +176,30 @@ async function limitDisable(c: Any): Promise<void> {
 async function limitRestore(c: Any): Promise<void> {
   try { await api.restoreLimit(props.objectId, c.id); await loadTab() } catch (e) { alert((e as Error).message) }
 }
+// ---------------- 工程态手动编辑：参数 / 参数约束 / 拓扑关系（需求 SW-042～044）
+const paramEditing = ref<Any>(null)    // { item? } 新增时 item 为空
+const consEditing = ref<Any>(null)
+const relPatching = ref<Any>(null)
+const EDIT_PILL: Record<string, string> = { 新增: 'pill-ok', 已修改: 'pill-info' }
+async function editAction(fn: () => Promise<unknown>): Promise<void> {
+  try { await fn(); await loadTab(); await loadHead() } catch (e) { alert((e as Error).message) }
+}
+function removeItem(t: string, key: string, label: string, added: boolean): void {
+  if (!confirm(added ? `删除本对象新增的「${label}」？` : `从本对象移除「${label}」？（可在列表下方恢复）`)) return
+  editAction(() => api.objEditRemove(props.objectId, t, key))
+}
+const restoreItem = (t: string, key: string) => editAction(() => api.objEditRestore(props.objectId, t, key))
+async function saveRelPatch(): Promise<void> {
+  const r = relPatching.value
+  await editAction(() => api.updateRelation(r.relationId, { label: r.label, mechanism: r.mechanism }))
+  relPatching.value = null
+}
+const consParams = ref<string[]>([])
+async function openConsEditor(item?: Any): Promise<void> {
+  try { consParams.value = (await api.objectTab(props.objectId, 'parameters', props.opId)).items.map((x: Any) => x.name) } catch { consParams.value = [] }
+  consEditing.value = { item }
+}
+
 function fmtBand(c: Any): string {
   const a = c.alarm ?? {}
   return [a.lowLow ?? '—', a.low ?? '—', c.normal ?? '—', a.high ?? '—', a.highHigh ?? '—'].join(' / ')
@@ -259,16 +286,17 @@ function fmtBand(c: Any): string {
               </template>
               <input v-model="tagKw" class="inp w-56 ml-2" placeholder="筛选参数名 / 位号 / 描述" />
               <span class="flex-1" />
+              <button v-if="data.canEdit" class="btn btn-primary !py-1 ro-hide" @click="paramEditing = {}">+ 新增参数</button>
               <span class="text-[11px] text-fg-mute">{{ data.scope }} {{ data.tagTotal }} 个 DCS 测点<template v-if="data.designPending"> · 设计参数 {{ data.designPending }} 项待补充</template></span>
             </div>
             <table class="tbl">
-              <thead><tr><th class="w-16 !text-center">来源</th><th class="w-[84px]">类别</th><th>参数 / 属性</th><th class="w-[110px]">类型 · 单位</th><th>值 / 数据关联（DCS 位号）</th><th class="w-[84px]">绑定</th></tr></thead>
+              <thead><tr><th class="w-16 !text-center">来源</th><th class="w-[84px]">类别</th><th>参数 / 属性</th><th class="w-[110px]">类型 · 单位</th><th>值 / 数据关联（DCS 位号）</th><th class="w-[84px]">绑定</th><th v-if="data.canEdit" class="w-[118px]"></th></tr></thead>
               <tbody>
                 <tr v-for="(a, i) in params" :key="i" class="!cursor-default">
                   <td><InheritBox :checked="a.inherited" :from="a.inheritedFrom" /></td>
                   <td><span class="pill" :class="GROUP_PILL[a.category] ?? 'pill-plain'">{{ a.category }}</span></td>
                   <td>
-                    <div class="font-medium">{{ a.name }}<span v-if="a.semantic" class="pill pill-ok !py-0 ml-1" title="本体工艺属性（语义参数），由工业关系表定义">工艺属性</span></div>
+                    <div class="font-medium">{{ a.name }}<span v-if="a.edit" class="pill !py-0 ml-1" :class="EDIT_PILL[a.edit]">{{ a.edit }}</span><span v-if="a.semantic" class="pill pill-ok !py-0 ml-1" title="本体工艺属性（语义参数），由工业关系表定义">工艺属性</span></div>
                     <div v-if="a.description" class="text-[11px] text-fg-mute">{{ a.description }}</div>
                   </td>
                   <td class="text-fg-dim whitespace-nowrap">{{ a.valueType }}</td>
@@ -295,9 +323,20 @@ function fmtBand(c: Any): string {
                     <span v-else class="text-fg-mute">—</span>
                     <div v-if="a.binding && a.binding !== '已绑定'" class="text-[10.5px] text-fg-mute leading-tight mt-0.5">{{ a.bindingNote }}</div>
                   </td>
+                  <td v-if="data.canEdit" class="whitespace-nowrap">
+                    <template v-if="a.editKey">
+                      <button class="ctl !py-0.5" @click="paramEditing = { item: a }">修改</button>
+                      <button v-if="a.edit === '已修改'" class="ctl !py-0.5 ml-1" title="撤销对这一条的修改" @click="restoreItem('parameters', a.editKey)">撤销</button>
+                      <button class="ctl !py-0.5 ml-1" @click="removeItem('parameters', a.editKey, a.name, !!a.userParam)">{{ a.userParam ? '删除' : '移除' }}</button>
+                    </template>
+                  </td>
                 </tr>
               </tbody>
             </table>
+            <div v-if="data.removedItems?.length" class="text-xs mt-2 flex flex-wrap items-center gap-1.5">
+              <span class="text-fg-mute">已从本对象移除 {{ data.removedItems.length }} 项：</span>
+              <span v-for="r in data.removedItems" :key="r.key" class="pill pill-mute">{{ r.name }}<button class="text-brand ml-1 ro-hide" @click="restoreItem('parameters', r.key)">恢复</button></span>
+            </div>
             <div class="text-[11px] text-fg-mute mt-2">
               设计参数来自 data/config/6APA_设备设计参数.xlsx（模板「{{ data.designTemplate ?? '无匹配模板' }}」），按设备档案 / 铭牌填写后重新导出即可显示；灰色位号表示测点在其他设备上（共用设备或组级属性）。
               {{ data.note }}。绑定状态：已绑定 / 待确认（按名称推断或归属置信度低）/ 未绑定 / 失效（位号不在点表中）。
@@ -306,15 +345,16 @@ function fmtBand(c: Any): string {
 
           <!-- 参数约束：工况与版本适用条件关联到「工况」现象 -->
           <div v-else-if="tab === 'constraints'" class="space-y-4">
-            <div class="text-xs text-fg-mute">{{ data.note }}</div>
+            <div class="flex items-center gap-2"><div class="text-xs text-fg-mute flex-1">{{ data.note }}</div>
+              <button v-if="data.canEdit" class="btn btn-primary !py-1 ro-hide" @click="openConsEditor()">+ 新增约束</button></div>
             <div v-if="!data.operating.length" class="empty">暂无工艺限值</div>
             <table v-else class="tbl">
-              <thead><tr><th class="w-16 !text-center">来源</th><th>编号</th><th>适用参数</th><th>工况</th><th>LL / L / 正常 / H / HH</th><th>单位</th><th>版本</th><th>状态</th><th v-if="data.canOverride"></th></tr></thead>
+              <thead><tr><th class="w-16 !text-center">来源</th><th>编号</th><th>适用参数</th><th>工况</th><th>LL / L / 正常 / H / HH</th><th>单位</th><th>版本</th><th>状态</th><th v-if="data.canOverride || data.canEdit"></th></tr></thead>
               <tbody>
                 <template v-for="c in data.operating" :key="c.id">
                   <tr class="!cursor-default" :class="{ 'opacity-50': c.inheritState === '已禁用' }">
                     <td><InheritBox :checked="c.inherited" :from="c.inheritedFrom" :state="c.inheritState" /></td>
-                    <td class="font-mono">{{ c.id }}</td>
+                    <td class="font-mono whitespace-nowrap">{{ c.id }}<span v-if="c.edit" class="pill !py-0 ml-1 font-sans" :class="EDIT_PILL[c.edit]">{{ c.edit }}</span></td>
                     <td>{{ c.appliesTo }}<div class="text-[11px] text-fg-mute max-w-[340px] truncate" :title="c.basis">{{ c.basis }}</div></td>
                     <td>
                       <button v-if="c.modePhenomenon" class="phen-link" :title="`工况现象：${c.modePhenomenon.name}（${c.modePhenomenon.anchor}）`" @click="gotoPhen(c.modePhenomenon.id)">
@@ -325,24 +365,33 @@ function fmtBand(c: Any): string {
                     <td class="font-mono text-xs whitespace-nowrap">
                       <template v-if="c.inheritState === '已禁用'">本台已禁用</template>
                       <template v-else>{{ c.hasValues ? fmtBand(c) : '待现场提供' }}</template>
-                      <div v-if="c.template" class="text-[10.5px] text-fg-mute font-sans">设备组：{{ fmtBand(c.template) }}<span v-if="c.override?.note"> · {{ c.override.note }}</span></div>
+                      <div v-if="c.template" class="text-[10.5px] text-fg-mute font-sans">{{ c.inherited ? '设备组' : '原值' }}：{{ fmtBand(c.template) }}<span v-if="c.override?.note"> · {{ c.override.note }}</span></div>
                     </td>
                     <td>{{ c.unit }}</td>
                     <td>
                       <button class="ctl !py-0" @click="openVer[c.id] = !openVer[c.id]">{{ c.versions.length }} 个 {{ openVer[c.id] ? '▾' : '▸' }}</button>
                     </td>
                     <td><span class="pill pill-warn">{{ c.status }}</span></td>
-                    <td v-if="data.canOverride" class="whitespace-nowrap">
-                      <template v-if="c.inherited">
+                    <td v-if="data.canOverride || data.canEdit" class="whitespace-nowrap">
+                      <template v-if="c.userConstraint">
+                        <button class="ctl" @click="openConsEditor(c)">修改</button>
+                        <button class="ctl ml-1" @click="removeItem('constraints', c.editKey, `${c.id} ${c.appliesTo}`, true)">删除</button>
+                      </template>
+                      <template v-else-if="c.inherited">
                         <button v-if="c.inheritState !== '已禁用'" class="ctl" title="只改本台的限值" @click="limitEditing = c">覆盖</button>
                         <button v-if="!c.inheritState" class="ctl ml-1" @click="limitDisable(c)">禁用</button>
                         <button v-else class="ctl ml-1" @click="limitRestore(c)">恢复继承</button>
+                      </template>
+                      <template v-else>
+                        <button class="ctl" title="修改本对象的限值（判定规则按修改后的值）" @click="limitEditing = c">修改</button>
+                        <button v-if="c.inheritState === '已修改'" class="ctl ml-1" @click="limitRestore(c)">撤销</button>
+                        <button class="ctl ml-1" @click="removeItem('constraints', c.editKey, `${c.id} ${c.appliesTo}`, false)">移除</button>
                       </template>
                     </td>
                   </tr>
                   <tr v-if="openVer[c.id]" class="!cursor-default hover:!bg-transparent">
                     <td />
-                    <td :colspan="data.canOverride ? 8 : 7" class="!pt-0">
+                    <td :colspan="data.canOverride || data.canEdit ? 8 : 7" class="!pt-0">
                       <table class="w-full text-xs border border-line-soft rounded">
                         <thead><tr class="bg-ink-panel2 text-fg-mute">
                           <th class="text-left px-2 py-1 font-medium">版本</th><th class="text-left px-2 py-1 font-medium">适用条件</th>
@@ -370,6 +419,10 @@ function fmtBand(c: Any): string {
                 </template>
               </tbody>
             </table>
+            <div v-if="data.removedItems?.length" class="text-xs flex flex-wrap items-center gap-1.5">
+              <span class="text-fg-mute">已从本对象移除 {{ data.removedItems.length }} 项：</span>
+              <span v-for="r in data.removedItems" :key="r.key" class="pill pill-mute">{{ r.name }}<button class="text-brand ml-1 ro-hide" @click="restoreItem('constraints', r.key)">恢复</button></span>
+            </div>
             <div v-if="data.safety.length">
               <div class="sec-title">安全约束</div>
               <ul class="text-xs space-y-1"><li v-for="(s, i) in data.safety" :key="i">{{ s.text ?? s }}</li></ul>
@@ -381,14 +434,15 @@ function fmtBand(c: Any): string {
             <div class="flex items-center gap-2">
               <button class="ctl" :class="{ 'ctl-on': topoView === 'graph' }" @click="topoView = 'graph'">关系图谱</button>
               <button class="ctl" :class="{ 'ctl-on': topoView === 'list' }" @click="topoView = 'list'">列表</button>
-              <span class="text-xs text-fg-mute">{{ data.items.length }} 条关系<template v-if="data.items.some((r: Any) => r.userRelation)">（人工新增 {{ data.items.filter((r: Any) => r.userRelation).length }} 条，列表中可删除）</template></span>
+              <span class="text-xs text-fg-mute">{{ data.items.length }} 条关系<template v-if="data.items.some((r: Any) => r.userRelation)">（人工新增 {{ data.items.filter((r: Any) => r.userRelation).length }} 条）</template>
+                <span v-if="data.canEdit" class="ro-hide">· 在「列表」中可修改 / 删除人工关系、移除推导出的关系</span></span>
               <span class="flex-1" />
               <button v-if="data.canEdit" class="btn btn-primary" @click="relEditing = 'topology'">+ 新增关系</button>
             </div>
             <TopologyGraph v-if="topoView === 'graph'" :items="data.items" :center-name="head.name" :center-kind="head.kind"
                            @open="(id: string) => openObject(id, opId ?? head.opId)" />
             <table v-else class="tbl">
-              <thead><tr><th class="w-16 !text-center">来源</th><th>层</th><th>类别</th><th>方向</th><th>关系</th><th>对象</th><th>说明</th><th>来源</th><th></th></tr></thead>
+              <thead><tr><th class="w-16 !text-center">来源</th><th>层</th><th>类别</th><th>方向</th><th>关系</th><th>对象</th><th>说明</th><th>来源</th><th v-if="data.canEdit"></th></tr></thead>
               <tbody>
                 <tr v-for="(r, i) in data.items" :key="i" class="!cursor-default">
                   <td><InheritBox :checked="r.inherited" :from="r.inheritedFrom" /></td>
@@ -399,10 +453,21 @@ function fmtBand(c: Any): string {
                   <td>{{ r.target }}<div v-if="r.targetType" class="text-[11px] text-fg-mute">{{ r.targetType }}</div></td>
                   <td class="text-fg-dim">{{ r.mechanism }}</td>
                   <td class="text-[11px] text-fg-mute">{{ r.source }}</td>
-                  <td><button v-if="r.userRelation && !r.inherited" class="ctl ro-hide" @click="removeRelation(r)">删除</button></td>
+                  <td v-if="data.canEdit" class="whitespace-nowrap">
+                    <template v-if="r.userRelation && !r.inherited">
+                      <button class="ctl" @click="relPatching = { ...r, label: r.predicate }">修改</button>
+                      <button class="ctl ml-1" @click="removeRelation(r)">删除</button>
+                    </template>
+                    <button v-else-if="!r.userRelation && r.editKey" class="ctl" title="从本对象移除这条推导出的关系（可恢复）"
+                            @click="removeItem('topology', r.editKey, `${r.predicate}：${r.target}`, false)">移除</button>
+                  </td>
                 </tr>
               </tbody>
             </table>
+            <div v-if="data.removedItems?.length" class="text-xs flex flex-wrap items-center gap-1.5">
+              <span class="text-fg-mute">已从本对象移除 {{ data.removedItems.length }} 条：</span>
+              <span v-for="r in data.removedItems" :key="r.key" class="pill pill-mute">{{ r.name }}<button class="text-brand ml-1 ro-hide" @click="restoreItem('topology', r.key)">恢复</button></span>
+            </div>
           </div>
 
           <!-- 现象定义 -->
@@ -476,6 +541,18 @@ function fmtBand(c: Any): string {
     <ObjectInfo v-if="showInfo" :object-id="objectId" :op-id="opId ?? head?.opId" @close="showInfo = false" />
     <RelationEditor v-if="relEditing" :mode="relEditing" :self="{ id: objectId, name: head?.name ?? '' }" :params="data?.params"
                     @close="relEditing = ''" @saved="relSaved" />
+    <ObjectParamEditor v-if="paramEditing" :object-id="objectId" :object-name="head?.name ?? ''" :item="paramEditing.item" :categories="data?.categories"
+                       @close="paramEditing = null" @saved="paramEditing = null; loadTab(); loadHead()" />
+    <ObjectConstraintEditor v-if="consEditing" :object-id="objectId" :object-name="head?.name ?? ''" :item="consEditing.item" :params="consParams"
+                            @close="consEditing = null" @saved="consEditing = null; loadTab(); loadHead()" />
+    <Modal v-if="relPatching" :title="`修改关系 · ${relPatching.predicate}：${relPatching.target}`" @close="relPatching = null">
+      <template #actions><button class="btn btn-primary" @click="saveRelPatch">保存</button></template>
+      <div class="grid grid-cols-[96px_1fr] gap-x-3 gap-y-2.5 items-center text-sm">
+        <span class="text-xs text-fg-mute text-right">关系名称</span><input v-model="relPatching.label" class="inp" placeholder="如：串联下游、流入、供给介质" />
+        <span class="text-xs text-fg-mute text-right">说明</span><input v-model="relPatching.mechanism" class="inp" placeholder="管线 / 介质 / 机理说明" />
+      </div>
+      <div class="text-[11px] text-fg-mute mt-2">起点、终点和关系类型不能改；要换对象请删除后重新「新增关系」。</div>
+    </Modal>
     <LimitOverrideEditor v-if="limitEditing" :object-id="objectId" :object-name="head?.name ?? ''" :limit="limitEditing"
                          @close="limitEditing = null" @saved="limitEditing = null; loadTab()" />
   </div>

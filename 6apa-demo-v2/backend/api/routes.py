@@ -56,6 +56,7 @@ def admin_reset() -> dict[str, Any]:
     ctx.calcs.reset_to_seed()
     ctx.overrides.reset()
     ctx.relations.reset()
+    ctx.object_edits.reset()
     ctx.procedure_edits.reset()
     ctx.knowledge.reset()
     ctx.classlib.reset()
@@ -1089,6 +1090,104 @@ def create_relation(body: dict = Body(...)) -> dict[str, Any]:
     return rel
 
 
+@router.put("/relations/{rid}")
+def update_relation(rid: str, body: dict = Body(...)) -> dict[str, Any]:
+    """修改人工新增的关系：关系名称（谓词 / 影响方向）、机理说明、时滞、状态；端点要换请删除后重新新增。"""
+    from backend.v2.userdata import INFLUENCE_LABELS, diff
+    ctx = get_ctx()
+    rel = next((r for r in ctx.relations.items if r["id"] == rid), None)
+    if not rel:
+        raise HTTPException(404, f"未找到关系：{rid}")
+    before = dict(rel)
+    patch = {k: body[k] for k in ("label", "mechanism", "lag", "status") if k in body}
+    if rel["type"] == "工艺影响" and patch.get("label") and patch["label"] not in INFLUENCE_LABELS:
+        raise HTTPException(400, f"影响方向只能是：{'、'.join(INFLUENCE_LABELS)}")
+    if "label" in patch and not str(patch["label"] or "").strip():
+        raise HTTPException(400, "关系名称不能为空")
+    rel.update(patch, updatedAt=__import__("backend.v2.userdata", fromlist=["now"]).now())
+    ctx.relations.save()
+    ctx.audit.record("修改", "关系", rid, f"{rel['from']['name']} —{rel['label']}→ {rel['to']['name']}",
+                     objects=[rel["from"]["id"], rel["to"]["id"]], changes=diff(before, rel), note=rel["type"])
+    return rel
+
+
+# ------------------------------------------------------------------ 工程态对象编辑：参数 / 参数约束 / 拓扑关系（需求 SW-042～044）
+_EDIT_KIND = {"parameters": "参数", "constraints": "参数约束", "topology": "拓扑关系"}
+
+
+def _edit_target(ctx, object_id: str, tab: str) -> None:  # noqa: ANN001
+    if object_id not in ctx.store.dcs.equipment and object_id not in ctx.store.dcs.equipment_groups:
+        raise HTTPException(404, f"未找到对象：{object_id}")
+    if tab not in _EDIT_KIND:
+        raise HTTPException(404, f"不支持编辑的页签：{tab}")
+
+
+def _clean_edit(tab: str, body: dict) -> dict:
+    from backend.v2 import object_edits as oe
+    from backend.v2.userdata import UserDataError
+    try:
+        return oe.clean_param(body) if tab == "parameters" else oe.clean_constraint(body)
+    except UserDataError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@router.post("/objects/{object_id}/edits/{tab}")
+def object_edit_add(object_id: str, tab: str, body: dict = Body(...)) -> dict[str, Any]:
+    ctx = get_ctx()
+    _edit_target(ctx, object_id, tab)
+    if tab == "topology":
+        raise HTTPException(400, "拓扑关系用「新增关系」（/relations）")
+    item = _clean_edit(tab, body)
+    if tab == "parameters":
+        if not item.get("name") or not item.get("category"):
+            raise HTTPException(400, "参数名称和类别必填")
+        names = {x["name"] for x in tabs.tab(ctx, object_id, "parameters")["items"]}
+        if item["name"] in names:
+            raise HTTPException(400, f"本对象已有同名参数：{item['name']}")
+    elif not item.get("appliesTo"):
+        raise HTTPException(400, "适用参数必填")
+    item = ctx.object_edits.add(object_id, tab, item)
+    ctx.audit.record("新增", _EDIT_KIND[tab], item["key"], item.get("name") or item.get("appliesTo") or item["key"],
+                     objects=[object_id], note=f"在 {ctx.object_name(object_id)} 上")
+    return item
+
+
+@router.put("/objects/{object_id}/edits/{tab}/{key:path}")
+def object_edit_update(object_id: str, tab: str, key: str, body: dict = Body(...)) -> dict[str, Any]:
+    from backend.v2.userdata import diff
+    ctx = get_ctx()
+    _edit_target(ctx, object_id, tab)
+    patch = _clean_edit(tab, body)
+    if tab == "parameters" and patch.get("name") and patch["name"] != key:
+        names = {x["name"] for x in tabs.tab(ctx, object_id, "parameters")["items"] if x.get("editKey") != key}
+        if patch["name"] in names:
+            raise HTTPException(400, f"本对象已有同名参数：{patch['name']}")
+    before, after = ctx.object_edits.update(object_id, tab, key, patch)
+    ctx.audit.record("修改", _EDIT_KIND[tab], key, after.get("name") or after.get("appliesTo") or key, objects=[object_id],
+                     changes=diff(before, after), note=f"在 {ctx.object_name(object_id)} 上")
+    return after
+
+
+@router.delete("/objects/{object_id}/edits/{tab}/{key:path}")
+def object_edit_remove(object_id: str, tab: str, key: str) -> dict[str, Any]:
+    ctx = get_ctx()
+    _edit_target(ctx, object_id, tab)
+    how = ctx.object_edits.remove(object_id, tab, key)
+    ctx.audit.record(how, _EDIT_KIND[tab], key, key, objects=[object_id],
+                     note=f"在 {ctx.object_name(object_id)} 上" + ("（已有条目从本对象移除，可恢复）" if how == "移除" else ""))
+    return {"result": how, "key": key}
+
+
+@router.post("/objects/{object_id}/edits/{tab}/restore")
+def object_edit_restore(object_id: str, tab: str, body: dict = Body(...)) -> dict[str, Any]:
+    ctx = get_ctx()
+    _edit_target(ctx, object_id, tab)
+    key = str(body.get("key") or "")
+    ctx.object_edits.restore(object_id, tab, key)
+    ctx.audit.record("恢复", _EDIT_KIND[tab], key, key, objects=[object_id], note=f"在 {ctx.object_name(object_id)} 上，撤销修改 / 移除")
+    return {"restored": key}
+
+
 @router.delete("/relations/{rid}")
 def delete_relation(rid: str) -> dict[str, Any]:
     ctx = get_ctx()
@@ -1143,7 +1242,10 @@ def restore_phenomenon(object_id: str, pid: str) -> dict[str, Any]:
 def override_limit(object_id: str, lid: str, body: dict = Body(...)) -> dict[str, Any]:
     from backend.v2.userdata import UserDataError, diff
     ctx = get_ctx()
-    _check_inherited(ctx, object_id)
+    if object_id not in ctx.store.dcs.equipment and object_id not in ctx.store.dcs.equipment_groups:
+        raise HTTPException(404, f"未找到对象：{object_id}")
+    if body.get("disabled"):
+        _check_inherited(ctx, object_id)  # 禁用只针对继承来的限值；本对象自己的限值用「移除」
     limit = ctx.limits.get(lid)
     if not limit:
         raise HTTPException(404, f"未找到限值：{lid}")
@@ -1153,7 +1255,9 @@ def override_limit(object_id: str, lid: str, body: dict = Body(...)) -> dict[str
     except UserDataError as exc:
         raise HTTPException(400, str(exc))
     base = {f: limit.get(f) for f in ("lowLow", "low", "normalLow", "normalHigh", "high", "highHigh")}
-    ctx.audit.record("禁用继承" if entry["disabled"] else "覆盖继承", "参数约束", lid, f"{lid} {limit.get('appliesTo') or ''}",
+    row = next((c for c in tabs.tab(ctx, object_id, "constraints")["operating"] if c["id"] == lid), {})
+    op = "禁用继承" if entry["disabled"] else ("覆盖继承" if row.get("inherited") else "修改")
+    ctx.audit.record(op, "参数约束", lid, f"{lid} {limit.get('appliesTo') or ''}",
                      objects=[object_id], note=f"在 {ctx.object_name(object_id)} 上",
                      changes=diff({**base, **((before or {}).get("values") or {}), "disabled": bool((before or {}).get("disabled"))},
                                   {**base, **(entry.get("values") or {}), "disabled": entry["disabled"]}))

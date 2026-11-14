@@ -25,6 +25,8 @@ class AppContext:
         self.audit = AuditLog()
         self.overrides = OverrideStore()
         self.relations = RelationStore()
+        from backend.v2.object_edits import ObjectEdits
+        self.object_edits = ObjectEdits()
         self.procedure_edits = ProcedureEdits()
         self.knowledge = KnowledgeStore()
         from backend.v2.classlib import ClassLibrary

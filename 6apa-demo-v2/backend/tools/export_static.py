@@ -267,6 +267,9 @@ def main() -> None:
         "calcRuns": calc_runs,
         "classlib": classlib,
         # 运行态实时值：浏览器内模拟器（frontend/src/api/simLocal.ts）用的位号元数据 → [块类型, 参数类型, 参数名, 单位, 标准单位, 限值编号]
+        # 工程态新增拓扑关系的端点候选（设备 / 设备组 / 物料流股 / 公用介质）：[ID, 类型, 名称, 提示, 拼音首字母]
+        "endpoints": [[e["id"], e["kind"], e["name"], e.get("hint") or "", initials(e["name"])]
+                      for e in ctx.endpoint_index().values() if e["kind"] in ("equipment", "group", "stream", "utility")],
         "liveTags": {n: [t.get("blockType") or "", t.get("parameterType") or "", t.get("parameterName") or "", t.get("unit") or "",
                          t.get("standardUnit") or "", (ctx.limit_of_tag.get(t["name"]) or {}).get("id")]
                      for n, t in ctx.tag_by_name.items()},

@@ -11,6 +11,7 @@
 import { ApiError, type Query } from './client'
 import { ClassLibLocal, type ClassLibBundle } from './classlibLocal'
 import { alarmOf, isDigital, valueAt, type SimTag } from './simLocal'
+import { ObjEditsLocal } from './objEditsLocal'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any
@@ -32,6 +33,7 @@ interface Snapshot {
   calcRuns: Record<string, Any>
   classlib?: ClassLibBundle
   liveTags?: Record<string, [string, string, string, string, string, string | null]>
+  endpoints?: Any[]
 }
 
 const STORE_KEY = 'v2-static-store'
@@ -102,9 +104,27 @@ export class StaticBackend {
   private links: Record<string, Any> = {}
   private seedRules: Record<string, string> = {}
   private cl: ClassLibLocal | null = null
+  private ed: ObjEditsLocal
+  private tabIndex: Map<string, string> | null = null
 
   constructor(snap: Snapshot) {
     this.snap = snap
+    const ends = new Map<string, Any>((snap.endpoints ?? []).map((e: Any) => [e[0], e]))
+    this.ed = new ObjEditsLocal({
+      stamp: snap.info.generatedAt,
+      tagInfo: (n) => {
+        const N = String(n).toUpperCase()
+        const c = snap.classlib?.tags?.[N]
+        const l = snap.liveTags?.[N]
+        if (!c && !l) return null
+        return { desc: c?.[1] ?? '', equipment: c?.[2] ?? '', unit: l?.[3] || l?.[4] || '', block: l?.[0] ?? '', limit: l?.[5] ?? null }
+      },
+      endpoints: snap.endpoints ?? [],
+      equipGroup: snap.base.equipGroup,
+      objectName: (id) => ends.get(id)?.[2] ?? id,
+      isObject: (id) => ['equipment', 'group'].includes(ends.get(id)?.[1]) || id in snap.base.equipGroup || id.startsWith('egrp-'),
+      tab: (id, t) => this.rawTab(id, t)
+    })
     if (snap.classlib) {
       this.cl = new ClassLibLocal(snap.classlib, snap.info.generatedAt, snap.get['/classlib/algorithms']?.items ?? [],
         snap.get['/classlib/hierarchy-preview'] ?? null, (r) => this.ruleText(r))
@@ -283,6 +303,9 @@ export class StaticBackend {
     let m: RegExpMatchArray | null
     // 开发态类库：浏览器内实现（classlibLocal.ts）
     if (this.cl && path.startsWith('/classlib')) return this.cl.handle(method, path, body, q)
+    // 工程态对象编辑（参数 / 参数约束 / 拓扑关系、限值覆盖、人工关系）：浏览器内实现（objEditsLocal.ts）
+    const edited = this.ed.handle(method, path, body, q)
+    if (edited !== undefined) return edited
     // 运行态：实时值（浏览器内模拟器，与完整版同一套公式）与现象状态（导出时刻的评估结果）
     if (path === '/live/values') return this.liveValues(String(q.tags ?? '').split(',').filter(Boolean))
     if ((m = path.match(/^\/live\/op\/([^/]+)$/))) return this.liveOp(m[1])
@@ -432,6 +455,7 @@ export class StaticBackend {
       try { localStorage.removeItem(STORE_KEY) } catch { /* ignore */ }
       this.load()
       this.cl?.reset()
+      this.ed.reset()
       return { status: 'ok' }
     }
     if (method !== 'GET') throw new ApiError(400, '单文件版不支持该操作，请在完整版中使用')
@@ -442,15 +466,35 @@ export class StaticBackend {
     if (hit === undefined) throw new ApiError(404, `单文件版未包含该数据：${path}`)
     const out = clone(hit)
     // 单文件版不支持继承覆盖、人工关系的编辑（需要后端保存），隐藏这些按钮
-    if (/^\/objects\/[^/]+\/tabs\/(topology|influence|constraints|procedures|calc)$/.test(path)) { out.canEdit = false; out.canOverride = false }
+    if (/^\/objects\/[^/]+\/tabs\/(influence|procedures|calc)$/.test(path)) { out.canEdit = false; out.canOverride = false }
+    const tm = path.match(/^\/objects\/([^/]+)\/tabs\/(parameters|constraints|topology)$/)
+    if (tm) {
+      if (tm[2] === 'parameters') return this.ed.mergeParameters(out, tm[1])
+      if (tm[2] === 'constraints') return this.ed.mergeConstraints(out, tm[1])
+      return this.ed.mergeTopology(out, tm[1])
+    }
     const om = path.match(/^\/objects\/([^/]+)$/)
     if (om && out.counts) {
+      this.ed.patchCounts(om[1], out.counts)
       const own = new Set(this.forObject(om[1]).map(([p]) => p.id))
       out.counts.phenomena = own.size
       out.counts.causal = this.touching(own).length
     }
     if (path.match(/^\/(ops|segments)\/[^/]+$/)) this.patchCounts(out)
     return out
+  }
+
+  /** 导出时的页签应答（不论导出时带的工序参数），未合并编辑。 */
+  private rawTab(id: string, tab: string): Any {
+    if (!this.tabIndex) {
+      this.tabIndex = new Map()
+      for (const k of Object.keys(this.snap.get)) {
+        const base = k.split('?')[0]
+        if (/^\/objects\/[^/]+\/tabs\//.test(base) && !this.tabIndex.has(base)) this.tabIndex.set(base, k)
+      }
+    }
+    const k = this.tabIndex.get(`/objects/${id}/tabs/${tab}`)
+    return k ? clone(this.snap.get[k]) : null
   }
 
   // ------------------------------------------------------------ 运行态

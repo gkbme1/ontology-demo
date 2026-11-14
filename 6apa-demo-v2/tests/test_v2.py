@@ -603,6 +603,72 @@ class RunStateTest(unittest.TestCase):
         self.assertEqual(client.get("/api/v2/live/op/NOPE").status_code, 404)
 
 
+class ObjectEditTest(unittest.TestCase):
+    """工程态对象手动编辑：参数 / 参数约束 / 拓扑关系的新增、修改、移除与恢复（需求 SW-042～044）。"""
+    E = None
+
+    @classmethod
+    def setUpClass(cls):
+        cls.E = _equip("水解罐C")
+        cls.B = f"/api/v2/objects/{cls.E}"
+
+    def setUp(self):
+        CTX.object_edits.reset()
+
+    def _params(self):
+        return client.get(self.B + "/tabs/parameters").json()
+
+    def test_parameter_add_modify_remove(self):
+        n0 = len(self._params()["items"])
+        r = client.post(self.B + "/edits/parameters", json={"name": "夹套出口温度", "category": "测量值", "tags": "TI_1301C, NOPE_1"})
+        self.assertEqual(r.status_code, 200, r.text)
+        t = self._params()
+        x = next(i for i in t["items"] if i["name"] == "夹套出口温度")
+        self.assertEqual((x["edit"], x["binding"]), ("新增", "失效"))  # NOPE_1 不在点表
+        self.assertEqual(len(t["items"]), n0 + 1)
+        self.assertEqual(client.post(self.B + "/edits/parameters", json={"name": "夹套出口温度", "category": "测量值"}).status_code, 400)
+        client.put(self.B + "/edits/parameters/" + x["editKey"], json={"tags": ["TI_1301C"]})
+        x = next(i for i in self._params()["items"] if i["name"] == "夹套出口温度")
+        self.assertEqual(x["binding"], "已绑定")
+        # 修改已有参数 → 已修改，可撤销
+        client.put(self.B + "/edits/parameters/釜内反应温度", json={"description": "人工说明"})
+        x = next(i for i in self._params()["items"] if i["name"] == "釜内反应温度")
+        self.assertEqual((x["edit"], x["description"]), ("已修改", "人工说明"))
+        client.post(self.B + "/edits/parameters/restore", json={"key": "釜内反应温度"})
+        self.assertNotIn("edit", next(i for i in self._params()["items"] if i["name"] == "釜内反应温度"))
+        # 移除已有 → removedItems，可恢复；新增的删除即消失
+        client.delete(self.B + "/edits/parameters/设计容积")
+        t = self._params()
+        self.assertEqual([r["key"] for r in t["removedItems"]], ["设计容积"])
+        self.assertEqual(client.get(self.B).json()["counts"]["parameters"], len(t["items"]))
+        client.post(self.B + "/edits/parameters/restore", json={"key": "设计容积"})
+        self.assertEqual(self._params()["removedItems"], [])
+
+    def test_constraint_add_and_own_limit_edit(self):
+        r = client.post(self.B + "/edits/constraints", json={"appliesTo": "夹套出口温度", "values": {"low": 10, "high": 40}})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(client.post(self.B + "/edits/constraints", json={"appliesTo": "x", "values": {"low": 50, "high": 40}}).status_code, 400)
+        t = client.get(self.B + "/tabs/constraints").json()
+        row = next(c for c in t["operating"] if c["id"] == r.json()["key"])
+        self.assertEqual((row["edit"], row["status"]), ("新增", "草案·待工艺确认"))
+        own = next(c for c in t["operating"] if not c["inherited"] and not c.get("userConstraint"))
+        self.assertEqual(client.put(self.B + f"/overrides/limits/{own['id']}", json={"values": {"high": 99}}).status_code, 200)
+        row = next(c for c in client.get(self.B + "/tabs/constraints").json()["operating"] if c["id"] == own["id"])
+        self.assertEqual((row["inheritState"], row["alarm"]["high"]), ("已修改", 99.0))
+        client.delete(self.B + f"/overrides/limits/{own['id']}")
+
+    def test_topology_hide_and_relation_edit(self):
+        t = client.get(self.B + "/tabs/topology").json()
+        r = next(i for i in t["items"] if not i.get("userRelation"))
+        client.delete(self.B + "/edits/topology/" + r["editKey"])
+        t2 = client.get(self.B + "/tabs/topology").json()
+        self.assertEqual(len(t2["items"]), len(t["items"]) - 1)
+        self.assertEqual(len(t2["removedItems"]), 1)
+        rel = client.post("/api/v2/relations", json={"type": "物理拓扑", "from": {"id": self.E}, "to": {"id": _equip("水解罐D")}}).json()
+        self.assertEqual(client.put(f"/api/v2/relations/{rel['id']}", json={"label": "并联", "mechanism": "人工"}).json()["label"], "并联")
+        client.delete(f"/api/v2/relations/{rel['id']}")
+
+
 class DocsAndSearchTest(unittest.TestCase):
     def test_docs(self):
         r = client.get("/api/v2/ops/OP-09/documents").json()

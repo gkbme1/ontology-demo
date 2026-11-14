@@ -142,6 +142,12 @@ export const api = {
   relationCandidates: (q: Query) => request<Any>('GET', '/relation-candidates', undefined, q),
   createRelation: (body: Any) => request<Any>('POST', '/relations', body),
   deleteRelation: (id: string) => request<Any>('DELETE', `/relations/${id}`),
+  updateRelation: (id: string, body: Any) => request<Any>('PUT', `/relations/${id}`, body),
+  // 工程态对象编辑：参数 / 参数约束 / 拓扑关系（新增、修改、删除或移除、恢复）
+  objEditAdd: (oid: string, tab: string, body: Any) => request<Any>('POST', `/objects/${oid}/edits/${tab}`, body),
+  objEditUpdate: (oid: string, tab: string, key: string, body: Any) => request<Any>('PUT', `/objects/${oid}/edits/${tab}/${encodeURIComponent(key)}`, body),
+  objEditRemove: (oid: string, tab: string, key: string) => request<Any>('DELETE', `/objects/${oid}/edits/${tab}/${encodeURIComponent(key)}`),
+  objEditRestore: (oid: string, tab: string, key: string) => request<Any>('POST', `/objects/${oid}/edits/${tab}/restore`, { key }),
   procedure: (id: string) => request<Any>('GET', `/procedures/${id}`),
   updateProcedure: (id: string, body: Any) => request<Any>('PUT', `/procedures/${id}`, body),
   splitCause: (id: string, seq: string, body: Any) => request<Any>('POST', `/procedures/${id}/causes/${seq}/split`, body),
