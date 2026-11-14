@@ -48,7 +48,11 @@ type Any = any
 
 /** 下载导出文件（Excel / TTL）：取文件名与 X-Export-Info，触发浏览器保存。 */
 async function download(path: string, query?: Query): Promise<{ filename: string; info: Any }> {
-  if (staticBackend) throw new ApiError(400, '单文件版不支持导出，请在完整版中操作')
+  if (staticBackend) {
+    const f = staticBackend.exportFile(path)
+    saveBlob(new Blob([f.text], { type: 'application/json' }), f.filename)
+    return { filename: f.filename, info: {} }
+  }
   const res = await fetch(`${BASE}/api/v2${path}${qs(query)}`)
   if (!res.ok) {
     let detail = `${res.status}`
@@ -59,7 +63,10 @@ async function download(path: string, query?: Query): Promise<{ filename: string
   const filename = decodeURIComponent((cd.match(/filename\*=UTF-8''([^;]+)/) ?? [])[1] ?? 'export')
   const raw = res.headers.get('X-Export-Info')
   const info = raw ? JSON.parse(decodeURIComponent(raw)) : {}
-  const blob = await res.blob()
+  saveBlob(await res.blob(), filename)
+  return { filename, info }
+}
+function saveBlob(blob: Blob, filename: string): void {
   const a = document.createElement('a')
   a.href = URL.createObjectURL(blob)
   a.download = filename
@@ -67,7 +74,6 @@ async function download(path: string, query?: Query): Promise<{ filename: string
   a.click()
   a.remove()
   setTimeout(() => URL.revokeObjectURL(a.href), 2000)
-  return { filename, info }
 }
 
 export const api = {

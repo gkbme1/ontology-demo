@@ -1,7 +1,6 @@
 /** 开发态类库的共享状态：当前版本、是否可编辑、枚举；编辑后 reloadLib() 刷新。 */
 import { reactive } from 'vue'
 import { api } from '@/api/client'
-import { staticBackend } from '@/api/static'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any
@@ -10,7 +9,7 @@ export const lib = reactive({ summary: null as Any, page: 'meta' as string, focu
 export async function reloadLib(): Promise<void> {
   try { lib.summary = await api.cl() } catch (e) { lib.error = String((e as Error).message) }
 }
-export const canEdit = (): boolean => !staticBackend && lib.summary?.current?.status === '编辑中'
+export const canEdit = (): boolean => lib.summary?.current?.status === '编辑中'
 export function flash(msg: string): void {
   lib.msg = msg
   setTimeout(() => { if (lib.msg === msg) lib.msg = '' }, 4000)

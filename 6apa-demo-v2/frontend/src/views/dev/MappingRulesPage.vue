@@ -2,7 +2,6 @@
 /** 映射规则（需求 SW-011，图 4-14）：位号解析 / 设备识别 / P&ID 图元 / 外部编码；规则定义 + 规则测试（样例、解析结果、匹配对象、置信度）。 */
 import { computed, ref, watch } from 'vue'
 import { api } from '@/api/client'
-import { staticBackend } from '@/api/static'
 import { act, canEdit, lib } from '@/composables/useClassLib'
 import DevForm from './DevForm.vue'
 
@@ -81,7 +80,6 @@ const confPill = (c: Any) => (c == null ? 'pill-err' : c >= (form.value?.thresho
         <div class="flex items-center gap-2 mb-2"><div class="sec-title !mb-0">规则测试</div>
           <input v-model="samples" class="inp flex-1 font-mono" placeholder="样例（空 = 用默认样例），用空格 / 逗号分隔" />
           <button class="btn btn-primary" @click="runTest">执行测试</button></div>
-        <div v-if="staticBackend" class="text-xs text-fg-mute">单文件版只能用默认样例测试</div>
         <template v-if="test">
           <table class="tbl"><thead><tr><th>样例</th><th>描述（点表）</th><th>解析结果</th><th>点表中的设备</th><th>置信度</th></tr></thead><tbody>
             <tr v-for="(r, i) in test.results" :key="i" class="!cursor-default">

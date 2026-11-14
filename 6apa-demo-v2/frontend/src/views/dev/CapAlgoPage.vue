@@ -2,7 +2,6 @@
 /** 能力与算法（需求 SW-012 / 013，图 4-15 / 4-16）：能力定义（适用类、引用算法、执行方式、输入 → 参数模板绑定、输出、运行态发现）；算法库（登记信息、输入输出、测试）。 */
 import { computed, ref, watch } from 'vue'
 import { api } from '@/api/client'
-import { staticBackend } from '@/api/static'
 import { act, canEdit, lib } from '@/composables/useClassLib'
 import DevForm from './DevForm.vue'
 
@@ -154,7 +153,7 @@ const discovery = computed(() => {
         <div class="text-[11px] text-fg-mute mt-1">登记来自 data/config/6APA_算法库.json；多版本与上传算法包在正式产品中实现</div>
       </div>
       <div class="card">
-        <div class="flex items-center mb-2"><div class="sec-title !mb-0 flex-1">测试</div><button class="btn btn-primary" :disabled="!!staticBackend" @click="runTest">运行</button></div>
+        <div class="flex items-center mb-2"><div class="sec-title !mb-0 flex-1">测试</div><button class="btn btn-primary" @click="runTest">运行</button></div>
         <div class="grid grid-cols-2 gap-3">
           <div><div class="text-xs text-fg-mute mb-1">输入（JSON，时序为数组）</div><textarea v-model="testIn" class="inp w-full font-mono text-xs" rows="5" /></div>
           <div><div class="text-xs text-fg-mute mb-1">输出 <span v-if="testOut" class="pill" :class="testOut.ok ? 'pill-ok' : 'pill-err'">{{ testOut.ok ? `成功 · ${testOut.ms} ms` : '失败' }}</span></div>

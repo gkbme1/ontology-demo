@@ -91,6 +91,7 @@
 - 页签顺序同需求 SW-041：图纸位置与外观、参数、参数约束、拓扑关系、现象/工况定义、根因影响关系、工艺影响关系、计算组态、处置规程；
   页头 `counts` 给出全部页签条目数。「继承」列改为「来源」（类 / 设备组 / 本对象），`InheritBox.vue`。
 - 图纸：单击显示摘要、双击打开对象详情（`DrawingView.vue`，`PidCanvas` 发 select / pick 两个事件）。
+- 单文件版开发态可编辑：`api/classlibLocal.ts` 是 `classlib.py` + `/classlib/*` 路由的浏览器版（改了后端类库规则要同步改它），依赖实例的数据由 `export_static.classlib_bundle` 预先导出；client.ts → static.ts → classlibLocal.ts 有循环引用，模块顶层不能继承 / 调用 `ApiError`。
 - 单文件版的 `static.ts` 要同步实现：搜索打分（与 `search.score` 一致）、因果环路（`inCycle` / 新增时 `warnings`）、页签计数。
 
 ## 关键口径

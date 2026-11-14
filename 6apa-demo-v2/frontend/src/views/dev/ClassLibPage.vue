@@ -5,7 +5,6 @@
  */
 import { computed, ref, watch } from 'vue'
 import { api } from '@/api/client'
-import { staticBackend } from '@/api/static'
 import { openInEngineering } from '@/composables/useNav'
 import { act, canEdit, lib } from '@/composables/useClassLib'
 import DevForm from './DevForm.vue'
@@ -339,7 +338,7 @@ const cnt = (k: string) => (k === 'caps' ? cls.value?.caps?.length : k === 'inst
           <div class="card">
             <div class="sec-title">位号匹配试验</div>
             <div class="flex gap-2"><input v-model="testTag" class="inp flex-1 font-mono" placeholder="输入位号，如 TI_1301C" @keydown.enter="runTagTest" />
-              <button class="btn btn-primary" :disabled="!!staticBackend" :title="staticBackend ? '单文件版不支持试验，请在完整版中使用' : ''" @click="runTagTest">试验</button></div>
+              <button class="btn btn-primary" @click="runTagTest">试验</button></div>
             <div v-if="testRes" class="text-xs mt-2 space-y-1">
               <div class="text-fg-dim">{{ testRes.tag }} · {{ testRes.desc || '（点表中无此位号描述）' }}<span v-if="testRes.equipment"> · {{ testRes.equipment }}</span></div>
               <div>→ {{ testRes.matched ? '匹配' : '不匹配' }} <b>{{ testRes.template }}</b>

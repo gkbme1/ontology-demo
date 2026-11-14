@@ -1,7 +1,6 @@
 <script setup lang="ts">
 /** 开发态页头右侧：当前类库与版本状态、导出类库包、发布类库（图 4-3(a) ②）。 */
 import { api } from '@/api/client'
-import { staticBackend } from '@/api/static'
 import { act, lib, reloadLib } from '@/composables/useClassLib'
 if (!lib.summary) reloadLib()
 async function exportPkg(): Promise<void> {
@@ -21,6 +20,6 @@ async function publish(): Promise<void> {
         :class="lib.summary.current.status === '编辑中' ? 'border-warn/50 bg-warn/5 text-warn' : 'border-ok/40 bg-ok/5 text-ok'">
     类库：{{ lib.summary.library.name }} {{ lib.summary.current.version }} · {{ lib.summary.current.status }}
   </span>
-  <button class="btn" :disabled="!!staticBackend" @click="exportPkg">导出类库包</button>
-  <button class="btn btn-primary" :disabled="!!staticBackend || lib.summary?.current?.status !== '编辑中'" @click="publish">发布类库</button>
+  <button class="btn" @click="exportPkg">导出类库包</button>
+  <button class="btn btn-primary" :disabled="lib.summary?.current?.status !== '编辑中'" @click="publish">发布类库</button>
 </template>

@@ -2,7 +2,6 @@
 /** 类库版本（需求 SW-014，图 4-17）：版本列表、版本对比（新增 / 修改 / 删除）、基于已发布版本新建版本、导入类库包。升级影响分析（同步到工程态）不做。 */
 import { computed, ref, watch } from 'vue'
 import { api } from '@/api/client'
-import { staticBackend } from '@/api/static'
 import { act, canEdit, lib } from '@/composables/useClassLib'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -40,7 +39,7 @@ const ST: Record<string, string> = { 编辑中: 'pill-warn', 已发布: 'pill-ok
     <span class="text-xs text-fg-mute">已发布版本只读；修改须基于新版本进行</span>
     <span class="flex-1" />
     <label class="btn cursor-pointer" :class="{ 'opacity-40 pointer-events-none': !canEdit() }">导入类库包<input type="file" accept=".json" class="hidden" @change="importPkg" /></label>
-    <button class="btn btn-primary" :disabled="!!staticBackend || lib.summary?.current?.status === '编辑中'" @click="newVersion">基于 {{ lastPublished ?? '—' }} 新建版本</button>
+    <button class="btn btn-primary" :disabled="lib.summary?.current?.status === '编辑中'" @click="newVersion">基于 {{ lastPublished ?? '—' }} 新建版本</button>
   </div>
   <div class="grid grid-cols-[340px_1fr] gap-4">
     <div class="card self-start">

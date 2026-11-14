@@ -9,6 +9,7 @@
  * 数据由 backend/tools/export_static.py 生成。
  */
 import { ApiError, type Query } from './client'
+import { ClassLibLocal, type ClassLibBundle } from './classlibLocal'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any
@@ -28,6 +29,7 @@ interface Snapshot {
   }
   evals: Record<string, Any>
   calcRuns: Record<string, Any>
+  classlib?: ClassLibBundle
 }
 
 const STORE_KEY = 'v2-static-store'
@@ -97,9 +99,14 @@ export class StaticBackend {
   private phen: Record<string, Any> = {}
   private links: Record<string, Any> = {}
   private seedRules: Record<string, string> = {}
+  private cl: ClassLibLocal | null = null
 
   constructor(snap: Snapshot) {
     this.snap = snap
+    if (snap.classlib) {
+      this.cl = new ClassLibLocal(snap.classlib, snap.info.generatedAt, snap.get['/classlib/algorithms']?.items ?? [],
+        snap.get['/classlib/hierarchy-preview'] ?? null, (r) => this.ruleText(r))
+    }
     for (const p of snap.base.phenomena) this.seedRules[p.id] = `${p.anchor?.id}|${canon(p.rule)}`
     this.load()
   }
@@ -272,6 +279,8 @@ export class StaticBackend {
   async handle(method: string, path: string, body: Any, query?: Query): Promise<Any> {
     const q = query ?? {}
     let m: RegExpMatchArray | null
+    // 开发态类库：浏览器内实现（classlibLocal.ts）
+    if (this.cl && path.startsWith('/classlib')) return this.cl.handle(method, path, body, q)
     // 现象
     if (path === '/phenomena' && method === 'GET') {
       const items = Object.values(this.phen).filter((p) =>
@@ -417,13 +426,8 @@ export class StaticBackend {
     if (path === '/admin/reset-store') {
       try { localStorage.removeItem(STORE_KEY) } catch { /* ignore */ }
       this.load()
+      this.cl?.reset()
       return { status: 'ok' }
-    }
-    if (path === '/classlib/mapping-test') {
-      if (body?.samples?.length) throw new ApiError(400, '单文件版只能用默认样例测试映射规则')
-      const hit = this.snap.get[key(path, { code: body?.code })]
-      if (!hit) throw new ApiError(404, '单文件版未包含该规则的测试结果')
-      return clone(hit)
     }
     if (method !== 'GET') throw new ApiError(400, '单文件版不支持该操作，请在完整版中使用')
 
@@ -442,6 +446,12 @@ export class StaticBackend {
     }
     if (path.match(/^\/(ops|segments)\/[^/]+$/)) this.patchCounts(out)
     return out
+  }
+
+  /** 单文件版可导出的文件（目前只有类库包）。 */
+  exportFile(path: string): { filename: string; text: string } {
+    if (path === '/classlib/export' && this.cl) return this.cl.exportPkg()
+    throw new ApiError(400, '单文件版不支持导出，请在完整版中操作')
   }
 
   private patchCounts(out: Any): void {

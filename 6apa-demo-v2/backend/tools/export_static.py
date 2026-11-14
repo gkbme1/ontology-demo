@@ -69,6 +69,37 @@ class Collector:
         return r.json() if r.status_code == 200 else None
 
 
+def classlib_bundle(ctx: Any) -> dict[str, Any]:
+    """单文件版开发态：类库种子 + 实例（数量 / 设备组）+ 点表位号 + 现象预览用的「参数 → 测点」，类库逻辑在浏览器里跑。"""
+    from backend.api import routes
+    from backend.v2.phenomena import iter_conditions
+    cl = ctx.classlib
+    counts = routes._instance_counts(ctx)
+    instances, preview = {}, {}
+    for c in cl.data["classes"]:
+        inst = routes._class_instances(ctx, c)
+        if not inst:
+            continue
+        instances[c["id"]] = inst
+        names = {x["name"] for x in cl.effective(c["id"], "params")}
+        for ph in cl.effective(c["id"], "phenomena"):
+            names |= {(k.get("subject") or {}).get("name") for k in iter_conditions(ph.get("rule"))
+                      if (k.get("subject") or {}).get("kind") == "parameter"}
+        gid = inst[0]["id"]
+        members = []
+        for m in (ctx.group_members(gid) or [gid])[:20]:
+            tags = {n: [t["name"] for t in ctx.parameter_tags(m, n)] for n in sorted(x for x in names if x)}
+            members.append({"name": ctx.object_name(m), "tags": {k: v for k, v in tags.items() if v}})
+        preview[c["id"]] = members
+    tags = {n: [t.get("name") or n, t.get("rawDescription") or "", t.get("equipmentName") or "", t.get("variableCategory") or ""]
+            for n, t in ctx.tag_by_name.items()}
+    data = dict(cl.data)
+    content = cl._content()
+    data["versions"] = [{k: v for k, v in x.items() if not (k == "snapshot" and v == content)} for x in cl.data["versions"]]
+    return {"data": data, "instanceCounts": counts, "instances": instances, "preview": preview, "tags": tags,
+            "mapSamples": routes.MAP_SAMPLES, "auditNote": "单文件版：编辑保存在本浏览器"}
+
+
 REL_KEYS = ("category", "from", "to", "direction", "target", "predicate", "mechanism")
 ATTR_KEYS = ("kind", "name", "value", "valueType", "description", "note")
 
@@ -167,22 +198,9 @@ def main() -> None:
     print("收集开发态 / 运行态 …")
     for path in ("/runtime/status", "/runtime/bindings", "/knowledge"):
         col.fetch(path)
-    # 开发态类库：单文件版只读浏览；映射规则测试取默认样例的结果
-    summary = col.fetch("/classlib") or {}
-    col.fetch("/classlib/tree")
-    for c in ctx.classlib.data["classes"]:
-        col.fetch(f"/classlib/class/{c['id']}")
-    for sec in ("metaclasses", "hierarchyTypes", "hierarchyTemplates", "relationTypes", "mappingRules", "capabilities"):
-        col.fetch(f"/classlib/section/{sec}")
+    # 开发态类库：单文件版在浏览器里编辑（static.ts → classlibLocal.ts），这里只收集依赖本体实例的数据
     col.fetch("/classlib/hierarchy-preview")
     col.fetch("/classlib/algorithms")
-    pub = next((v["version"] for v in summary.get("versions") or [] if v.get("status") == "已发布"), None)
-    if pub:
-        col.fetch("/classlib/diff", {"a": pub, "b": "current"})
-    for r in ctx.classlib.data["mappingRules"]:
-        res = col.post("/classlib/mapping-test", {"code": r["code"]})
-        if res is not None:
-            col.get[key("/classlib/mapping-test", {"code": r["code"]})] = res
     for cid in ctx.store.procedures.cards:
         col.fetch(f"/procedures/{cid}")
     for q in [{}] + [{"seg": s} for s in h.segments] + [{"op": o} for o in h.ops]:
@@ -236,6 +254,8 @@ def main() -> None:
     limits = {lid: {k: l.get(k) for k in ("lowLow", "low", "normalLow", "normalHigh", "high", "highHigh")}
               for lid, l in ctx.limits.items()}
     generated = datetime.now().strftime("%Y-%m-%d %H:%M")
+    print("整理开发态类库 …")
+    classlib = classlib_bundle(ctx)
     snapshot = {
         "info": {"generatedAt": generated, "note": "单文件版数据快照（种子数据 + 模拟数据试算结果）"},
         "get": col.get,
@@ -245,6 +265,7 @@ def main() -> None:
                  "phenProcedures": {pid: procedures.cards_for_phenomenon(ctx, pid) for pid in ctx.phen.phenomena}},
         "evals": evals,
         "calcRuns": calc_runs,
+        "classlib": classlib,
     }
     raw = json.dumps(snapshot, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     packed = base64.b64encode(gzip.compress(raw, 9)).decode("ascii")
