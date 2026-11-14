@@ -419,6 +419,12 @@ export class StaticBackend {
       this.load()
       return { status: 'ok' }
     }
+    if (path === '/classlib/mapping-test') {
+      if (body?.samples?.length) throw new ApiError(400, '单文件版只能用默认样例测试映射规则')
+      const hit = this.snap.get[key(path, { code: body?.code })]
+      if (!hit) throw new ApiError(404, '单文件版未包含该规则的测试结果')
+      return clone(hit)
+    }
     if (method !== 'GET') throw new ApiError(400, '单文件版不支持该操作，请在完整版中使用')
 
     // 预先生成的只读应答

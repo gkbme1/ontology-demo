@@ -14,6 +14,7 @@ import GlobalSections from '@/views/GlobalSections.vue'
 import ConsistencyCheck from '@/views/ConsistencyCheck.vue'
 import ReleaseCenter from '@/views/ReleaseCenter.vue'
 import DevStudio from '@/views/DevStudio.vue'
+import DevHeader from '@/views/dev/DevHeader.vue'
 import RuntimeView from '@/views/RuntimeView.vue'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -124,10 +125,11 @@ const kind = (): string => nav.selection.type
         </div>
       </div>
       <span class="flex-1" />
+      <DevHeader v-if="nav.stage === 'dev'" />
       <span v-if="staticBackend" class="pill pill-info" title="离线单文件版：数据为导出时的快照，现象与根因关系的编辑保存在本浏览器">
         单文件版 · 数据快照 {{ staticBackend.info.generatedAt }}
       </span>
-      <button class="pill cursor-pointer" :class="currentRelease ? 'pill-ok' : 'pill-mute'" title="当前发布版本；点击打开「发布与导出」"
+      <button v-if="nav.stage !== 'dev'" class="pill cursor-pointer" :class="currentRelease ? 'pill-ok' : 'pill-mute'" title="当前发布版本；点击打开「发布与导出」"
               @click="nav.page = 'browse'; select({ type: 'global:release' }, 'global:release')">
         {{ currentRelease ? `发布版本 ${currentRelease.version} · ${currentRelease.time.slice(5, 16)}` : '未发布' }}
       </button>

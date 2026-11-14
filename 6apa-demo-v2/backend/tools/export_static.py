@@ -165,15 +165,24 @@ def main() -> None:
     col.fetch("/validation")
     col.fetch("/releases")
     print("收集开发态 / 运行态 …")
-    for path in ("/dev/metamodel", "/dev/hierarchy-types", "/dev/relation-types", "/dev/mapping-rules", "/runtime/status",
-                 "/runtime/bindings", "/knowledge"):
+    for path in ("/runtime/status", "/runtime/bindings", "/knowledge"):
         col.fetch(path)
-    tree = col.fetch("/dev/class-tree") or {"items": []}
-    stack = list(tree["items"])
-    while stack:
-        n = stack.pop()
-        col.fetch("/dev/class", {"id": n["id"]})
-        stack += n.get("children") or []
+    # 开发态类库：单文件版只读浏览；映射规则测试取默认样例的结果
+    summary = col.fetch("/classlib") or {}
+    col.fetch("/classlib/tree")
+    for c in ctx.classlib.data["classes"]:
+        col.fetch(f"/classlib/class/{c['id']}")
+    for sec in ("metaclasses", "hierarchyTypes", "hierarchyTemplates", "relationTypes", "mappingRules", "capabilities"):
+        col.fetch(f"/classlib/section/{sec}")
+    col.fetch("/classlib/hierarchy-preview")
+    col.fetch("/classlib/algorithms")
+    pub = next((v["version"] for v in summary.get("versions") or [] if v.get("status") == "已发布"), None)
+    if pub:
+        col.fetch("/classlib/diff", {"a": pub, "b": "current"})
+    for r in ctx.classlib.data["mappingRules"]:
+        res = col.post("/classlib/mapping-test", {"code": r["code"]})
+        if res is not None:
+            col.get[key("/classlib/mapping-test", {"code": r["code"]})] = res
     for cid in ctx.store.procedures.cards:
         col.fetch(f"/procedures/{cid}")
     for q in [{}] + [{"seg": s} for s in h.segments] + [{"op": o} for o in h.ops]:

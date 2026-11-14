@@ -43,7 +43,8 @@
 | `userdata.py` | 在线编辑的补充数据（`data/store/` 下，无种子）：变更记录 `audit.json`、继承覆盖 `overrides.json`、人工关系 `user_relations.json`、处置规程编辑 `procedure_edits.json` |
 | `release.py` | 发布 / 版本列表 / 对比 / 回滚 / 批量状态（`data/store/releases/`）；只有生效的现象、导致关系、计算组态计入发布内容 |
 | `export.py` | Excel 导出（openpyxl）、TTL 导出（手写 Turtle，rdflib 可选自检）；命名空间前缀 `NS` 为占位 |
-| `devtime.py` | 开发态：类树（元类 设备 → 资产大类 → 设备类型）、类详情（由实例归纳的模板）、元模型、层级类型、关系类型（附录 B）、映射规则与位号解析测试 |
+| `classlib.py` | 开发态可编辑类库（需求 4.2）：元模型 / 层级类型与模板 / 类（单继承，`effective` 由根到本类合并，`_src` 标本类 / 继承 / 覆盖）/ 关系类型 / 映射规则 / 能力；版本（编辑中可改，发布后只读，`diff`）；种子 `data/seed/classlib.json` 由 `build_classlib.py` 生成，编辑存 `data/store/classlib.json`；接口 `/api/v2/classlib/*`，前端 `views/dev/*` |
+| `devtime.py` | （旧，仅后端保留，前端已改用 classlib）开发态：类树（元类 设备 → 资产大类 → 设备类型）、类详情（由实例归纳的模板）、元模型、层级类型、关系类型（附录 B）、映射规则与位号解析测试 |
 | `runtime.py` | 运行态：服务状态、现象状态评估（发布版本中生效的，或全部 + 工艺段）、原因链状态、绑定状态汇总（缓存） |
 | `procedures.py` | 处置规程视图：按现象 / 导致关系的 source.ref、basis（`ARP-xx 可能原因 n` 或 `ARP-xx #n`）匹配拆分状态；拆分可能原因；步骤 / 检查项 / 执行边界 |
 
@@ -82,7 +83,7 @@
 - 继承覆盖：设备上的覆盖存 `ctx.overrides`；`rule_eval.evaluate(..., phenomenon_id=)` 逐台套用覆盖规则 / 禁用，`threshold(th, target)` 取本台覆盖限值。
 - 计算组态：`execution`（周期 / 事件触发 / 按需…）与 `output`（输出测点、写回）在 `calculations._clean` 校验并补默认值；
   绑定引用的参数 / 位号在 `routes._check_calc_refs` 校验；运行记录 `ctx.calcs.log_run`（内存）。
-- 三态：`nav.stage`（dev / eng / run），`App.vue` 顶栏切换；`DevStudio.vue`、`RuntimeView.vue`；从开发态 / 运行态打开对象用 `openInEngineering`。
+- 三态：`nav.stage`（dev / eng / run），`App.vue` 顶栏切换；`DevStudio.vue`（左侧元模型在最前；类库写操作只允许「编辑中」版本，`useClassLib.canEdit`）、`RuntimeView.vue`；从开发态 / 运行态打开对象用 `openInEngineering`。
 - 知识沉淀 `userdata.KnowledgeStore`（`knowledge.json`），审核在 `ReleaseCenter.vue` 的「知识审核」页。
 - 一致性校验每条带 `draft` / `blocking`：生效对象上的错误才阻止发布（`publishable`）。
 - 写操作都经 `routes._audit` / `ctx.audit.record` 记变更；新写接口要记一条。单文件版对覆盖 / 人工关系只读（`static.ts` 把 `canEdit / canOverride` 置 false）。

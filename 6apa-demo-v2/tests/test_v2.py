@@ -468,6 +468,85 @@ class Batch5Test(unittest.TestCase):
         client.delete(f"/api/v2/causal-links/{lid}")
 
 
+class ClassLibTest(unittest.TestCase):
+    """开发态可编辑类库（需求 4.2）：元模型 / 类继承 / 模板编辑 / 发布只读 / 版本对比 / 规则测试。"""
+    CID = "cls-type-gdhmfyg"  # 固定化酶反应罐
+
+    def setUp(self):
+        CTX.classlib.reset()
+
+    def test_summary_meta_first(self):
+        r = client.get("/api/v2/classlib").json()
+        self.assertEqual(r["current"]["status"], "编辑中")
+        metas = client.get("/api/v2/classlib/section/metaclasses").json()["items"]
+        self.assertEqual(metas[0]["code"], "MC_NODE")
+        self.assertTrue(any(m["code"] == "MC_EQUIP" for m in metas))
+
+    def test_inheritance_and_override(self):
+        d = client.get(f"/api/v2/classlib/class/{self.CID}").json()
+        self.assertEqual(d["path"][0]["name"], "设备")
+        attrs = d["parts"]["attrs"]
+        tag = next(a for a in attrs if a["code"] == "tag_no")
+        self.assertFalse(tag["_own"])
+        self.assertTrue(tag["_src"].startswith("继承"))
+        # 子类不能改继承属性的数据类型
+        r = client.put(f"/api/v2/classlib/class/{self.CID}/attrs/tag_no", json={**tag, "dtype": "整数"})
+        self.assertEqual(r.status_code, 400)
+        # 约束的限值顺序校验
+        con = d["parts"]["constraints"][0]
+        r = client.put(f"/api/v2/classlib/class/{self.CID}/constraints/{con['code']}", json={**con, "type": "上下限", "l": 10, "h": 5})
+        self.assertEqual(r.status_code, 400)
+
+    def test_class_crud_and_cycle(self):
+        r = client.post("/api/v2/classlib/class", json={"code": "CLS-TEST-SUB", "name": "测试子类", "parent": self.CID, "metaclass": "MC_EQUIP"})
+        self.assertEqual(r.status_code, 200, r.text)
+        cid = r.json()["id"]
+        d = client.get(f"/api/v2/classlib/class/{cid}").json()
+        self.assertTrue(d["parts"]["params"])  # 全部继承
+        self.assertTrue(all(not x["_own"] for x in d["parts"]["params"]))
+        # 父类不能设成自己的子类
+        r = client.put(f"/api/v2/classlib/class/{self.CID}", json={**client.get(f"/api/v2/classlib/class/{self.CID}").json(), "parent": cid})
+        self.assertEqual(r.status_code, 400)
+        r = client.put(f"/api/v2/classlib/class/{cid}/params/P_TEST", json={"code": "P_TEST", "name": "测试参数", "category": "测量值",
+                                                                           "dtype": "实数", "tagRule": {"funcs": "TI", "keywords": "温度"}})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(client.delete(f"/api/v2/classlib/class/{cid}").status_code, 200)
+
+    def test_publish_readonly_new_version_diff(self):
+        r = client.put(f"/api/v2/classlib/class/{self.CID}/params/P_NEW", json={"code": "P_NEW", "name": "新参数", "category": "计算值", "dtype": "实数"})
+        self.assertEqual(r.status_code, 200, r.text)
+        diff = client.get("/api/v2/classlib/diff", params={"a": "v0.1", "b": "current"}).json()
+        self.assertGreaterEqual(diff["counts"]["新增"], 1)
+        v = client.post("/api/v2/classlib/publish", json={"note": "测试发布"}).json()
+        self.assertEqual(v["status"], "已发布")
+        r = client.put(f"/api/v2/classlib/class/{self.CID}/params/P_NEW2", json={"code": "P_NEW2", "name": "x", "category": "计算值"})
+        self.assertEqual(r.status_code, 400)  # 已发布只读
+        nv = client.post("/api/v2/classlib/versions", json={}).json()
+        self.assertEqual(client.get("/api/v2/classlib").json()["current"]["version"], nv["version"])
+
+    def test_rule_tests(self):
+        d = client.get(f"/api/v2/classlib/class/{self.CID}").json()
+        p = next(x for x in d["parts"]["params"] if (x.get("tagRule") or {}).get("funcs") == "AT")
+        r = client.post(f"/api/v2/classlib/class/{self.CID}/params/{p['code']}/test", json={"tag": "AT_1301C1"}).json()
+        self.assertTrue(r)
+        m = client.post("/api/v2/classlib/mapping-test", json={"code": "MR-01"}).json()
+        self.assertTrue(any(x.get("confidence") for x in m["results"]))
+        self.assertGreater(m["hits"], 0)
+        algos = client.get("/api/v2/classlib/algorithms").json()["items"]
+        self.assertTrue(algos)
+        ph = d["parts"]["phenomena"][0]
+        prev = client.get(f"/api/v2/classlib/class/{self.CID}/phenomena/{ph['code']}/preview")
+        self.assertEqual(prev.status_code, 200, prev.text)
+
+    def test_export_import(self):
+        r = client.get("/api/v2/classlib/export")
+        self.assertEqual(r.status_code, 200)
+        import json as _j
+        pkg = _j.loads(r.content.decode("utf-8"))
+        r = client.post("/api/v2/classlib/import", json={"package": pkg, "strategy": "skip"}).json()
+        self.assertEqual(r.get("added", 0), 0)
+
+
 class DocsAndSearchTest(unittest.TestCase):
     def test_docs(self):
         r = client.get("/api/v2/ops/OP-09/documents").json()

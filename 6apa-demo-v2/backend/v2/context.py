@@ -27,6 +27,8 @@ class AppContext:
         self.relations = RelationStore()
         self.procedure_edits = ProcedureEdits()
         self.knowledge = KnowledgeStore()
+        from backend.v2.classlib import ClassLibrary
+        self.classlib = ClassLibrary()
         self.limits = {l["id"]: l for l in process_limits._load()}
         dcs = self.store.dcs
         self.tag_by_name = {t["name"]: t for t in dcs.tags.values()}

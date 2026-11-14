@@ -58,6 +58,7 @@ def admin_reset() -> dict[str, Any]:
     ctx.relations.reset()
     ctx.procedure_edits.reset()
     ctx.knowledge.reset()
+    ctx.classlib.reset()
     ctx.audit.reset()
     return health()
 
@@ -274,6 +275,368 @@ def dev_mapping_rules() -> dict[str, Any]:
 def dev_parse_tag(tag: str) -> dict[str, Any]:
     from backend.v2 import devtime
     return devtime.parse_tag(get_ctx(), tag)
+
+
+# ------------------------------------------------------------------ 开发态类库（可编辑，需求 4.2）
+def _cl():  # noqa: ANN202
+    return get_ctx().classlib
+
+
+def _cl_guard(fn, *args):  # noqa: ANN001, ANN202
+    from backend.v2.classlib import ClassLibError
+    try:
+        return fn(*args)
+    except ClassLibError as exc:
+        raise HTTPException(400, str(exc))
+    except LookupError as exc:
+        raise HTTPException(404, f"未找到：{exc}")
+
+
+def _cl_audit(op: str, name: str, target: str = "", note: str = "") -> None:
+    get_ctx().audit.record(op, "类库", target, name, note=f"{_cl().current['version']}{'；' + note if note else ''}")
+
+
+def _class_instances(ctx, cls: dict) -> list[dict]:  # noqa: ANN001
+    """类的直接实例：设备类型类 → 该设备类型的设备组；元类根类 → 该元类的对象数（只计数）。"""
+    if cls.get("abstract"):
+        return []
+    from backend.v2 import devtime
+    h = ctx.hierarchy
+    out = []
+    for g in devtime._groups_of_type(ctx, cls["name"]):
+        ops = h.ops_of_group.get(g) or []
+        members = [e for e, x in ctx.store.dcs.equipment.items() if x.get("equipmentGroupId") == g]
+        out.append({"id": g, "name": ctx.store.dcs.equipment_groups[g]["name"], "members": len(members), "inNav": bool(ops),
+                    "opId": ops[0] if ops else None, "segmentId": h.ops[ops[0]]["segmentId"] if ops else None})
+    return out
+
+
+def _instance_counts(ctx) -> dict:  # noqa: ANN001
+    from backend.v2 import devtime
+    cnt = {}
+    for c in _cl().data["classes"]:
+        if not c.get("abstract"):
+            gids = devtime._groups_of_type(ctx, c["name"])
+            eq = sum(1 for e in ctx.store.dcs.equipment.values() if e.get("equipmentGroupId") in set(gids))
+            cnt[c["id"]] = {"instances": eq + len(gids)}
+    g = None
+    for c in _cl().data["classes"]:
+        if c.get("parent") is None and c["metaclass"] != "MC_EQUIP":
+            if g is None:
+                from backend.v2 import global_graph
+                g = global_graph.build(ctx)["nodeCounts"]
+            n = {"MC_EQGRP": len(ctx.store.dcs.equipment_groups), "MC_PARAM": g.get("工艺参数", 0), "MC_STREAM": g.get("物料流股", 0),
+                 "MC_UTIL": g.get("公用介质", 0), "MC_QI": g.get("质量指标", 0)}.get(c["metaclass"], 0)
+            cnt[c["id"]] = {"instances": n}
+    return cnt
+
+
+@router.get("/classlib")
+def classlib_summary() -> dict[str, Any]:
+    return _cl().summary()
+
+
+@router.get("/classlib/tree")
+def classlib_tree() -> dict[str, Any]:
+    ctx = get_ctx()
+    return {"items": _cl().tree(_instance_counts(ctx))}
+
+
+@router.get("/classlib/class/{cid}")
+def classlib_class(cid: str) -> dict[str, Any]:
+    from backend.v2.classlib import PARTS
+    ctx = get_ctx()
+    cl = _cl()
+    c = _cl_guard(cl.cls, cid)
+    chain = cl.chain(cid)
+    parts = {p: cl.effective(cid, p) for p in PARTS}
+    inherited_caps = sorted({x for k in chain[:-1] for x in k.get("caps") or []})
+    caps = [{**x, "_src": "本类" if x["code"] in (c.get("caps") or []) else "继承"} for x in cl.data["capabilities"]
+            if x["code"] in set(c.get("caps") or []) | set(inherited_caps)]
+    meta = next((m for m in cl.data["metaclasses"] if m["code"] == c["metaclass"]), {})
+    prev = next((v["version"] for v in reversed(cl.data["versions"]) if v["status"] == "已发布"), None)
+    changes = 0
+    if prev and prev != cl.current["version"]:
+        changes = sum(1 for r in cl.diff(prev, "current")["rows"] if r["id"] == cid or r["id"].startswith(cid + "/"))
+    instances = _class_instances(ctx, c)
+    base = {k: v for k, v in c.items() if k not in PARTS}
+    return {**base, "path": [{"id": x["id"], "name": x["name"], "abstract": x.get("abstract")} for x in chain],
+            "metaclassName": meta.get("name"), "tabsEffective": c.get("tabs") or meta.get("tabs") or [],
+            "parts": parts, "caps": caps, "instances": instances,
+            "summary": {p: {"own": sum(1 for x in v if x["_own"]), "inherited": sum(1 for x in v if not x["_own"])} for p, v in parts.items()},
+            "version": {"current": cl.current["version"], "status": cl.current["status"], "since": prev, "changes": changes,
+                        "updatedAt": c.get("updatedAt")}}
+
+
+@router.post("/classlib/class")
+def classlib_class_create(body: dict = Body(...)) -> dict[str, Any]:
+    c = _cl_guard(_cl().upsert_class, None, body)
+    _cl_audit("新建类", c["name"], c["id"])
+    return c
+
+
+@router.put("/classlib/class/{cid}")
+def classlib_class_update(cid: str, body: dict = Body(...)) -> dict[str, Any]:
+    c = _cl_guard(_cl().upsert_class, cid, body)
+    _cl_audit("修改类", c["name"], cid)
+    return c
+
+
+@router.delete("/classlib/class/{cid}")
+def classlib_class_delete(cid: str) -> dict[str, Any]:
+    ctx = get_ctx()
+    c = _cl_guard(_cl().cls, cid)
+    n = sum(i["members"] + 1 for i in _class_instances(ctx, c))
+    old = _cl_guard(_cl().delete_class, cid, n)
+    _cl_audit("删除类", old["name"], cid)
+    return {"deleted": cid}
+
+
+@router.put("/classlib/class/{cid}/caps")
+def classlib_caps(cid: str, body: dict = Body(...)) -> dict[str, Any]:
+    caps = _cl_guard(_cl().set_caps, cid, list(body.get("caps") or []))
+    _cl_audit("挂载能力", _cl().cls(cid)["name"], cid, "、".join(caps))
+    return {"caps": caps}
+
+
+@router.put("/classlib/class/{cid}/{part}/{code}")
+def classlib_item_upsert(cid: str, part: str, code: str, body: dict = Body(...)) -> dict[str, Any]:
+    from backend.v2.classlib import PARTS
+    if part not in PARTS:
+        raise HTTPException(404, part)
+    item = _cl_guard(_cl().upsert_item, cid, part, code, body)
+    _cl_audit(f"修改{PARTS[part]}", f"{_cl().cls(cid)['name']} › {item.get('name') or item['code']}", f"{cid}/{item['code']}")
+    return item
+
+
+@router.delete("/classlib/class/{cid}/{part}/{code}")
+def classlib_item_delete(cid: str, part: str, code: str) -> dict[str, Any]:
+    from backend.v2.classlib import PARTS
+    old = _cl_guard(_cl().delete_item, cid, part, code)
+    _cl_audit(f"删除{PARTS.get(part, part)}", f"{_cl().cls(cid)['name']} › {old.get('name') or code}", f"{cid}/{code}")
+    return {"deleted": code}
+
+
+@router.post("/classlib/class/{cid}/params/{code}/test")
+def classlib_param_test(cid: str, code: str, body: dict = Body(...)) -> dict[str, Any]:
+    """参数模板的位号匹配试验（需求 SW-005 第 3 条）：功能字母 + 描述关键字 + 位置维度。"""
+    from backend.v2.classlib import tag_match
+    ctx = get_ctx()
+    tpl = next((x for x in _cl().effective(cid, "params") if x["code"] == code), None)
+    if not tpl:
+        raise HTTPException(404, code)
+    tag = (body.get("tag") or "").strip()
+    t = ctx.tag_by_name.get(tag.upper()) or ctx.tag_by_name.get(tag) or {}
+    desc = body.get("desc") or t.get("rawDescription") or ""
+    return {**tag_match(tpl, t.get("name") or tag, desc), "template": tpl["name"], "equipment": t.get("equipmentName")}
+
+
+@router.get("/classlib/class/{cid}/phenomena/{code}/preview")
+def classlib_phen_preview(cid: str, code: str) -> dict[str, Any]:
+    """现象模板实例化预览：在本类第一个设备组的第一台设备上展开为具体位号。"""
+    from backend.v2.phenomena import iter_conditions, rule_text
+    ctx = get_ctx()
+    tpl = next((x for x in _cl().effective(cid, "phenomena") if x["code"] == code), None)
+    if not tpl:
+        raise HTTPException(404, code)
+    inst = _class_instances(ctx, _cl().cls(cid))
+    if not inst:
+        return {"instance": None, "lines": [], "note": "本类暂无实例"}
+    gid = inst[0]["id"]
+    names = [((c.get("subject") or {}).get("name") or "") for c in iter_conditions(tpl.get("rule")) if (c.get("subject") or {}).get("kind") == "parameter"]
+    members = ctx.group_members(gid) or [gid]
+    member = next((m for m in members if any(ctx.parameter_tags(m, n) for n in names)), members[0])
+    lines = []
+    for c in iter_conditions(tpl.get("rule")):
+        s = c.get("subject") or {}
+        if s.get("kind") == "parameter":
+            tags = [t["name"] for t in ctx.parameter_tags(member, s.get("name") or "")]
+            lines.append({"text": rule_text(c, ctx.limits, {}), "tags": tags or ["（本台未落到测点）"]})
+        else:
+            lines.append({"text": rule_text(c, ctx.limits, {k: v["name"] for k, v in ctx.calcs.items.items()}), "tags": []})
+    return {"instance": inst[0]["name"], "member": ctx.object_name(member), "lines": lines,
+            "ruleText": rule_text(tpl.get("rule"), ctx.limits, {k: v["name"] for k, v in ctx.calcs.items.items()}) if tpl.get("rule") else "（判定规则待定义）"}
+
+
+@router.get("/classlib/section/{sec}")
+def classlib_section(sec: str) -> dict[str, Any]:
+    items = _cl_guard(_cl().section, sec)
+    out = {"items": items}
+    if sec == "metaclasses":
+        out["usage"] = {m["code"]: sum(1 for c in _cl().data["classes"] if c.get("metaclass") == m["code"]) for m in items}
+    if sec == "capabilities":
+        names = {c["id"]: c["name"] for c in _cl().data["classes"]}
+        out["classNames"] = names
+    return out
+
+
+@router.put("/classlib/section/{sec}/{code}")
+def classlib_section_upsert(sec: str, code: str, body: dict = Body(...)) -> dict[str, Any]:
+    from backend.v2.classlib import SECTIONS
+    item = _cl_guard(_cl().upsert, sec, code, body)
+    _cl_audit(f"修改{SECTIONS.get(sec, sec)}", item.get("name") or item["code"], item["code"])
+    return item
+
+
+@router.delete("/classlib/section/{sec}/{code}")
+def classlib_section_delete(sec: str, code: str) -> dict[str, Any]:
+    from backend.v2.classlib import SECTIONS
+    old = _cl_guard(_cl().delete, sec, code)
+    _cl_audit(f"删除{SECTIONS.get(sec, sec)}", old.get("name") or code, code)
+    return {"deleted": code}
+
+
+@router.get("/classlib/hierarchy-preview")
+def classlib_hierarchy_preview() -> dict[str, Any]:
+    """层级模板预览（取自已引用工程 105 车间）：车间 › 工艺段 › 工序，以及工序的子工序链。"""
+    h = get_ctx().hierarchy
+    op = next((o for o in h.ops.values() if o.get("subSteps")), next(iter(h.ops.values())))
+    return {"path": [p["name"] for p in h.path(op["id"])], "subSteps": op.get("subSteps") or [],
+            "levels": {"WORKSHOP": len(h.workshops), "SECTION": len(h.segments), "PROCESS": len(h.ops),
+                       "SUBPROC": sum(len(o.get("subSteps") or []) for o in h.ops.values())}}
+
+
+MAP_SAMPLES = {"位号解析": ["TI_1301C", "AT_1301C1", "FT_1302A", "P_1303C_RUN", "XV_1304C_VAL2", "SJGYW_C", "PT_1301", "HV_1301_AO"],
+               "设备识别": ["水解罐C", "RB储罐A", "一级离心机A", "碳酸钾泵", "结晶罐A1"]}
+
+
+@router.post("/classlib/mapping-test")
+def classlib_mapping_test(body: dict = Body(...)) -> dict[str, Any]:
+    """映射规则测试（需求 SW-011 第 5 条）：输入样例，显示解析结果、命中规则与置信度；同时给出点表中的实际归属作对照。"""
+    from backend.v2.classlib import run_mapping
+    ctx = get_ctx()
+    rule = next((r for r in _cl().data["mappingRules"] if r["code"] == body.get("code")), None)
+    if not rule:
+        raise HTTPException(404, body.get("code"))
+    raw = body.get("samples") or MAP_SAMPLES.get(rule["kind"]) or []
+    samples = []
+    for s in raw:
+        t = ctx.tag_by_name.get(str(s).upper()) or {}
+        samples.append({"tag": t.get("name") or s, "desc": t.get("rawDescription") or "", "equipment": t.get("equipmentName") or "",
+                        "variable": t.get("variableCategory") or ""})
+    res = _cl_guard(run_mapping, rule, samples, _cl().data["library"].get("funcMap") or {})
+    hits = 0
+    if rule.get("pattern") and rule["kind"] == "位号解析":
+        import re as _re
+        rx = _re.compile(rule["pattern"])
+        hits = sum(1 for n in ctx.tag_by_name if rx.match(n))
+    return {"rule": rule, "results": res, "hits": hits, "total": len(ctx.tag_by_name)}
+
+
+@router.get("/classlib/algorithms")
+def classlib_algorithms() -> dict[str, Any]:
+    ctx = get_ctx()
+    caps = _cl().data["capabilities"]
+    items = []
+    for a in ctx.algos.items.values():
+        items.append({**a, "usedByCaps": [c["code"] for c in caps if c.get("algorithm") == a["id"]],
+                      "usedByCalcs": [c["id"] for c in ctx.calcs.items.values() if c.get("algorithmId") == a["id"]],
+                      "impl": "Python 包（本 Demo 内置实现）"})
+    return {"items": items}
+
+
+@router.post("/classlib/algorithms/{aid}/test")
+def classlib_algorithm_test(aid: str, body: dict = Body(...)) -> dict[str, Any]:
+    """算法测试（需求 SW-013 第 2 条）：输入测试数据（数组 / 常量），看输出与日志。内置实现代替隔离环境。"""
+    import time
+    import numpy as np
+    ctx = get_ctx()
+    algo = _guard(ctx.algos.get, aid)
+    args = {}
+    log = []
+    for inp in algo.get("inputs") or []:
+        v = (body.get("inputs") or {}).get(inp["name"])
+        if v is None:
+            if inp.get("default") is not None:
+                v = inp["default"]
+            elif inp.get("required"):
+                raise HTTPException(400, f"缺少输入 {inp['name']}（{inp['label']}）")
+            else:
+                continue
+        if isinstance(v, list) and v and isinstance(v[0], list):
+            args[inp["name"]] = [np.asarray(x, dtype=float) for x in v]
+        elif isinstance(v, list):
+            args[inp["name"]] = [np.asarray(v, dtype=float)] if inp.get("multi") else np.asarray(v, dtype=float)
+        else:
+            args[inp["name"]] = v
+        log.append(f"输入 {inp['name']} = {v}")
+    t0 = time.time()
+    try:
+        out = ctx.algos.invoke(aid, args, float(body.get("stepMin") or 1))
+        ok, err = True, ""
+        values = [round(float(x), 4) for x in np.atleast_1d(out)][:200]
+    except Exception as exc:  # noqa: BLE001
+        ok, err, values = False, str(exc), []
+    return {"ok": ok, "error": err, "output": {(algo.get("output") or {}).get("name") or "out": values},
+            "ms": int((time.time() - t0) * 1000), "log": log + ["运行环境：本 Demo 内置实现（代替隔离环境）"]}
+
+
+@router.post("/classlib/publish")
+def classlib_publish(body: dict = Body(default={})) -> dict[str, Any]:
+    v = _cl_guard(_cl().publish, body.get("note") or "")
+    _cl_audit("发布类库", v["version"], v["version"], body.get("note") or "")
+    return v
+
+
+@router.post("/classlib/versions")
+def classlib_new_version(body: dict = Body(default={})) -> dict[str, Any]:
+    v = _cl_guard(_cl().new_version, body.get("base"))
+    _cl_audit("新建类库版本", v["version"], v["version"], f"基于 {v['base']}")
+    return v
+
+
+@router.get("/classlib/diff")
+def classlib_diff(a: str, b: str = "current") -> dict[str, Any]:
+    return _cl_guard(_cl().diff, a, b)
+
+
+@router.get("/classlib/export")
+def classlib_export():  # noqa: ANN201
+    """导出类库包（需求 SW-014 第 4 条）：当前版本的类库内容（JSON）。"""
+    import json as _json
+    cl = _cl()
+    pkg = {"format": "6apa-classlib/1", "library": cl.data["library"], "version": cl.current["version"], "exportedAt": __import__("datetime").datetime.now().isoformat(timespec="seconds"),
+           **cl._content()}
+    _cl_audit("导出类库包", cl.current["version"], cl.current["version"])
+    return _download(_json.dumps(pkg, ensure_ascii=False, indent=1).encode("utf-8"), f"类库包_{cl.current['version']}.json", "application/json")
+
+
+@router.post("/classlib/import")
+def classlib_import(body: dict = Body(...)) -> dict[str, Any]:
+    """导入类库包：按编码检测冲突，strategy = merge（覆盖同编码）/ skip（跳过同编码）。"""
+    cl = _cl()
+    _cl_guard(cl.editable)
+    pkg = body.get("package") or {}
+    if pkg.get("format") != "6apa-classlib/1":
+        raise HTTPException(400, "不是本系统导出的类库包")
+    strategy = body.get("strategy") or "skip"
+    stats = {"added": 0, "merged": 0, "skipped": 0}
+    for sec in ("metaclasses", "hierarchyTypes", "hierarchyTemplates", "relationTypes", "mappingRules", "capabilities"):
+        mine = {x["code"]: x for x in cl.data[sec]}
+        for x in pkg.get(sec) or []:
+            if x["code"] in mine:
+                if strategy == "merge":
+                    cl.data[sec][cl.data[sec].index(mine[x["code"]])] = x
+                    stats["merged"] += 1
+                else:
+                    stats["skipped"] += 1
+            else:
+                cl.data[sec].append(x)
+                stats["added"] += 1
+    mine = {c["id"]: c for c in cl.data["classes"]}
+    for c in pkg.get("classes") or []:
+        if c["id"] in mine:
+            if strategy == "merge":
+                cl.data["classes"][cl.data["classes"].index(mine[c["id"]])] = c
+                stats["merged"] += 1
+            else:
+                stats["skipped"] += 1
+        else:
+            cl.data["classes"].append(c)
+            stats["added"] += 1
+    cl.save()
+    _cl_audit("导入类库包", f"{pkg.get('version')}（{strategy}）", "", str(stats))
+    return stats
 
 
 # ------------------------------------------------------------------ 运行态（需求 4.9）

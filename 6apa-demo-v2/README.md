@@ -45,7 +45,7 @@ python3 -m backend.tools.export_static --build
 
 ## 使用
 
-顶栏左侧是**三态切换**：开发态（类库：元模型、层级类型、类树与类模板、关系类型、映射规则、算法库，只读）、
+顶栏左侧是**三态切换**：开发态（可编辑的类库，按需求 4.2 原型：元模型 → 层级类型 → 类库（类树 + 属性 / 参数 / 约束 / 现象 / 根因 / 工艺影响模板 + 能力挂载）→ 关系类型 → 映射规则 → 能力与算法 → 类库版本；编辑中的版本可改，发布后只读，基于已发布版本新建版本后再改，可对比版本差异、导出 / 导入类库包）、
 工程态（下面 1～10 条，实例组态）、运行态（运行服务状态、现象 / 工况状态评估与原因链、绑定状态、知识沉淀提交）。
 
 1. 左侧「空间层级」第一屏只有 **105车间** 和 6 个工艺段。**双击工艺段**（如 6A_水解）进入工艺段内的层级树，顶部「返回车间导航」退回；
@@ -153,6 +153,8 @@ python3 -m backend.tools.build_seed --force     # 覆盖 data/seed/*.json（不�
 | `POST /api/v2/status-batch` | 批量变更现象 / 导致关系 / 计算组态的状态 |
 | `GET /api/v2/export/excel?seg=` · `GET /api/v2/export/ttl?seg=` | 导出 Excel / TTL（`X-Export-Info` 头带统计与语法自检结果） |
 | `GET /api/v2/audit?op=&keyword=` | 操作日志 |
-| `GET /api/v2/dev/metamodel` · `/dev/hierarchy-types` · `/dev/class-tree` · `/dev/class?id=` · `/dev/relation-types` · `/dev/mapping-rules` · `/dev/parse-tag?tag=` | 开发态（只读） |
+| `GET /api/v2/classlib` · `/classlib/tree` · `/classlib/class/{id}` · `/classlib/section/{sec}` · `/classlib/diff?a=&b=` · `/classlib/export` | 开发态类库（读） |
+| `POST/PUT/DELETE /api/v2/classlib/class[/{id}]` · `PUT/DELETE /classlib/class/{id}/{part}/{code}` · `PUT/DELETE /classlib/section/{sec}/{code}` · `POST /classlib/publish` · `/classlib/versions` · `/classlib/import` | 开发态类库（写，只允许改「编辑中」的版本） |
+| `POST /api/v2/classlib/class/{id}/params/{code}/test` · `GET /classlib/class/{id}/phenomena/{code}/preview` · `POST /classlib/mapping-test` · `POST /classlib/algorithms/{id}/test` | 开发态试验（位号匹配 / 现象实例化预览 / 映射规则 / 算法） |
 | `GET /api/v2/runtime/status` · `POST /runtime/evaluate` · `GET /runtime/causes/{pid}?target=` · `GET /runtime/bindings` | 运行态 |
 | `GET/POST /api/v2/knowledge` · `POST /knowledge/{id}/review` | 知识沉淀提交与审核 |
