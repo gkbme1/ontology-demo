@@ -57,6 +57,7 @@ def admin_reset() -> dict[str, Any]:
     ctx.overrides.reset()
     ctx.relations.reset()
     ctx.procedure_edits.reset()
+    ctx.knowledge.reset()
     ctx.audit.reset()
     return health()
 
@@ -227,6 +228,136 @@ def validation_run() -> dict[str, Any]:
     """一致性校验（全量）：错误 / 警告 / 提示，每条带可跳转的目标对象。"""
     from backend.v2 import validation
     return validation.run(get_ctx())
+
+
+# ------------------------------------------------------------------ 开发态（需求 4.2，只读）
+@router.get("/dev/metamodel")
+def dev_metamodel() -> dict[str, Any]:
+    from backend.v2 import devtime
+    return devtime.metamodel(get_ctx())
+
+
+@router.get("/dev/hierarchy-types")
+def dev_hierarchy_types() -> dict[str, Any]:
+    from backend.v2 import devtime
+    return devtime.hierarchy_types(get_ctx())
+
+
+@router.get("/dev/class-tree")
+def dev_class_tree() -> dict[str, Any]:
+    from backend.v2 import devtime
+    return devtime.class_tree(get_ctx())
+
+
+@router.get("/dev/class")
+def dev_class(id: str) -> dict[str, Any]:  # noqa: A002
+    from backend.v2 import devtime
+    try:
+        return devtime.class_detail(get_ctx(), id)
+    except LookupError:
+        raise HTTPException(404, f"未找到类：{id}")
+
+
+@router.get("/dev/relation-types")
+def dev_relation_types() -> dict[str, Any]:
+    from backend.v2 import devtime
+    return devtime.relation_types(get_ctx())
+
+
+@router.get("/dev/mapping-rules")
+def dev_mapping_rules() -> dict[str, Any]:
+    from backend.v2 import devtime
+    return devtime.mapping_rules(get_ctx())
+
+
+@router.get("/dev/parse-tag")
+def dev_parse_tag(tag: str) -> dict[str, Any]:
+    from backend.v2 import devtime
+    return devtime.parse_tag(get_ctx(), tag)
+
+
+# ------------------------------------------------------------------ 运行态（需求 4.9）
+@router.get("/runtime/status")
+def runtime_status() -> dict[str, Any]:
+    from backend.v2 import runtime
+    return runtime.status(get_ctx())
+
+
+@router.post("/runtime/evaluate")
+def runtime_evaluate(body: dict = Body(default={})) -> dict[str, Any]:
+    from backend.v2 import runtime
+    ctx = get_ctx()
+    seg = body.get("seg") or None
+    if seg and seg not in ctx.hierarchy.segments:
+        raise HTTPException(404, f"未找到工艺段：{seg}")
+    return runtime.evaluate(ctx, "all" if body.get("scope") == "all" else "effective", seg)
+
+
+@router.get("/runtime/causes/{pid}")
+def runtime_causes(pid: str, target: Optional[str] = None) -> dict[str, Any]:
+    from backend.v2 import runtime
+    return _guard(runtime.cause_states, get_ctx(), pid, target)
+
+
+@router.get("/runtime/bindings")
+def runtime_bindings() -> dict[str, Any]:
+    from backend.v2 import runtime
+    return runtime.binding_summary(get_ctx())
+
+
+@router.get("/knowledge")
+def knowledge_list(status: str = "") -> dict[str, Any]:
+    from backend.v2.userdata import KNOWLEDGE_TYPES
+    items = [k for k in reversed(get_ctx().knowledge.items) if not status or k["status"] == status]
+    return {"items": items, "types": KNOWLEDGE_TYPES, "pending": sum(1 for k in get_ctx().knowledge.items if k["status"] == "待审核")}
+
+
+@router.post("/knowledge")
+def knowledge_submit(body: dict = Body(...)) -> dict[str, Any]:
+    """知识沉淀提交接口（需求 SW-075）：智能体或业务应用提交新知识，进入工程态候选审核队列。"""
+    from backend.v2.userdata import UserDataError
+    ctx = get_ctx()
+    try:
+        rec = ctx.knowledge.submit(body)
+    except UserDataError as exc:
+        raise HTTPException(400, str(exc))
+    ctx.audit.record("提交知识", "知识沉淀", rec["id"], f"{rec['type']}：{rec['content'][:40]}", objects=rec["objectIds"], note=rec["submitter"])
+    return rec
+
+
+@router.post("/knowledge/{kid}/review")
+def knowledge_review(kid: str, body: dict = Body(...)) -> dict[str, Any]:
+    """审核知识沉淀：采纳后按类型落到本体（草案），经发布后生效；驳回只记录意见。"""
+    from backend.v2.userdata import UserDataError
+    ctx = get_ctx()
+    rec = _guard(ctx.knowledge.get, kid)
+    decision = body.get("decision")
+    if decision not in ("采纳", "驳回"):
+        raise HTTPException(400, "审核结论只能是 采纳 / 驳回")
+    result = ""
+    if decision == "采纳":
+        pl = rec.get("payload") or {}
+        if rec["type"] == "新的根因关系" and pl.get("cause") and pl.get("effect"):
+            link = _guard(ctx.phen.create_link, {"cause": pl["cause"], "effect": pl["effect"], "confidence": pl.get("confidence") or "低",
+                                                 "mechanism": rec["content"], "basis": f"知识沉淀 {kid}：{rec['basis']}"})
+            link["source"] = {"kind": "知识沉淀", "ref": kid}
+            ctx.phen._save("links")
+            _audit("新增", "导致关系", None, tabs.link_view(ctx, link), _link_objects(ctx, link))
+            result = f"已新增导致关系 {link['id']} （草案）"
+        elif rec["type"] == "关系置信度修正" and pl.get("linkId") and pl.get("confidence"):
+            import copy
+            before = copy.deepcopy(_guard(ctx.phen.get_link, pl["linkId"]))
+            after = _guard(ctx.phen.update_link, pl["linkId"], {"confidence": pl["confidence"]})
+            _audit("修改", "导致关系", before, after, _link_objects(ctx, after))
+            result = f"已把 {pl['linkId']} 的置信度改为 {pl['confidence']}"
+        else:
+            result = "已采纳，需工程人员按建议在本体详情中修改"
+    try:
+        out = ctx.knowledge.set_review(kid, decision, body.get("comment") or "", result)
+    except UserDataError as exc:
+        raise HTTPException(400, str(exc))
+    ctx.audit.record(f"审核知识·{decision}", "知识沉淀", kid, f"{rec['type']}：{rec['content'][:40]}", note=result or (body.get("comment") or ""))
+    return out
 
 
 # ------------------------------------------------------------------ 发布与版本（需求 SW-060 / 061 / 062）

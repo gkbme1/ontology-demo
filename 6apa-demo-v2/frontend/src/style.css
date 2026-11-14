@@ -67,6 +67,7 @@
   .tab-btn { @apply px-3 py-2 text-[12.5px] text-fg-mute border-b-2 border-transparent hover:text-fg whitespace-nowrap; }
   .tab-on { @apply text-fg border-brand; }
   .tree-row { @apply flex items-center gap-1.5 px-2 py-[3px] rounded cursor-pointer select-none text-[12.5px] text-fg-dim hover:bg-ink-panel2 hover:text-fg; }
+  .tree-row-on { @apply bg-brand/10 text-fg font-medium; }
   .tree-on { @apply bg-brand/[0.14] text-fg; }
   .sec-title { @apply text-[11px] tracking-wider uppercase text-fg-mute mb-2; }
   .card { @apply border border-line rounded-[10px] bg-ink-panel px-4 py-3 shadow-sm; }

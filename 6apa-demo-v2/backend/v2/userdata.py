@@ -237,3 +237,49 @@ class ProcedureEdits(_JsonFile):
             self.data["cards"][cid] = {**(self.data["cards"].get(cid) or {}), **entry}
             self.save()
             return self.data["cards"][cid]
+
+
+# ------------------------------------------------------------------ 知识沉淀（需求 SW-075）
+KNOWLEDGE_TYPES = ["新的根因关系", "关系置信度修正", "现象阈值建议", "规程反馈", "对象属性更正"]
+
+
+class KnowledgeStore(_JsonFile):
+    """智能体 / 业务应用提交的知识，进入工程态候选审核队列；审核通过的按类型落到本体（草案），经发布后生效。"""
+
+    def __init__(self) -> None:
+        super().__init__("knowledge.json", {"items": []})
+
+    @property
+    def items(self) -> list[dict[str, Any]]:
+        return self.data["items"]
+
+    def submit(self, body: dict[str, Any]) -> dict[str, Any]:
+        ktype = body.get("type")
+        if ktype not in KNOWLEDGE_TYPES:
+            raise UserDataError(f"知识类型只能是：{'、'.join(KNOWLEDGE_TYPES)}")
+        if not str(body.get("content") or "").strip():
+            raise UserDataError("建议内容不能为空")
+        with self._lock:
+            nums = [int(k["id"].rsplit("-", 1)[-1]) for k in self.items]
+            rec = {"id": f"KN-{(max(nums) if nums else 0) + 1:04d}", "type": ktype, "objectIds": body.get("objectIds") or [],
+                   "content": body["content"], "basis": body.get("basis") or "", "submitter": body.get("submitter") or "智能体（演示）",
+                   "payload": body.get("payload") or {}, "status": "待审核", "submittedAt": now(), "review": None}
+            self.items.append(rec)
+            self.save()
+            return rec
+
+    def get(self, kid: str) -> dict[str, Any]:
+        rec = next((k for k in self.items if k["id"] == kid), None)
+        if not rec:
+            raise LookupError(kid)
+        return rec
+
+    def set_review(self, kid: str, decision: str, comment: str, result: str = "") -> dict[str, Any]:
+        with self._lock:
+            rec = self.get(kid)
+            if rec["status"] != "待审核":
+                raise UserDataError(f"{kid} 已审核（{rec['status']}）")
+            rec["status"] = "已采纳" if decision == "采纳" else "已驳回"
+            rec["review"] = {"decision": decision, "comment": comment, "reviewer": "演示用户", "at": now(), "result": result}
+            self.save()
+            return rec

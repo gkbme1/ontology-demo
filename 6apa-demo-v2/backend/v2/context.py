@@ -21,11 +21,12 @@ class AppContext:
         self.algos = AlgorithmLibrary()
         self.calcs = CalcStore(self.algos)
         self.design = DesignParams()
-        from backend.v2.userdata import AuditLog, OverrideStore, ProcedureEdits, RelationStore
+        from backend.v2.userdata import AuditLog, KnowledgeStore, OverrideStore, ProcedureEdits, RelationStore
         self.audit = AuditLog()
         self.overrides = OverrideStore()
         self.relations = RelationStore()
         self.procedure_edits = ProcedureEdits()
+        self.knowledge = KnowledgeStore()
         self.limits = {l["id"]: l for l in process_limits._load()}
         dcs = self.store.dcs
         self.tag_by_name = {t["name"]: t for t in dcs.tags.values()}

@@ -417,6 +417,57 @@ class Batch4Test(unittest.TestCase):
         self.assertIn("导出", client.get("/api/v2/audit").json()["ops"])
 
 
+class Batch5Test(unittest.TestCase):
+    """第 5 批：开发态（类库、元模型、关系类型、映射规则）与运行态（状态、评估、原因链、绑定、知识沉淀）。"""
+
+    def test_dev_class_library(self):
+        tree = client.get("/api/v2/dev/class-tree").json()["items"][0]
+        self.assertEqual(tree["label"], "设备")
+        self.assertTrue(all(c["abstract"] for c in tree["children"]))
+        d = client.get("/api/v2/dev/class", params={"id": "type:固定化酶反应罐"}).json()
+        self.assertEqual(d["parent"], "反应设备")
+        self.assertTrue(any(p["name"] == "釜内反应温度" for p in d["parameters"]))
+        self.assertTrue(any(c["id"] == "PL001" for c in d["constraints"]))
+        self.assertTrue(any(p["name"] == "水解罐温度偏高" for p in d["phenomena"]))
+        self.assertTrue(any(a["from"].startswith("继承") for a in d["attributes"]))
+        self.assertEqual(client.get("/api/v2/dev/class", params={"id": "type:不存在"}).status_code, 404)
+
+    def test_dev_meta_relations_mapping(self):
+        meta = client.get("/api/v2/dev/metamodel").json()["items"]
+        self.assertIn("现象", {m["name"] for m in meta})
+        rels = client.get("/api/v2/dev/relation-types").json()["items"]
+        self.assertEqual(len(rels), 15)
+        self.assertGreater(next(r for r in rels if r["name"] == "包含")["count"], 0)
+        p = client.get("/api/v2/dev/parse-tag", params={"tag": "AT_1301C1"}).json()
+        self.assertEqual(p["rule"]["code"], "MR-01")
+        self.assertEqual(p["catalog"]["equipment"], "水解罐C")
+        self.assertEqual(client.get("/api/v2/dev/parse-tag", params={"tag": "P_1303C_RUN"}).json()["rule"]["code"], "MR-02")
+
+    def test_runtime_status_and_eval(self):
+        st = client.get("/api/v2/runtime/status").json()
+        self.assertGreater(st["objectTotal"], 0)
+        ev = client.post("/api/v2/runtime/evaluate", json={"scope": "all", "seg": "SEG-04"}).json()
+        self.assertTrue(ev["dataSource"]["simulated"])
+        self.assertTrue(ev["items"])
+        self.assertTrue(all(i["state"] in ("发生", "未发生", "未知") for i in ev["items"]))
+        c = client.get("/api/v2/runtime/causes/PH-S11-01", params={"target": _equip("水解罐C")}).json()
+        self.assertTrue(c["causes"])
+        self.assertTrue(all(x["state"] in ("发生", "未发生", "未知") for x in c["causes"]))
+
+    def test_knowledge_flow(self):
+        bad = client.post("/api/v2/knowledge", json={"type": "随便", "content": "x"})
+        self.assertEqual(bad.status_code, 400)
+        k = client.post("/api/v2/knowledge", json={"type": "新的根因关系", "content": "搅拌非指令停机导致水解罐pH偏高",
+                                                   "payload": {"cause": "PH-S11-07", "effect": "PH-S11-04"}}).json()
+        self.assertEqual(k["status"], "待审核")
+        r = client.post(f"/api/v2/knowledge/{k['id']}/review", json={"decision": "采纳"}).json()
+        self.assertEqual(r["status"], "已采纳")
+        lid = r["review"]["result"].split()[1]
+        self.assertEqual(get_ctx().phen.links[lid]["source"]["kind"], "知识沉淀")
+        self.assertEqual(client.post(f"/api/v2/knowledge/{k['id']}/review", json={"decision": "驳回"}).status_code, 400)
+        client.delete(f"/api/v2/causal-links/{lid}")
+
+
 class DocsAndSearchTest(unittest.TestCase):
     def test_docs(self):
         r = client.get("/api/v2/ops/OP-09/documents").json()

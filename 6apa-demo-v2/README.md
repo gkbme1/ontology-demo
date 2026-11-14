@@ -45,6 +45,9 @@ python3 -m backend.tools.export_static --build
 
 ## 使用
 
+顶栏左侧是**三态切换**：开发态（类库：元模型、层级类型、类树与类模板、关系类型、映射规则、算法库，只读）、
+工程态（下面 1～10 条，实例组态）、运行态（运行服务状态、现象 / 工况状态评估与原因链、绑定状态、知识沉淀提交）。
+
 1. 左侧「空间层级」第一屏只有 **105车间** 和 6 个工艺段。**双击工艺段**（如 6A_水解）进入工艺段内的层级树，顶部「返回车间导航」退回；
 2. 工艺段内：**单击工序**选中看概览，**双击工序**（或点「进入」）打开图纸。水解A-F 显示现场流程画面；图上的设备**单击看摘要**
    （类型、测点数、现象 / 计算组态 / 处置规程数），**双击**或点「打开本体详情」进入对象本体详情；
@@ -150,3 +153,6 @@ python3 -m backend.tools.build_seed --force     # 覆盖 data/seed/*.json（不�
 | `POST /api/v2/status-batch` | 批量变更现象 / 导致关系 / 计算组态的状态 |
 | `GET /api/v2/export/excel?seg=` · `GET /api/v2/export/ttl?seg=` | 导出 Excel / TTL（`X-Export-Info` 头带统计与语法自检结果） |
 | `GET /api/v2/audit?op=&keyword=` | 操作日志 |
+| `GET /api/v2/dev/metamodel` · `/dev/hierarchy-types` · `/dev/class-tree` · `/dev/class?id=` · `/dev/relation-types` · `/dev/mapping-rules` · `/dev/parse-tag?tag=` | 开发态（只读） |
+| `GET /api/v2/runtime/status` · `POST /runtime/evaluate` · `GET /runtime/causes/{pid}?target=` · `GET /runtime/bindings` | 运行态 |
+| `GET/POST /api/v2/knowledge` · `POST /knowledge/{id}/review` | 知识沉淀提交与审核 |

@@ -9,7 +9,7 @@ import { bump, nav, select } from '@/composables/useNav'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any
-const tab = ref<'publish' | 'compare' | 'export' | 'audit'>('publish')
+const tab = ref<'publish' | 'compare' | 'export' | 'audit' | 'know'>('publish')
 const rel = ref<Any>({ items: [], current: null })
 const preview = ref<Any>(null)
 const check = ref<Any>(null)
@@ -18,7 +18,20 @@ const busy = ref(false)
 const msg = ref('')
 const err = ref('')
 
+// 知识沉淀审核（需求 SW-075：运行态提交的知识进入工程态候选审核队列）
+const know = ref<Any>(null)
+const comments = ref<Record<string, string>>({})
+async function loadKnow(): Promise<void> { try { know.value = await api.knowledge() } catch { know.value = null } }
+async function review(k: Any, decision: string): Promise<void> {
+  err.value = ''; msg.value = ''
+  try {
+    const r = await api.reviewKnowledge(k.id, { decision, comment: comments.value[k.id] ?? '' })
+    msg.value = `${k.id} ${r.status}${r.review?.result ? '：' + r.review.result : ''}`
+    bump()
+  } catch (e) { err.value = String((e as Error).message) }
+}
 async function load(): Promise<void> {
+  loadKnow()
   rel.value = await api.releases()
   if (staticBackend) return
   preview.value = (await api.releasePreview()).stats
@@ -91,7 +104,7 @@ watch([auditOp, auditKw], loadAudit)
       <h2 class="text-[16px] font-semibold">发布与导出</h2>
       <span class="pill pill-info">当前发布版本：{{ rel.current ? `${rel.current.version} · ${rel.current.time}` : '未发布' }}</span>
       <span class="flex-1" />
-      <button v-for="[k, l] in [['publish', '版本发布'], ['compare', '版本对比'], ['export', '导出'], ['audit', '操作日志']]" :key="k"
+      <button v-for="[k, l] in [['publish', '版本发布'], ['compare', '版本对比'], ['know', `知识审核${know?.pending ? ' ' + know.pending : ''}`], ['export', '导出'], ['audit', '操作日志']]" :key="k"
               class="asset-tab !py-0.5" :class="{ 'asset-tab-on': tab === k }" @click="tab = k as Any">{{ l }}</button>
     </div>
     <div class="flex-1 overflow-auto px-4 py-3 space-y-3 min-h-0 text-sm">
@@ -143,6 +156,25 @@ watch([auditOp, auditKw], loadAudit)
           </tbody>
         </table>
         <div v-if="!rel.items.length" class="empty">还没有发布过版本</div>
+      </template>
+
+      <!-- 知识审核 -->
+      <template v-if="tab === 'know'">
+        <div class="text-xs text-fg-mute">运行态提交的知识沉淀（智能体 / 业务应用）。采纳后：新的根因关系 → 新增导致关系（草案）；置信度修正 → 修改该关系置信度；其他类型记录采纳，由工程人员按建议修改。经发布后生效。</div>
+        <table class="tbl"><thead><tr><th class="w-20">编号</th><th class="w-28">类型</th><th>建议内容</th><th class="w-32">提交方</th><th class="w-24">状态</th><th class="w-[300px]">审核</th></tr></thead><tbody>
+          <tr v-for="k in know?.items ?? []" :key="k.id" class="!cursor-default"><td class="font-mono text-xs">{{ k.id }}</td><td class="text-xs">{{ k.type }}</td>
+            <td>{{ k.content }}<div v-if="k.basis" class="text-[11px] text-fg-mute">依据：{{ k.basis }}</div></td>
+            <td class="text-xs">{{ k.submitter }}<div class="text-fg-mute">{{ k.submittedAt }}</div></td>
+            <td><span class="pill" :class="k.status === '已采纳' ? 'pill-ok' : k.status === '已驳回' ? 'pill-mute' : 'pill-warn'">{{ k.status }}</span></td>
+            <td>
+              <template v-if="k.status === '待审核' && !staticBackend">
+                <input v-model="comments[k.id]" class="inp w-full mb-1" placeholder="审核意见" />
+                <button class="ctl" @click="review(k, '采纳')">采纳</button><button class="ctl ml-1" @click="review(k, '驳回')">驳回</button>
+              </template>
+              <div v-else class="text-xs text-fg-dim">{{ k.review?.reviewer }} {{ k.review?.at }}<div>{{ k.review?.comment }}</div><div>{{ k.review?.result }}</div></div>
+            </td></tr>
+        </tbody></table>
+        <div v-if="!(know?.items ?? []).length" class="empty">审核队列为空（在「运行态 · 知识沉淀提交」模拟提交）</div>
       </template>
 
       <!-- 版本对比 -->

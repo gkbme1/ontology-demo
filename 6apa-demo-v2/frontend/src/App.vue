@@ -13,11 +13,15 @@ import GlobalGraph from '@/views/GlobalGraph.vue'
 import GlobalSections from '@/views/GlobalSections.vue'
 import ConsistencyCheck from '@/views/ConsistencyCheck.vue'
 import ReleaseCenter from '@/views/ReleaseCenter.vue'
+import DevStudio from '@/views/DevStudio.vue'
+import RuntimeView from '@/views/RuntimeView.vue'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any
 
 const keyword = ref('')
+const STAGES = [['dev', '开发态'], ['eng', '工程态'], ['run', '运行态']] as const
+function switchStage(k: 'dev' | 'eng' | 'run'): void { if (nav.stage !== k) nav.stage = k }
 // 页头显示当前发布版本（需求 SW-077 第 5 条、SW-088 第 2 条）
 const currentRelease = ref<Any>(null)
 async function loadRelease(): Promise<void> { try { currentRelease.value = (await api.releases()).current } catch { currentRelease.value = null } }
@@ -94,12 +98,17 @@ const kind = (): string => nav.selection.type
   <div class="h-full flex flex-col">
     <header class="flex items-center gap-4 px-4 h-12 border-b border-line bg-ink-panel2 shrink-0">
       <div class="font-semibold tracking-wide"><span class="text-brand">◆</span> 6APA 本体 <span class="text-fg-mute text-xs font-normal">v2 · 105 车间</span></div>
-      <button class="ctl !px-2" :disabled="!navHistory.size" :class="{ 'opacity-40': !navHistory.size }" title="后退到上一个查看的位置" @click="goBack">← 后退</button>
+      <!-- 三态切换（需求 SW-088）：开发态（类库）/ 工程态（实例组态）/ 运行态（运行服务） -->
       <div class="flex rounded-md border border-line overflow-hidden text-xs font-medium">
+        <button v-for="[k, l] in STAGES" :key="k" class="px-2.5 py-1.5 border-l border-line first:border-l-0"
+                :class="nav.stage === k ? 'bg-fg text-white' : 'bg-white text-fg-dim hover:text-brand'" @click="switchStage(k)">{{ l }}</button>
+      </div>
+      <button class="ctl !px-2" :disabled="!navHistory.size" :class="{ 'opacity-40': !navHistory.size }" title="后退到上一个查看的位置" @click="goBack">← 后退</button>
+      <div v-show="nav.stage === 'eng'" class="flex rounded-md border border-line overflow-hidden text-xs font-medium">
         <button class="px-3 py-1.5" :class="nav.page === 'browse' ? 'bg-brand text-white' : 'bg-white text-fg-dim hover:text-brand'" @click="nav.page = 'browse'">本体浏览</button>
         <button class="px-3 py-1.5 border-l border-line" :class="nav.page === 'graph' ? 'bg-brand text-white' : 'bg-white text-fg-dim hover:text-brand'" @click="nav.page = 'graph'">◎ 全局图谱</button>
       </div>
-      <div class="relative w-[380px]">
+      <div v-show="nav.stage === 'eng'" class="relative w-[380px]">
         <input v-model="keyword" class="inp w-full !py-1.5" placeholder="搜索工艺段 / 工序 / 设备 / 位号 / 现象 / 参数（支持拼音首字母）"
                @input="onSearch" @keydown.esc="hits = []; searched = false" />
         <div v-if="searched" class="absolute z-40 mt-1 w-[520px] panel max-h-[480px] overflow-auto shadow-xl">
@@ -127,6 +136,8 @@ const kind = (): string => nav.selection.type
     </header>
 
     <div v-if="error" class="empty m-6">{{ error }}</div>
+    <main v-else-if="ready && nav.stage === 'dev'" class="flex-1 min-h-0 bg-ink"><DevStudio /></main>
+    <main v-else-if="ready && nav.stage === 'run'" class="flex-1 min-h-0 bg-ink"><RuntimeView /></main>
     <main v-else-if="ready && nav.page === 'graph'" class="flex-1 min-h-0 bg-ink"><GlobalGraph /></main>
     <div v-else-if="ready" class="flex-1 grid grid-cols-[320px_1fr] min-h-0">
       <NavPanel />

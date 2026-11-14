@@ -33,17 +33,19 @@ export const nav = reactive({
   version: 0,
   // 顶层页面：本体浏览 / 全局图谱
   page: 'browse' as 'browse' | 'graph',
+  // 三态（需求 SW-088）：开发态（类库）/ 工程态（实例组态）/ 运行态（运行服务）
+  stage: 'eng' as 'dev' | 'eng' | 'run',
   // 从设备 / 工序跳到全局图谱时的定位
   graphFocus: null as { id: string; hops?: number } | null
 })
 
 // 浏览历史（需求 SW-041 第 5 条：支持浏览历史后退；SW-088 第 4 条：返回时保留原位置）
-interface Snap { selection: Selection; activeKey: string; category: string; mode: 'root' | 'segment'; segmentId: string; page: 'browse' | 'graph' }
+interface Snap { selection: Selection; activeKey: string; category: string; mode: 'root' | 'segment'; segmentId: string; page: 'browse' | 'graph'; stage: 'dev' | 'eng' | 'run' }
 const history: Snap[] = []
 let restoring = false
 export const navHistory = reactive({ size: 0 })
 function snap(): Snap {
-  return { selection: { ...nav.selection }, activeKey: nav.activeKey, category: nav.category, mode: nav.mode, segmentId: nav.segmentId, page: nav.page }
+  return { selection: { ...nav.selection }, activeKey: nav.activeKey, category: nav.category, mode: nav.mode, segmentId: nav.segmentId, page: nav.page, stage: nav.stage }
 }
 function remember(): void {
   if (restoring || nav.selection.type === 'none') return
@@ -59,7 +61,7 @@ export function goBack(): void {
   navHistory.size = history.length
   if (!prev) return
   restoring = true
-  Object.assign(nav, { category: prev.category, mode: prev.mode, segmentId: prev.segmentId, page: prev.page, activeKey: prev.activeKey })
+  Object.assign(nav, { category: prev.category, mode: prev.mode, segmentId: prev.segmentId, page: prev.page, activeKey: prev.activeKey, stage: prev.stage })
   nav.selection = { ...prev.selection }
   restoring = false
 }
@@ -113,6 +115,15 @@ export function openGlobalGraph(focusId?: string, hops = 2): void {
   remember()
   nav.graphFocus = focusId ? { id: focusId, hops } : null
   nav.page = 'graph'
+}
+
+/** 从开发态 / 运行态跳到工程态的对象本体详情。 */
+export function openInEngineering(objectId: string, opId?: string | null, segmentId?: string | null, tab?: string): void {
+  remember()
+  nav.stage = 'eng'
+  nav.page = 'browse'
+  if (segmentId) enterSegment(segmentId, { type: 'object', id: objectId, opId: opId ?? undefined, tab })
+  openObject(objectId, opId ?? undefined, tab)
 }
 
 export function bump(): void {

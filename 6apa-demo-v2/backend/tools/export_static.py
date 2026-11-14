@@ -164,6 +164,16 @@ def main() -> None:
     col.fetch("/algorithms")
     col.fetch("/validation")
     col.fetch("/releases")
+    print("收集开发态 / 运行态 …")
+    for path in ("/dev/metamodel", "/dev/hierarchy-types", "/dev/relation-types", "/dev/mapping-rules", "/runtime/status",
+                 "/runtime/bindings", "/knowledge"):
+        col.fetch(path)
+    tree = col.fetch("/dev/class-tree") or {"items": []}
+    stack = list(tree["items"])
+    while stack:
+        n = stack.pop()
+        col.fetch("/dev/class", {"id": n["id"]})
+        stack += n.get("children") or []
     for cid in ctx.store.procedures.cards:
         col.fetch(f"/procedures/{cid}")
     for q in [{}] + [{"seg": s} for s in h.segments] + [{"op": o} for o in h.ops]:
