@@ -56,6 +56,8 @@ python3 -m backend.tools.export_static --build
    - **参数**分「属性」（基本信息、设计参数）与「参数」（测量值 / 设定值 / 阀位 / 控制指令 / 状态 / 计算值），每个参数有位号绑定状态；
    - 设备上可**覆盖 / 禁用 / 恢复继承**设备组的现象（阈值、持续时长）和工艺限值，试算按本台覆盖判定；
    - 拓扑关系、工艺影响关系可**新增 / 删除**人工关系（端点类型校验，全局图谱同步）；
+   - **处置规程**：处置卡拆成报警现象、可能原因（原因现象 + 导致关系，可逐条 / 一键拆分）和规程（步骤、检查项、执行边界），可在线编辑；
+   - **计算组态**：可新建 / 编辑 / 删除，含执行方式（周期 / 事件触发 / 按需）、超时、失败处理、输出测点，保存时校验绑定；
    - 页头「基础信息 · 变更记录」：ID、编码、类、来源、所属位置、被引用、本台覆盖项、变更记录；顶栏「← 后退」回到上一个查看位置；
 5. **现象定义**：每个现象有判定规则（与 / 或任意嵌套，条件 = 参数 运算 阈值 持续时长，阈值可引用工艺限值），可新增、编辑，
    在模拟数据（时段）上试算，或**手工输入**各条件主体的当前值试算；
@@ -140,3 +142,5 @@ python3 -m backend.tools.build_seed --force     # 覆盖 data/seed/*.json（不�
 | `PUT/DELETE /api/v2/objects/{id}/overrides/phenomena/{pid}` · `/overrides/limits/{lid}` | 设备上覆盖（或 `disabled`）/ 恢复继承设备组的现象、限值 |
 | `GET /api/v2/relation-candidates?type=&end=&keyword=` · `POST /api/v2/relations` · `DELETE /api/v2/relations/{id}` | 人工新增 / 删除拓扑、工艺影响关系 |
 | `GET /api/v2/objects/{id}/info` | 基础信息、所属位置、被引用、覆盖项、变更记录 |
+| `GET/PUT /api/v2/procedures/{id}` · `POST /procedures/{id}/causes/{seq}/split` · `POST /procedures/{id}/split-all` | 处置规程查看 / 编辑；可能原因拆成原因现象 + 导致关系 |
+| `GET /api/v2/calc-meta` | 计算组态执行方式、失败处理等枚举 |

@@ -11,6 +11,7 @@ import CalcPanel from '@/components/CalcPanel.vue'
 import PhenomenaPanel from '@/components/causal/PhenomenaPanel.vue'
 import CausalPanel from '@/components/causal/CausalPanel.vue'
 import Modal from '@/components/Modal.vue'
+import { staticBackend } from '@/api/static'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any
@@ -29,6 +30,12 @@ const algos = ref<Any>(null)
 const cond = ref<Any>(null)
 const docs = ref<Any>(null)
 const docView = ref<Any>(null)
+// 全局新建计算组态：作用范围可选工艺段（跨装置统计）或范围内的设备组
+const calcGroups = ref<Any[]>([])
+const calcAnchors = computed(() => [
+  ...segments.value.filter((x: Any) => !seg.value || x.id === seg.value).map((x: Any) => ({ id: x.id, name: x.label, kind: 'segment' })),
+  ...calcGroups.value.map((g: Any) => ({ id: g.id, name: g.name, kind: 'group' }))
+])
 const condTab = ref<'phenomena' | 'causal'>('phenomena')
 const onlyCross = ref(false)
 
@@ -47,7 +54,10 @@ async function ensureTree(): Promise<void> {
 async function load(): Promise<void> {
   await ensureTree()
   const q = { seg: op.value ? undefined : seg.value || undefined, op: op.value || undefined }
-  if (props.kind === 'global:calc') calcs.value = (await api.scopeCalculations(q)).items
+  if (props.kind === 'global:calc') {
+    calcs.value = (await api.scopeCalculations(q)).items
+    if (!staticBackend) calcGroups.value = (await api.scopeConditions(q)).anchors ?? []
+  }
   if (props.kind === 'global:algo') algos.value = await api.algorithms()
   if (props.kind === 'global:cond') cond.value = await api.scopeConditions(q)
   if (props.kind === 'global:docs') docs.value = await api.scopeDocuments(q)
@@ -88,7 +98,7 @@ const docHtml = computed(() => (docView.value ? (marked.parse(docView.value.cont
           {{ scopeText }}：{{ calcs.length }} 条计算组态。计算组态只引用算法库里的算法，并把算法的每个参数绑定到本体（本对象参数 / 设备组全部成员的参数 / 位号 / 常量）；
           作用范围是工艺段、输入取设备组全部成员的，属于跨装置 / 跨工艺统计。
         </div>
-        <CalcPanel :items="calcs" :op-id="op || undefined" />
+        <CalcPanel :items="calcs" :op-id="op || undefined" :can-edit="!staticBackend" :anchor-options="calcAnchors" @changed="load" />
       </template>
 
       <!-- 算法库 -->

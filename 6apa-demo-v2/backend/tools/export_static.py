@@ -35,7 +35,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from backend.main import app  # noqa: E402
 from backend.v2.context import get_ctx  # noqa: E402
-from backend.v2 import drawing as drawing_mod, nav  # noqa: E402
+from backend.v2 import drawing as drawing_mod, nav, procedures  # noqa: E402
 
 STATIC_TABS = ["constraints", "topology", "influence", "calc", "procedures"]
 OP_TABS = ["drawing", "parameters"]  # 设备组在不同工序下内容不同
@@ -163,6 +163,8 @@ def main() -> None:
     print("收集全局视图（计算组态 / 算法库 / 工况与根因 / 文档提取）…")
     col.fetch("/algorithms")
     col.fetch("/validation")
+    for cid in ctx.store.procedures.cards:
+        col.fetch(f"/procedures/{cid}")
     for q in [{}] + [{"seg": s} for s in h.segments] + [{"op": o} for o in h.ops]:
         for path in ("/scope/calculations", "/scope/documents", "/scope/conditions"):
             col.fetch(path, q)
@@ -219,7 +221,8 @@ def main() -> None:
         "get": col.get,
         "base": {"phenomena": list(ctx.phen.phenomena.values()), "links": list(ctx.phen.links.values()),
                  "anchorOps": anchor_ops, "equipGroup": equip_group, "limits": limits,
-                 "calcNames": {k: v["name"] for k, v in ctx.calcs.items.items()}, "search": search},
+                 "calcNames": {k: v["name"] for k, v in ctx.calcs.items.items()}, "search": search,
+                 "phenProcedures": {pid: procedures.cards_for_phenomenon(ctx, pid) for pid in ctx.phen.phenomena}},
         "evals": evals,
         "calcRuns": calc_runs,
     }

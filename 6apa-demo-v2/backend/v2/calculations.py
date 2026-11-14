@@ -13,6 +13,12 @@ backend/v2/algorithms.py），本体只定义「传哪个参数」。
 - {"kind": "const", "value": 10}                           常量（算法的配置参数，如时间窗）
 
 计算组态的输出可在判定规则里作为条件主体引用（subject.kind = calc）。
+
+执行设置（需求 SW-050 / SW-074）：
+  execution = {"mode": "周期" | "事件触发" | "按需", "periodSec": 60, "trigger": "事件说明 / 现象 ID",
+               "timeoutSec": 30, "onFailure": "重试" | "跳过", "retries": 1, "disableAfter": 3}
+  output    = {"tag": "XBase 输出计算测点位号", "writeBack": bool}   计算结果写入 XBase 指定测点，本体通过读测点获得结果
+本 Demo 没有调度器：执行设置只登记，试算按需运行一次并记入运行记录。
 """
 from __future__ import annotations
 
@@ -34,6 +40,10 @@ SEED_FILE = ROOT / "data" / "seed" / "calculations.json"
 STORE_FILE = Path(os.environ.get("V2_STORE_DIR") or ROOT / "data" / "store") / "calculations.json"
 BINDING_KINDS = {"parameter": "本对象参数", "groupParameter": "设备组全部成员的参数", "tag": "DCS 位号",
                  "calc": "计算组态输出", "const": "常量"}
+EXEC_MODES = ["周期", "事件触发", "按需"]
+FAILURE_MODES = ["重试", "跳过"]
+DEFAULT_EXECUTION = {"mode": "按需", "periodSec": 60, "trigger": "", "timeoutSec": 30, "onFailure": "跳过", "retries": 0, "disableAfter": 3}
+DEFAULT_OUTPUT = {"tag": "", "writeBack": False}
 
 
 class CalcError(ValueError):
@@ -129,7 +139,7 @@ class CalcStore:
 
     def _clean(self, body: dict[str, Any], current: dict[str, Any] | None = None) -> dict[str, Any]:
         data = copy.deepcopy(current) if current else {}
-        for key in ("name", "anchor", "algorithmId", "bindings", "unit", "description", "basis", "status"):
+        for key in ("name", "anchor", "algorithmId", "bindings", "unit", "description", "basis", "status", "execution", "output"):
             if key in body:
                 data[key] = body[key]
         if not (data.get("name") or "").strip():
@@ -149,8 +159,57 @@ class CalcStore:
                 raise CalcError(f"算法「{algo['name']}」没有参数 {name}")
             if b.get("kind") not in BINDING_KINDS:
                 raise CalcError(f"参数 {name} 的绑定类型只能是：{'、'.join(BINDING_KINDS)}")
+            inp = next(i for i in algo["inputs"] if i["name"] == name)
+            # 类型匹配：时序输入不能绑常量，常量输入只能绑常量
+            if inp.get("type") == "常量" and b.get("kind") != "const":
+                raise CalcError(f"参数「{inp['label']}」是常量，只能绑定常量")
+            if inp.get("type") != "常量" and b.get("kind") == "const":
+                raise CalcError(f"参数「{inp['label']}」是{inp.get('type') or '时序'}，不能绑定常量")
+            if b.get("kind") == "const":
+                try:
+                    float(b.get("value"))
+                except (TypeError, ValueError):
+                    raise CalcError(f"参数「{inp['label']}」的常量不是数字") from None
+            if b.get("kind") in ("parameter", "groupParameter") and not b.get("name"):
+                raise CalcError(f"参数「{inp['label']}」要选择本体参数")
+            if b.get("kind") == "tag" and not b.get("tag"):
+                raise CalcError(f"参数「{inp['label']}」要填写位号")
+            if b.get("kind") == "calc":
+                if not b.get("calcId") or b.get("calcId") not in self.items:
+                    raise CalcError(f"参数「{inp['label']}」引用的计算组态不存在")
+                if b.get("calcId") == data.get("id"):
+                    raise CalcError("计算组态不能引用自己的输出")
+        ex = {**DEFAULT_EXECUTION, **(data.get("execution") or {})}
+        if ex["mode"] not in EXEC_MODES:
+            raise CalcError(f"执行方式只能是：{'、'.join(EXEC_MODES)}")
+        if ex["onFailure"] not in FAILURE_MODES:
+            raise CalcError(f"失败处理只能是：{'、'.join(FAILURE_MODES)}")
+        try:
+            for k in ("periodSec", "timeoutSec", "retries", "disableAfter"):
+                ex[k] = int(float(ex[k] or 0))
+        except (TypeError, ValueError):
+            raise CalcError("周期、超时、重试次数要填数字") from None
+        if ex["mode"] == "周期" and ex["periodSec"] < 10:
+            raise CalcError("周期执行的周期不能小于 10 秒")
+        if ex["timeoutSec"] <= 0:
+            raise CalcError("超时时间要大于 0")
+        if ex["mode"] == "事件触发" and not str(ex.get("trigger") or "").strip():
+            raise CalcError("事件触发要填写触发事件（如某现象成立、批次开始）")
+        data["execution"] = ex
+        data["output"] = {**DEFAULT_OUTPUT, **(data.get("output") or {})}
+        if data["output"].get("writeBack") and not str(data["output"].get("tag") or "").strip():
+            raise CalcError("写回 XBase 时要指定输出计算测点位号")
         data.setdefault("status", "草案·待工艺确认")
         return data
+
+    def log_run(self, cid: str, entry: dict[str, Any]) -> None:
+        """试算 / 执行记录（需求 SW-074 第 4 条）：时间、耗时、对象数、状态、错误；只保留最近 20 次（内存）。"""
+        runs = self.__dict__.setdefault("runs", {})
+        runs.setdefault(cid, []).insert(0, entry)
+        del runs[cid][20:]
+
+    def last_run(self, cid: str) -> dict[str, Any] | None:
+        return (self.__dict__.get("runs") or {}).get(cid, [None])[0]
 
     def create(self, body: dict[str, Any]) -> dict[str, Any]:
         with self._lock:

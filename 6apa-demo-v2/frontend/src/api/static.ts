@@ -24,6 +24,7 @@ interface Snapshot {
     limits: Record<string, Any>
     calcNames: Record<string, string>
     search: { index: Any[]; phenPy: Record<string, string>; opSegment: Record<string, string> }
+    phenProcedures?: Record<string, Any[]>
   }
   evals: Record<string, Any>
   calcRuns: Record<string, Any>
@@ -298,7 +299,7 @@ export class StaticBackend {
       const id = m[1]
       if (!this.phen[id]) throw new ApiError(404, `未找到：${id}`)
       if (method === 'GET') {
-        return { ...this.view(this.phen[id]),
+        return { ...this.view(this.phen[id]), procedures: this.snap.base.phenProcedures?.[id] ?? [],
                  causes: Object.values(this.links).filter((l) => l.effect === id).map((l) => this.linkView(l)),
                  effects: Object.values(this.links).filter((l) => l.cause === id).map((l) => this.linkView(l)) }
       }
@@ -426,7 +427,7 @@ export class StaticBackend {
     if (hit === undefined) throw new ApiError(404, `单文件版未包含该数据：${path}`)
     const out = clone(hit)
     // 单文件版不支持继承覆盖、人工关系的编辑（需要后端保存），隐藏这些按钮
-    if (/^\/objects\/[^/]+\/tabs\/(topology|influence|constraints)$/.test(path)) { out.canEdit = false; out.canOverride = false }
+    if (/^\/objects\/[^/]+\/tabs\/(topology|influence|constraints|procedures|calc)$/.test(path)) { out.canEdit = false; out.canOverride = false }
     const om = path.match(/^\/objects\/([^/]+)$/)
     if (om && out.counts) {
       const own = new Set(this.forObject(om[1]).map(([p]) => p.id))

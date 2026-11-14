@@ -330,6 +330,52 @@ class Batch2Test(unittest.TestCase):
         self.assertEqual(ops, ["恢复继承", "禁用继承"])
 
 
+class Batch3Test(unittest.TestCase):
+    """第 3 批：处置规程拆分与编辑、计算组态执行设置与编辑。"""
+
+    def test_procedure_view_and_split(self):
+        gid = _group("水解反应釜组")
+        cards = client.get(f"/api/v2/objects/{gid}/tabs/procedures").json()["items"]
+        card = next(c for c in cards if c["id"] == "ARP-S11-01")
+        states = {c["seq"]: c["splitState"] for c in card["causes"]}
+        self.assertEqual(states["6"], "已拆分")  # 种子：反应期搅拌停止 → 水解罐温度偏高（依据 ARP-S11-01 可能原因 6）
+        self.assertTrue(all(k in card["steps"][0] for k in ("precondition", "expected", "caution", "manualConfirm")))
+        self.assertTrue(any(k["when"] == "处置后" for k in card["checks"]))
+        seq = next(c["seq"] for c in card["causes"] if c["splitState"] == "未拆分")
+        r = client.post(f"/api/v2/procedures/ARP-S11-01/causes/{seq}/split", json={"anchorId": gid}).json()
+        self.assertEqual(next(c for c in r["card"]["causes"] if c["seq"] == seq)["splitState"], "已拆分")
+        link = get_ctx().phen.links[r["link"]]
+        self.assertEqual(link["effect"], r["alarm"])
+        again = client.post(f"/api/v2/procedures/ARP-S11-01/causes/{seq}/split", json={"anchorId": gid}).json()
+        self.assertEqual(again["created"], [])  # 已拆分的不重复建
+        procs = client.get(f"/api/v2/phenomena/{r['phenomenon']}").json()["procedures"]
+        self.assertEqual(procs[0]["id"], "ARP-S11-01")
+
+    def test_procedure_edit(self):
+        card = client.get("/api/v2/procedures/ARP-S11-02").json()
+        steps = card["steps"]
+        steps[0]["expected"] = "确认真实低温或测点故障"
+        r = client.put("/api/v2/procedures/ARP-S11-02", json={"steps": steps, "version": "V1.1"}).json()
+        self.assertEqual((r["steps"][0]["expected"], r["version"], r["edited"]), ("确认真实低温或测点故障", "V1.1", True))
+        bad = client.put("/api/v2/procedures/ARP-S11-02", json={"steps": [{"description": ""}]})
+        self.assertEqual(bad.status_code, 400)
+
+    def test_calc_execution_and_validation(self):
+        gid = _group("水解反应釜组")
+        base = {"name": "罐温均值（周期）", "anchor": {"kind": "group", "id": gid}, "algorithmId": "ALG-MEAN",
+                "bindings": {"series": {"kind": "parameter", "name": "釜内反应温度"}}}
+        self.assertEqual(client.post("/api/v2/calculations", json={**base, "bindings": {"series": {"kind": "const", "value": 1}}}).status_code, 400)
+        self.assertEqual(client.post("/api/v2/calculations", json={**base, "bindings": {"series": {"kind": "parameter", "name": "不存在的参数"}}}).status_code, 400)
+        self.assertEqual(client.post("/api/v2/calculations", json={**base, "execution": {"mode": "事件触发"}}).status_code, 400)
+        c = client.post("/api/v2/calculations", json={**base, "execution": {"mode": "周期", "periodSec": 60},
+                                                      "output": {"tag": "CALC_T1301_AVG", "writeBack": True}}).json()
+        self.assertEqual(c["execution"]["mode"], "周期")
+        client.post(f"/api/v2/calculations/{c['id']}/run", json={"opId": "OP-09"})
+        view = next(x for x in client.get(f"/api/v2/objects/{gid}/tabs/calc?op=OP-09").json()["items"] if x["id"] == c["id"])
+        self.assertIn("成功", view["runState"])
+        client.delete(f"/api/v2/calculations/{c['id']}")
+
+
 class DocsAndSearchTest(unittest.TestCase):
     def test_docs(self):
         r = client.get("/api/v2/ops/OP-09/documents").json()

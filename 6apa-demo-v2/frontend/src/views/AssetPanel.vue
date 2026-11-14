@@ -71,6 +71,11 @@ const anchorOptions = computed(() => {
   const g = head.value.group
   return g ? [self, { id: g.id, name: g.name, kind: 'group' }] : [self]
 })
+// 计算组态的作用范围：本对象、所属设备组、所在工艺段（跨装置统计）
+const calcAnchors = computed(() => {
+  const seg = head.value?.path?.find((p: Any) => String(p.id).startsWith('SEG-'))
+  return [...anchorOptions.value, ...(seg ? [{ id: seg.id, name: seg.name, kind: 'segment' }] : [])]
+})
 const paramGroup = ref('')
 const openVer = ref<Record<string, boolean>>({})
 const topoView = ref<'graph' | 'list'>('graph')
@@ -381,7 +386,8 @@ function fmtBand(c: Any): string {
 
           <!-- 计算/指标 -->
           <div v-else-if="tab === 'calc'" class="space-y-4">
-            <CalcPanel :items="data.items" :op-id="opId ?? head.opId" :target-id="head.kind === 'equipment' ? objectId : undefined" show-inherit />
+            <CalcPanel :items="data.items" :op-id="opId ?? head.opId" :target-id="head.kind === 'equipment' ? objectId : undefined" show-inherit
+                       :can-edit="data.canEdit" :anchor-options="calcAnchors" @changed="loadTab" />
             <div v-if="data.derivedCandidates.length" class="card">
               <div class="sec-title">尚无测点、可做成计算组态的工艺属性</div>
               <div class="flex flex-wrap gap-1.5">
@@ -401,7 +407,10 @@ function fmtBand(c: Any): string {
           <!-- 处置规程 -->
           <div v-else-if="tab === 'procedures'" class="space-y-3">
             <div v-if="!data.items.length" class="empty">暂无相关处置卡</div>
-            <ProcedureCard v-for="(c, i) in data.items" :key="c.id" :card="c" :open="i === 0" />
+            <div class="text-xs text-fg-mute">处置卡按需求拆成三部分：报警现象、可能原因（原因现象 + 导致关系，进根因影响关系）、处置规程（步骤、检查项、执行边界）。原文来自 6APA_处置规程.xlsx，在线修改另存。</div>
+            <ProcedureCard v-for="(c, i) in data.items" :key="c.id" :card="c" :open="i === 0" :can-edit="data.canEdit" :anchor-id="objectId"
+                           @changed="(nc: Any) => { data.items.splice(data.items.findIndex((x: Any) => x.id === nc.id), 1, nc) }"
+                           @phen="(id: string) => gotoPhen(id)" />
           </div>
         </template>
       </div>

@@ -56,6 +56,7 @@ def admin_reset() -> dict[str, Any]:
     ctx.calcs.reset_to_seed()
     ctx.overrides.reset()
     ctx.relations.reset()
+    ctx.procedure_edits.reset()
     ctx.audit.reset()
     return health()
 
@@ -327,6 +328,71 @@ def limits(keyword: str = "") -> dict[str, Any]:
     return {"items": items}
 
 
+# ------------------------------------------------------------------ 处置规程（需求 SW-051）
+@router.get("/procedures/{cid}")
+def procedure(cid: str) -> dict[str, Any]:
+    from backend.v2 import procedures
+    ctx = get_ctx()
+    card = ctx.store.procedures.cards.get(cid)
+    if not card:
+        raise HTTPException(404, f"未找到处置卡：{cid}")
+    return procedures.card_view(ctx, card)
+
+
+@router.put("/procedures/{cid}")
+def procedure_update(cid: str, body: dict = Body(...)) -> dict[str, Any]:
+    from backend.v2 import procedures
+    from backend.v2.userdata import UserDataError, diff
+    ctx = get_ctx()
+    card = ctx.store.procedures.cards.get(cid)
+    if not card:
+        raise HTTPException(404, f"未找到处置卡：{cid}")
+    before = procedures.card_view(ctx, card)
+    try:
+        ctx.procedure_edits.put(cid, body)
+    except UserDataError as exc:
+        raise HTTPException(400, str(exc))
+    after = procedures.card_view(ctx, card)
+    keys = ("steps", "checks", "autoExecution", "authorization", "version", "status", "scope")
+    ctx.audit.record("修改", "处置规程", cid, card["name"],
+                     objects=[p["anchorId"] for p in after["alarmPhenomena"]] + [p["id"] for p in after["alarmPhenomena"]],
+                     changes=diff({k: before.get(k) for k in keys}, {k: after.get(k) for k in keys}))
+    return after
+
+
+@router.post("/procedures/{cid}/causes/{seq}/split")
+def procedure_split(cid: str, seq: str, body: dict = Body(default={})) -> dict[str, Any]:
+    """把处置卡的一条可能原因拆成「原因现象 + 导致关系」（4.4 d：处置卡分别对应为现象、根因影响关系和处置规程）。"""
+    from backend.v2 import procedures
+    ctx = get_ctx()
+    try:
+        r = procedures.split_cause(ctx, cid, seq, body.get("anchorId"))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    except LookupError as exc:
+        raise HTTPException(404, f"未找到：{exc}")
+    alarm = ctx.phen.phenomena[r["alarm"]]
+    for x in r["created"]:
+        if x in ctx.phen.phenomena:
+            _audit("新增", "现象", None, ctx.phen.phenomena[x], _anchor_objects(ctx.phen.phenomena[x]))
+        elif x in ctx.phen.links:
+            _audit("新增", "导致关系", None, tabs.link_view(ctx, ctx.phen.links[x]), _link_objects(ctx, ctx.phen.links[x]))
+    return {**r, "card": procedures.card_view(ctx, ctx.store.procedures.cards[cid]), "anchor": alarm.get("anchor")}
+
+
+@router.post("/procedures/{cid}/split-all")
+def procedure_split_all(cid: str, body: dict = Body(default={})) -> dict[str, Any]:
+    ctx = get_ctx()
+    card = ctx.store.procedures.cards.get(cid)
+    if not card:
+        raise HTTPException(404, f"未找到处置卡：{cid}")
+    created: list[str] = []
+    for c in card.get("causes") or []:
+        created += procedure_split(cid, str(c.get("seq")), body)["created"]
+    from backend.v2 import procedures
+    return {"created": created, "card": procedures.card_view(ctx, card)}
+
+
 # ------------------------------------------------------------------ 人工关系（拓扑 / 工艺影响，需求 SW-044 / 049）
 @router.get("/relation-candidates")
 def relation_candidates(type: str, end: str = "to", keyword: str = "", limit: int = 30) -> dict[str, Any]:
@@ -474,6 +540,8 @@ def phenomenon(pid: str) -> dict[str, Any]:
     view = tabs.phenomenon_view(ctx, p)
     view["causes"] = [tabs.link_view(ctx, l) for l in ctx.phen.causes_of(pid)]
     view["effects"] = [tabs.link_view(ctx, l) for l in ctx.phen.effects_of(pid)]
+    from backend.v2 import procedures
+    view["procedures"] = procedures.cards_for_phenomenon(ctx, pid)  # 需求 SW-051：现象详情中直接查看关联规程
     return view
 
 
@@ -625,8 +693,42 @@ def calc_get(cid: str) -> dict[str, Any]:
     return {**c, "usedBy": used_by, "opIds": ctx.hierarchy.ops_of_object(ctx.store, (c.get("anchor") or {}).get("id") or "")}
 
 
+@router.get("/calc-meta")
+def calc_meta() -> dict[str, Any]:
+    from backend.v2.calculations import DEFAULT_EXECUTION, EXEC_MODES, FAILURE_MODES
+    return {"modes": EXEC_MODES, "failureModes": FAILURE_MODES, "defaults": DEFAULT_EXECUTION,
+            "bindingKinds": calculations.BINDING_KINDS}
+
+
+def _check_calc_refs(body: dict) -> None:
+    """保存前校验参数绑定指向的本体对象存在（需求 SW-050 第 3 条）。"""
+    ctx = get_ctx()
+    anchor = (body.get("anchor") or {}).get("id") or ""
+
+    def names(oid: str) -> set[str]:
+        out = set()
+        for t in [oid] + (ctx.group_members(oid) if oid.startswith("egrp-") else []):
+            try:
+                out |= {p["name"] for p in ctx.parameter_names(t)}
+            except Exception:  # noqa: BLE001
+                pass
+        return out
+    for name, b in (body.get("bindings") or {}).items():
+        k = (b or {}).get("kind")
+        if k == "parameter" and anchor.startswith(("equip-", "egrp-")) and b.get("name") not in names(anchor):
+            raise HTTPException(400, f"参数 {name} 绑定的「{b.get('name')}」不是作用对象上的参数")
+        if k == "groupParameter":
+            if b.get("groupId") not in ctx.store.dcs.equipment_groups:
+                raise HTTPException(400, f"参数 {name} 绑定的设备组不存在")
+            if b.get("name") not in names(b["groupId"]):
+                raise HTTPException(400, f"参数 {name} 绑定的「{b.get('name')}」不是该设备组的参数")
+        if k == "tag" and b.get("tag") not in ctx.tag_by_name:
+            raise HTTPException(400, f"参数 {name} 绑定的位号 {b.get('tag')} 不在点表中")
+
+
 @router.post("/calculations")
 def calc_create(body: dict = Body(...)) -> dict[str, Any]:
+    _check_calc_refs(body)
     rec = _guard(get_ctx().calcs.create, body)
     _audit("新增", "计算组态", None, rec, _anchor_objects(rec))
     return rec
@@ -636,6 +738,7 @@ def calc_create(body: dict = Body(...)) -> dict[str, Any]:
 def calc_update(cid: str, body: dict = Body(...)) -> dict[str, Any]:
     import copy
     before = copy.deepcopy(_guard(get_ctx().calcs.get, cid))
+    _check_calc_refs({**before, **body})
     rec = _guard(get_ctx().calcs.update, cid, body)
     _audit("修改", "计算组态", before, rec, _anchor_objects(rec))
     return rec
@@ -652,7 +755,21 @@ def calc_delete(cid: str) -> dict[str, Any]:
 
 @router.post("/calculations/{cid}/run")
 def calc_run(cid: str, body: dict = Body(default={})) -> dict[str, Any]:
+    import time
+    from datetime import datetime
     ctx = get_ctx()
     calc = _guard(ctx.calcs.get, cid)
-    return _guard(rule_eval.run_calc, ctx, calc, hours=float(body.get("hours") or 6), op_id=body.get("opId"),
-                  target_id=body.get("targetId"))
+    t0 = time.time()
+    entry = {"kind": "试算", "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "ok": False, "targets": 0, "ms": 0, "error": ""}
+    try:
+        r = _guard(rule_eval.run_calc, ctx, calc, hours=float(body.get("hours") or 6), op_id=body.get("opId"),
+                   target_id=body.get("targetId"))
+        entry.update(ok=all(x.get("values") is not None for x in r["results"]), targets=len(r["results"]),
+                     error="；".join(f"{x['targetName']}：{'、'.join(x['unresolved'])}" for x in r["results"] if x.get("values") is None))
+        return r
+    except HTTPException as exc:
+        entry["error"] = str(exc.detail)
+        raise
+    finally:
+        entry["ms"] = int((time.time() - t0) * 1000)
+        ctx.calcs.log_run(cid, entry)

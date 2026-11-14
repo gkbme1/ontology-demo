@@ -5,10 +5,22 @@ import { ref, watch } from 'vue'
 import { api } from '@/api/client'
 import LineChart from './LineChart.vue'
 import InheritBox from './InheritBox.vue'
+import CalcEditor from './CalcEditor.vue'
+import { bump } from '@/composables/useNav'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any
-const props = defineProps<{ items: Any[]; opId?: string; targetId?: string; focusId?: string; showInherit?: boolean }>()
+const props = defineProps<{ items: Any[]; opId?: string; targetId?: string; focusId?: string; showInherit?: boolean
+  // 可编辑时：新建的作用范围选项（本对象 / 所属设备组 / 工艺段）
+  anchorOptions?: { id: string; name: string; kind: string }[]; canEdit?: boolean }>()
+const emit = defineEmits<{ (e: 'changed'): void }>()
+const editing = ref<Any>(null)
+const creating = ref(false)
+function saved(): void { editing.value = null; creating.value = false; bump(); emit('changed') }
+async function remove(c: Any): Promise<void> {
+  if (!confirm(`删除计算组态「${c.name}」？${c.usedBy?.length ? `有 ${c.usedBy.length} 条判定规则引用了它的输出，删除后这些规则无法判定。` : ''}`)) return
+  try { await api.deleteCalc(c.id); saved() } catch (e) { alert((e as Error).message) }
+}
 
 const openId = ref(props.focusId ?? '')
 const runs = ref<Record<string, Any>>({})
@@ -17,6 +29,7 @@ async function run(c: Any): Promise<void> {
   openId.value = c.id
   runs.value[c.id] = null
   runs.value[c.id] = await api.runCalc(c.id, { hours: 6, opId: props.opId, targetId: props.targetId })
+  emit('changed')
 }
 watch(() => props.focusId, (id) => {
   const c = props.items.find((x) => x.id === id)
@@ -27,6 +40,7 @@ watch(() => props.focusId, (id) => {
 
 <template>
   <div class="space-y-3">
+    <div v-if="canEdit" class="flex"><span class="flex-1" /><button class="btn btn-primary" :disabled="!anchorOptions?.length" @click="creating = true">+ 新建计算组态</button></div>
     <div v-if="!items.length" class="empty">暂无计算组态</div>
     <div v-for="c in items" :key="c.id" class="card">
       <div class="flex items-center gap-2">
@@ -39,6 +53,10 @@ watch(() => props.focusId, (id) => {
         <StatusPill :status="c.status" />
         <span class="flex-1" />
         <button class="btn" @click="run(c)">试算（模拟数据）</button>
+        <template v-if="canEdit">
+          <button class="btn" @click="editing = c">编辑</button>
+          <button class="btn" @click="remove(c)">删除</button>
+        </template>
       </div>
       <div class="mt-2 grid grid-cols-[1fr_1.4fr] gap-4">
         <dl class="kv">
@@ -50,6 +68,12 @@ watch(() => props.focusId, (id) => {
           </dd>
           <dt>输出</dt><dd>{{ c.algorithm?.output?.label }}（{{ c.unit || c.algorithm?.output?.unit }}）</dd>
           <dt>作用范围</dt><dd>{{ c.anchor?.name }}<span v-if="c.anchor?.kind === 'group' && c.bindingRows?.some((r: Any) => r.binding?.kind === 'parameter')" class="text-fg-mute">（组内每台分别计算）</span></dd>
+          <dt>执行方式</dt>
+          <dd>{{ c.execution?.mode }}<template v-if="c.execution?.mode === '周期'"> · 每 {{ c.execution.periodSec }} 秒</template>
+            <template v-if="c.execution?.mode === '事件触发'"> · {{ c.execution.trigger }}</template>
+            <span class="text-fg-mute"> · 超时 {{ c.execution?.timeoutSec }} 秒 · 失败{{ c.execution?.onFailure }}{{ c.execution?.onFailure === '重试' ? ` ${c.execution.retries} 次` : '' }}，连续 {{ c.execution?.disableAfter }} 次停用</span></dd>
+          <dt>输出测点</dt><dd><span class="font-mono">{{ c.output?.tag || '待分配' }}</span><span class="text-fg-mute">{{ c.output?.writeBack ? '（写回 XBase）' : '（不写回）' }}</span></dd>
+          <dt>运行状态</dt><dd class="text-fg-dim">{{ c.runState }}<div v-if="c.lastRun?.error" class="text-warn">{{ c.lastRun.error }}</div></dd>
           <dt>说明</dt><dd class="text-fg-dim">{{ c.description }}</dd>
           <dt>依据</dt><dd class="text-fg-dim">{{ c.basis }}</dd>
           <template v-if="c.usedBy?.length">
@@ -101,5 +125,7 @@ watch(() => props.focusId, (id) => {
         />
       </div>
     </div>
+    <CalcEditor v-if="creating" :anchor-options="anchorOptions ?? []" @close="creating = false" @saved="saved" />
+    <CalcEditor v-if="editing" :calc="editing" :anchor-options="anchorOptions ?? []" @close="editing = null" @saved="saved" />
   </div>
 </template>

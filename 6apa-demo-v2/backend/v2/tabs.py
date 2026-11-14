@@ -395,7 +395,13 @@ def calc_view(ctx: AppContext, c: dict[str, Any]) -> dict[str, Any]:
     anchor = c.get("anchor") or {}
     scope = {"segment": "工艺段", "group": "设备组", "equipment": "设备"}.get(anchor.get("kind"), anchor.get("kind") or "")
     cross = anchor.get("kind") == "segment" or any((b or {}).get("kind") == "groupParameter" for b in bindings.values())
-    return {**c, "algorithm": {k: algo.get(k) for k in ("id", "name", "category", "version", "provider", "invoke", "output", "status")},
+    from backend.v2.calculations import DEFAULT_EXECUTION, DEFAULT_OUTPUT
+    ex = {**DEFAULT_EXECUTION, **(c.get("execution") or {})}
+    last = ctx.calcs.last_run(c["id"])
+    run_state = ("未运行（本 Demo 无调度器，执行设置仅登记）" if not last else
+                 f"最近一次{last['kind']} {last['time']} · {'成功' if last['ok'] else '失败'} · {last['ms']} ms · {last['targets']} 个对象")
+    return {**c, "execution": ex, "output": {**DEFAULT_OUTPUT, **(c.get("output") or {})}, "runState": run_state, "lastRun": last,
+            "algorithm": {k: algo.get(k) for k in ("id", "name", "category", "version", "provider", "invoke", "output", "status")},
             "bindingRows": rows, "scopeText": scope, "crossDevice": cross,
             "usedBy": [{"id": p["id"], "name": p["name"]} for p in ctx.phen.phenomena.values() if c["id"] in str(p.get("rule"))]}
 
@@ -488,8 +494,12 @@ def tab(ctx: AppContext, object_id: str, key: str, op_id: str | None = None) -> 
         calcs = [_inherit({**calc_view(ctx, c), "origin": c["origin"]}, c["origin"] == "继承自设备组", f"设备组 {gname}")
                  for c in _calcs_for(ctx, object_id)]
         derived = [a for a in prof.get("attributes") or [] if a.get("kind") == "工艺属性" and not a.get("dataLinks")]
-        return {"items": calcs, "capabilities": prof.get("capabilities") or [],
+        return {"items": calcs, "capabilities": prof.get("capabilities") or [], "canEdit": True,
                 "derivedCandidates": [{"name": a["name"], "description": a.get("description") or ""} for a in derived]}
     if key == "procedures":
-        return {"items": prof.get("procedures") or []}
+        from backend.v2 import procedures
+        pindex = procedures.phenomenon_index(ctx)
+        cards = ctx.store.procedures.cards
+        return {"items": [procedures.card_view(ctx, cards.get(c["id"]) or c, pindex) for c in prof.get("procedures") or []],
+                "canEdit": True}
     raise TabNotFound(key)

@@ -215,3 +215,25 @@ class RelationStore(_JsonFile):
             self.items.remove(rel)
             self.save()
             return rel
+
+
+# ------------------------------------------------------------------ 处置规程的在线编辑
+class ProcedureEdits(_JsonFile):
+    """处置卡原文来自 6APA_处置规程.xlsx（只读）；在线编辑的步骤、检查项、执行边界、版本与状态按卡片 ID 覆盖保存。"""
+
+    def __init__(self) -> None:
+        super().__init__("procedure_edits.json", {"cards": {}})
+
+    def get(self, cid: str) -> dict[str, Any] | None:
+        return self.data["cards"].get(cid)
+
+    def put(self, cid: str, body: dict[str, Any]) -> dict[str, Any]:
+        with self._lock:
+            entry = {k: body[k] for k in ("steps", "checks", "autoExecution", "authorization", "version", "status", "scope") if k in body}
+            for s in entry.get("steps") or []:
+                if not str(s.get("description") or "").strip():
+                    raise UserDataError("每个步骤都要有操作说明")
+            entry["updatedAt"], entry["updatedBy"] = now(), "演示用户"
+            self.data["cards"][cid] = {**(self.data["cards"].get(cid) or {}), **entry}
+            self.save()
+            return self.data["cards"][cid]

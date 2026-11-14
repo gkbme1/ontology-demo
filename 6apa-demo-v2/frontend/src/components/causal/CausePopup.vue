@@ -12,6 +12,7 @@ import RuleView from '../rules/RuleView.vue'
 import EvalResult from '../rules/EvalResult.vue'
 import CausalGraph from './CausalGraph.vue'
 import LinkEditor from './LinkEditor.vue'
+import ProcedureCard from '../ProcedureCard.vue'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any
@@ -27,6 +28,11 @@ const evalResult = ref<Any>(null)
 const evaluating = ref(false)
 const adding = ref(false)
 const calcNames = ref<Record<string, string>>({})
+// 关联处置规程（需求 SW-051：在现象详情和导致链中可直接查看关联规程）
+const procView = ref<Any>(null)
+async function openProc(id: string): Promise<void> {
+  try { procView.value = await api.procedure(id) } catch (e) { alert((e as Error).message) }
+}
 
 async function load(): Promise<void> {
   evalResult.value = null
@@ -88,6 +94,11 @@ async function onAdded(): Promise<void> {
           <dt>状态</dt><dd><StatusPill :status="detail.status" /></dd>
           <dt>来源</dt><dd>{{ detail.source?.kind }} {{ detail.source?.ref }}</dd>
           <dt>角色</dt><dd>作为原因 {{ detail.roles.asCause }} 次 · 作为结果 {{ detail.roles.asEffect }} 次</dd>
+          <dt>关联规程</dt>
+          <dd>
+            <button v-for="c in detail.procedures ?? []" :key="c.id" class="phen-link mr-1" @click="openProc(c.id)">{{ c.id }} {{ c.name }}<span class="opacity-60">（{{ c.role }}）</span></button>
+            <span v-if="!(detail.procedures ?? []).length" class="text-fg-mute">无</span>
+          </dd>
         </dl>
         <div>
           <div class="sec-title">判定规则</div>
@@ -133,5 +144,8 @@ async function onAdded(): Promise<void> {
       @close="adding = false"
       @saved="onAdded"
     />
+    <Modal v-if="procView" :title="`处置规程 · ${procView.id} ${procView.name}`" wide @close="procView = null">
+      <ProcedureCard :card="procView" open />
+    </Modal>
   </Modal>
 </template>
