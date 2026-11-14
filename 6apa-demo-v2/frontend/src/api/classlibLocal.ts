@@ -98,7 +98,10 @@ export class ClassLibLocal {
     let saved: Any = null
     try { saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null') } catch { saved = null }
     this.data = saved?.stamp === this.stamp ? saved.data : clone(this.b.data)
+    // 能力挂载只以类的 caps 为准：去掉能力定义上旧的「适用类」副本
+    for (const c of this.data.capabilities ?? []) delete c.classes
     for (const v of this.data.versions) {
+      if (v.snapshot && v.snapshot !== SEED_REF) for (const c of v.snapshot.capabilities ?? []) delete c.classes
       if (v.snapshot === SEED_REF) v.snapshot = this.seedContent
       else if (v.status === '已发布' && !v.snapshot) v.snapshot = this.seedContent
     }
@@ -205,14 +208,35 @@ export class ClassLibLocal {
   private upsert(sec: string, code: string, body: Any): Any {
     this.editable()
     const items = this.section(sec)
-    body = { ...body, code: String(body.code || code).trim() }
+    body = Object.fromEntries(Object.entries(body).filter(([k]) => !k.startsWith('_') && k !== 'inheritedClasses'))
+    body.code = String(body.code || code).trim()
     if (!body.code || !String(body.name ?? '').trim()) throw err('编码和名称不能为空')
     const old = items.find((x) => x.code === code)
     if (body.code !== code && items.some((x) => x.code === body.code)) throw err(`编码已存在：${body.code}`)
     if ((sec === 'metaclasses' || sec === 'relationTypes') && old?.preset) body.preset = true
     if (sec === 'mappingRules' && body.pattern) pyRegex(body.pattern)
+    let mounts: string[] | null = null
+    if (sec === 'capabilities' && 'classes' in body) {
+      mounts = (body.classes ?? []).map(String)
+      delete body.classes
+      const known = new Set(this.data.classes.map((c: Any) => c.id))
+      const bad = mounts!.filter((x) => !known.has(x))
+      if (bad.length) throw err(`类不存在：${bad.join('、')}`)
+    }
     if (old) items[items.indexOf(old)] = { ...old, ...body }
     else items.push({ preset: false, ...body })
+    if (sec === 'capabilities') {
+      for (const c of this.data.classes) {  // 改编码时同步类上的挂载；「适用类」写回各类的 caps
+        const caps: string[] = (c.caps ?? []).map((x: string) => (x === code ? body.code : x))
+        if (mounts) {
+          const on = mounts.includes(c.id)
+          const has = caps.includes(body.code)
+          if (on && !has) caps.push(body.code)
+          else if (has && !on) caps.splice(caps.indexOf(body.code), 1)
+        }
+        if (canon(caps) !== canon(c.caps ?? [])) c.caps = caps
+      }
+    }
     this.save()
     return items.find((x) => x.code === body.code)
   }
@@ -234,6 +258,22 @@ export class ClassLibLocal {
     items.splice(items.indexOf(old), 1)
     this.save()
     return old
+  }
+
+  /** 能力定义 + 由类的挂载算出的适用类（classes 直接挂载，inheritedClasses 因继承而具备）。 */
+  private capabilitiesView(): Any[] {
+    const kids: Record<string, string[]> = {}
+    for (const c of this.data.classes) if (c.parent) (kids[c.parent] ??= []).push(c.id)
+    return this.data.capabilities.map((cap: Any) => {
+      const direct: string[] = this.data.classes.filter((c: Any) => (c.caps ?? []).includes(cap.code)).map((c: Any) => c.id)
+      const inherited: string[] = []
+      const queue = direct.flatMap((d) => kids[d] ?? [])
+      while (queue.length) {
+        const x = queue.shift()!
+        if (!direct.includes(x) && !inherited.includes(x)) { inherited.push(x); queue.push(...(kids[x] ?? [])) }
+      }
+      return { ...clone(cap), classes: direct, inheritedClasses: inherited }
+    })
   }
 
   // ------------------------------------------------------------ 类
@@ -578,7 +618,12 @@ export class ClassLibLocal {
         if (i < 0) { list.push(x); stats.added++ } else if (strategy === 'merge') { list[i] = x; stats.merged++ } else stats.skipped++
       }
     }
-    for (const sec of Object.keys(SECTIONS)) merge(this.data[sec], pkg[sec], 'code')
+    for (const sec of Object.keys(SECTIONS)) {
+      const inc = sec === 'capabilities'  // 挂载随类导入
+        ? (pkg[sec] ?? []).map((x: Any) => { const { classes: _c, inheritedClasses: _i, ...rest } = x; return rest })
+        : pkg[sec]
+      merge(this.data[sec], inc, 'code')
+    }
     merge(this.data.classes, pkg.classes, 'id')
     this.save()
     return { ...stats, strategy }
@@ -609,7 +654,7 @@ export class ClassLibLocal {
       if (method === 'DELETE') return this.deleteItem(m[1], m[2], dec(m[3]))
     }
     if ((m = path.match(/^\/classlib\/section\/([^/]+)$/))) {
-      const items = clone(this.section(m[1]))
+      const items = m[1] === 'capabilities' ? this.capabilitiesView() : clone(this.section(m[1]))
       const out: Any = { items }
       if (m[1] === 'metaclasses') out.usage = Object.fromEntries(items.map((x: Any) => [x.code, this.data.classes.filter((c: Any) => c.metaclass === x.code).length]))
       if (m[1] === 'capabilities') out.classNames = Object.fromEntries(this.data.classes.map((c: Any) => [c.id, c.name]))

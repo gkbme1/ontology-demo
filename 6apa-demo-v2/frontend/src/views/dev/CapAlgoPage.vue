@@ -91,7 +91,7 @@ const discovery = computed(() => {
       <table class="tbl"><thead><tr><th>能力</th><th>适用类</th><th>算法</th><th>方式</th></tr></thead><tbody>
         <tr v-for="c in caps" :key="c.code" :class="{ '!bg-brand/10': sel === c.code }" @click="pick(c.code)">
           <td>{{ c.name }}<div class="font-mono text-[10.5px] text-fg-mute">{{ c.code }}</div></td>
-          <td class="text-xs">{{ (c.classes ?? []).map((x: string) => classNames[x] ?? x).join('、') || '—' }}</td>
+          <td class="text-xs">{{ (c.classes ?? []).map((x: string) => classNames[x] ?? x).join('、') || '—' }}<div v-if="c.inheritedClasses?.length" class="text-fg-mute">+ 继承 {{ c.inheritedClasses.length }} 个子类</div></td>
           <td class="font-mono text-xs">{{ c.algorithm || '—' }}<span v-if="c.version"> v{{ c.version }}</span></td><td>{{ c.mode }}</td></tr>
       </tbody></table>
     </div>
@@ -102,10 +102,15 @@ const discovery = computed(() => {
           <button class="btn btn-primary" :disabled="!canEdit()" @click="save">保存</button></div>
         <DevForm :model="form" :disabled="!canEdit()" :fields="[
           { key: 'code', label: '能力编码', type: 'code', readonly: !form._new }, { key: 'name', label: '名称' },
-          { key: 'classes', label: '适用类', type: 'multi', options: classOptions, hint: '挂载后该类的所有实例自动具备该能力（类库「能力」页签也可挂载）' },
+          { key: 'classes', label: '适用类', type: 'multi', options: classOptions, hint: '即类的挂载：在这里勾选与在类库「能力」页签勾选是同一份数据；子类自动继承' },
           { key: 'algorithm', label: '引用算法', type: 'select', options: [{ value: '', label: '（无，数据类能力）' }, ...algos.map((a) => ({ value: a.id, label: `${a.name}（${a.id}）` }))] },
           { key: 'version', label: '算法版本' }, { key: 'mode', label: '执行方式', type: 'select', options: ['同步', '异步'] },
           { key: 'timeout', label: '超时（秒）', type: 'number' }, { key: 'desc', label: '说明' }]" />
+        <div v-if="form.inheritedClasses?.length" class="text-xs mt-2 pl-[104px]">
+          <span class="text-fg-mute">因继承而具备（{{ form.inheritedClasses.length }} 个子类）：</span>
+          <span v-for="x in form.inheritedClasses.slice(0, 12)" :key="x" class="pill pill-plain mr-1 mb-0.5">{{ classNames[x] ?? x }}</span>
+          <span v-if="form.inheritedClasses.length > 12" class="text-fg-mute">等</span>
+        </div>
       </div>
       <div class="grid grid-cols-2 gap-3">
         <div class="card">

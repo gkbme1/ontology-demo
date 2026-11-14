@@ -557,6 +557,20 @@ class ClassLibTest(unittest.TestCase):
         self.assertGreaterEqual(r["counts"]["auto"], 1)
         self.assertGreater(r["groups"]["conflict"][0]["memberCount"], 0)
 
+    def test_capability_mounts_single_source(self):
+        caps = {c["code"]: c for c in client.get("/api/v2/classlib/section/capabilities").json()["items"]}
+        self.assertEqual(caps["CAP-001"]["classes"], ["cls-equipment"])
+        self.assertIn(self.CID, caps["CAP-001"]["inheritedClasses"])  # 根类挂载，子类继承
+        # 能力定义里改「适用类」→ 写回类的挂载
+        cap = caps["CAP-S11-01"]
+        client.put("/api/v2/classlib/section/capabilities/CAP-S11-01", json={**cap, "classes": [self.CID, "cls-type-zhg"]})
+        self.assertIn("CAP-S11-01", [c["code"] for c in client.get("/api/v2/classlib/class/cls-type-zhg").json()["caps"]])
+        # 类库能力页签取消挂载 → 能力定义的适用类同步
+        client.put("/api/v2/classlib/class/cls-type-zhg/caps", json={"caps": []})
+        caps = {c["code"]: c for c in client.get("/api/v2/classlib/section/capabilities").json()["items"]}
+        self.assertEqual(caps["CAP-S11-01"]["classes"], [self.CID])
+        self.assertNotIn("classes", CTX.classlib.data["capabilities"][0])  # 能力定义上不再另存一份
+
     def test_export_import(self):
         r = client.get("/api/v2/classlib/export")
         self.assertEqual(r.status_code, 200)

@@ -283,7 +283,8 @@ def build() -> dict[str, Any]:
                 "target": "物料流股", "descMatch": "", "locate": "", "threshold": 0.9, "status": "草案", "confidence": "—"}]
 
     content = {"metaclasses": metas, "hierarchyTypes": htypes, "hierarchyTemplates": htemplates, "classes": classes,
-               "relationTypes": rels, "mappingRules": mrules, "capabilities": caps}
+               "relationTypes": rels, "mappingRules": mrules,
+               "capabilities": [{k: v for k, v in c.items() if k != "classes"} for c in caps]}  # 挂载以类的 caps 为准
     return {"library": {"name": "105 车间工业类库", "note": "由 105 车间实例归纳生成，全部为草案·待工艺确认", "funcMap": func_map},
             **content,
             "versions": [{"version": "v0.1", "status": "已发布", "createdAt": STAMP, "publishedAt": STAMP, "note": "由 105 车间实例归纳生成（初始版本）",

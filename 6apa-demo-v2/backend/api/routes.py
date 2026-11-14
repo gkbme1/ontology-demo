@@ -461,6 +461,8 @@ def classlib_phen_preview(cid: str, code: str) -> dict[str, Any]:
 @router.get("/classlib/section/{sec}")
 def classlib_section(sec: str) -> dict[str, Any]:
     items = _cl_guard(_cl().section, sec)
+    if sec == "capabilities":
+        items = _cl().capabilities_view()  # 适用类由类的挂载算出
     out = {"items": items}
     if sec == "metaclasses":
         out["usage"] = {m["code"]: sum(1 for c in _cl().data["classes"] if c.get("metaclass") == m["code"]) for m in items}
@@ -629,6 +631,8 @@ def classlib_import(body: dict = Body(...)) -> dict[str, Any]:
     for sec in ("metaclasses", "hierarchyTypes", "hierarchyTemplates", "relationTypes", "mappingRules", "capabilities"):
         mine = {x["code"]: x for x in cl.data[sec]}
         for x in pkg.get(sec) or []:
+            if sec == "capabilities":
+                x = {k: v for k, v in x.items() if k not in ("classes", "inheritedClasses")}  # 挂载随类导入
             if x["code"] in mine:
                 if strategy == "merge":
                     cl.data[sec][cl.data[sec].index(mine[x["code"]])] = x

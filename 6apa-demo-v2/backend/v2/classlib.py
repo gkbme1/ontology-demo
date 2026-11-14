@@ -57,6 +57,10 @@ class ClassLibrary:
                     raise FileNotFoundError(f"缺少类库种子 {SEED}，先运行 python3 -m backend.tools.build_classlib")
                 shutil.copyfile(SEED, self.path)
             self.data = json.loads(self.path.read_text("utf-8"))
+            # 能力挂载只以类的 caps 为准：去掉能力定义上旧的「适用类」副本（含历史版本快照）
+            for content in [self.data] + [v["snapshot"] for v in self.data["versions"] if v.get("snapshot")]:
+                for c in content.get("capabilities") or []:
+                    c.pop("classes", None)
             for v in self.data["versions"]:
                 if v["status"] == "已发布" and not v.get("snapshot"):
                     v["snapshot"] = copy.deepcopy(self._content())
@@ -168,7 +172,8 @@ class ClassLibrary:
         with self._lock:
             self.editable()
             items = self.section(sec)
-            body = {**body, "code": (body.get("code") or code).strip()}
+            body = {k: v for k, v in body.items() if not k.startswith("_") and k != "inheritedClasses"}  # 去掉界面状态与计算字段
+            body["code"] = (body.get("code") or code).strip()
             if not body["code"] or not str(body.get("name") or "").strip():
                 raise ClassLibError("编码和名称不能为空")
             old = next((x for x in items if x["code"] == code), None)
@@ -183,11 +188,28 @@ class ClassLibrary:
                     re.compile(body["pattern"])
                 except re.error as exc:
                     raise ClassLibError(f"匹配表达式不合法：{exc}") from None
+            mounts = body.pop("classes", None) if sec == "capabilities" else None
+            if sec == "capabilities" and mounts is not None:
+                known = {c["id"] for c in self.data["classes"]}
+                bad = [x for x in mounts if x not in known]
+                if bad:
+                    raise ClassLibError(f"类不存在：{'、'.join(bad)}")
             if old:
                 items[items.index(old)] = {**old, **body}
             else:
                 body.setdefault("preset", False)
                 items.append(body)
+            if sec == "capabilities":
+                for c in self.data["classes"]:  # 改编码时同步类上的挂载；「适用类」写回各类的 caps
+                    caps = [body["code"] if x == code else x for x in c.get("caps") or []]
+                    if mounts is not None:
+                        on, has = c["id"] in mounts, body["code"] in caps
+                        if on and not has:
+                            caps.append(body["code"])
+                        elif has and not on:
+                            caps.remove(body["code"])
+                    if caps != (c.get("caps") or []):
+                        c["caps"] = caps
             self.save()
             return next(x for x in items if x["code"] == body["code"])
 
@@ -215,6 +237,24 @@ class ClassLibrary:
             items.remove(old)
             self.save()
             return old
+
+    def capabilities_view(self) -> list[dict[str, Any]]:
+        """能力定义 + 由类的挂载算出的适用类：classes = 直接挂载的类，inheritedClasses = 因继承而具备的子类。"""
+        kids: dict[str, list[str]] = {}
+        for c in self.data["classes"]:
+            if c.get("parent"):
+                kids.setdefault(c["parent"], []).append(c["id"])
+        out = []
+        for cap in self.data["capabilities"]:
+            direct = [c["id"] for c in self.data["classes"] if cap["code"] in (c.get("caps") or [])]
+            inherited, stack = [], [k for d in direct for k in kids.get(d, [])]
+            while stack:
+                x = stack.pop(0)
+                if x not in direct and x not in inherited:
+                    inherited.append(x)
+                    stack += kids.get(x, [])
+            out.append({**cap, "classes": direct, "inheritedClasses": inherited})
+        return out
 
     # ---------------------------------------------------------- 类
     def cls(self, cid: str) -> dict[str, Any]:
