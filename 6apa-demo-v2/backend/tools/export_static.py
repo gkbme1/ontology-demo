@@ -163,6 +163,7 @@ def main() -> None:
     print("收集全局视图（计算组态 / 算法库 / 工况与根因 / 文档提取）…")
     col.fetch("/algorithms")
     col.fetch("/validation")
+    col.fetch("/releases")
     for cid in ctx.store.procedures.cards:
         col.fetch(f"/procedures/{cid}")
     for q in [{}] + [{"seg": s} for s in h.segments] + [{"op": o} for o in h.ops]:

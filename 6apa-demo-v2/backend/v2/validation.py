@@ -32,8 +32,12 @@ def run(ctx: AppContext) -> dict[str, Any]:
     dcs = ctx.store.dcs
     items: list[dict[str, Any]] = []
 
+    # 需求 SW-060：只有「生效」的对象进入发布版本，草案上的错误照常列出，但不阻止发布
+    cur = {"draft": False}
+
     def add(level: str, rule: str, message: str, target: dict[str, Any] | None = None) -> None:
-        items.append({"level": level, "rule": rule, "message": message, "target": target})
+        items.append({"level": level, "rule": rule, "message": message, "target": target,
+                      "draft": cur["draft"], "blocking": level == "错误" and not cur["draft"]})
 
     def obj_target(oid: str, tab: str | None = None) -> dict[str, Any] | None:
         ops = h.ops_of_object(ctx.store, oid)
@@ -59,6 +63,7 @@ def run(ctx: AppContext) -> dict[str, Any]:
     # 1 / 2 现象与判定规则
     pending = []
     for p in ctx.phen.phenomena.values():
+        cur["draft"] = p.get("status") != "生效"
         aid = (p.get("anchor") or {}).get("id") or ""
         tgt = obj_target(aid, "phenomena")
         where = f"现象「{p['name']}」（{p['id']}）"
@@ -85,6 +90,7 @@ def run(ctx: AppContext) -> dict[str, Any]:
                     add("错误", "判定规则引用", f"{where} 引用的限值 {t.get('limitId')} 不存在", tgt)
                 elif lim.get(t.get("field")) in (None, ""):
                     add("警告", "限值待补", f"{where} 引用 {t.get('limitId')} 的「{t.get('field')}」暂无数值（待现场提供），规则无法判定", tgt)
+    cur["draft"] = False
     for p in pending:
         add("提示", "判定规则待定义", f"现象「{p['name']}」（{p['id']}）判定规则待定义，只能作为图谱节点，不能试算",
             obj_target((p.get("anchor") or {}).get("id") or "", "phenomena"))
@@ -92,6 +98,7 @@ def run(ctx: AppContext) -> dict[str, Any]:
     # 3 根因关系
     cyc = ctx.phen.cyclic_links()
     for lid, l in ctx.phen.links.items():
+        cur["draft"] = l.get("status") != "生效"
         c, e = ctx.phen.phenomena.get(l["cause"]), ctx.phen.phenomena.get(l["effect"])
         if not c or not e:
             add("错误", "关系有效性", f"导致关系 {lid} 的端点现象不存在", None)
@@ -99,6 +106,7 @@ def run(ctx: AppContext) -> dict[str, Any]:
             add("警告", "因果环路", f"导致关系 {lid}「{c['name']} → {e['name']}」处在因果环路上，请确认是正反馈 / 控制回路还是方向登记错误",
                 obj_target((e.get("anchor") or {}).get("id") or "", "causal"))
 
+    cur["draft"] = False
     # 3b 人工新增的关系：端点仍然存在
     idx = ctx.endpoint_index()
     for r in ctx.relations.items:
@@ -108,6 +116,7 @@ def run(ctx: AppContext) -> dict[str, Any]:
 
     # 4 计算组态
     for cid, calc in ctx.calcs.items.items():
+        cur["draft"] = calc.get("status") != "生效"
         aid = (calc.get("anchor") or {}).get("id") or ""
         tgt = obj_target(aid, "calc") if (aid.startswith(("equip-", "egrp-"))) else {"kind": "global:calc", "name": "计算组态"}
         where = f"计算组态「{calc['name']}」（{cid}）"
@@ -134,6 +143,7 @@ def run(ctx: AppContext) -> dict[str, Any]:
             elif k == "calc" and b.get("calcId") not in ctx.calcs.items:
                 add("错误", "计算组态", f"{where} 输入「{inp['label']}」引用的计算组态 {b.get('calcId')} 不存在", tgt)
 
+    cur["draft"] = False
     # 5 位号映射 / 6 参数约束的适用工况（逐个设备组 / 设备）
     cond_keys = {p.get("conditionKey") for p in ctx.phen.phenomena.values() if p.get("conditionKey")}
     cond_modes = {(k.split(":")[1], k.split(":")[2]) for k in cond_keys if k.startswith("mode:") and k.count(":") >= 2}
@@ -185,7 +195,8 @@ def run(ctx: AppContext) -> dict[str, Any]:
         rules[i["rule"]] = rules.get(i["rule"], 0) + 1
     items.sort(key=lambda i: LEVELS.index(i["level"]))
     return {"checkedAt": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "counts": counts, "rules": rules, "items": items,
-            "publishable": counts["错误"] == 0,
+            "blocking": sum(1 for i in items if i["blocking"]),
+            "publishable": not any(i["blocking"] for i in items),
             "scope": {"phenomena": len(ctx.phen.phenomena), "links": len(ctx.phen.links), "calculations": len(ctx.calcs.items),
                       "objects": len(objects), "limits": len(seen_limits)},
-            "note": "位号以点表代替 XBase 位号目录校验；错误需处理后才能发布（发布功能后续实现）"}
+            "note": "位号以点表代替 XBase 位号目录校验；「生效」对象上的错误阻止发布，草案上的错误照常列出但不阻止（草案不进入发布版本）"}

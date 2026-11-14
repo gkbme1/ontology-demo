@@ -12,6 +12,8 @@ import CausePopup from './CausePopup.vue'
 import InheritBox from '../InheritBox.vue'
 import OverrideEditor from '../rules/OverrideEditor.vue'
 import ManualEval from '../rules/ManualEval.vue'
+import BatchStatusBar from '../BatchStatusBar.vue'
+import { staticBackend } from '@/api/static'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any
@@ -27,6 +29,11 @@ const props = defineProps<{
   canOverride?: boolean
 }>()
 const overriding = ref<Any>(null)
+// 批量变更状态
+const picked = ref<Set<string>>(new Set())
+const canBatch = !staticBackend
+function togglePick(id: string): void { const s = new Set(picked.value); if (s.has(id)) s.delete(id); else s.add(id); picked.value = s }
+function toggleAll(): void { picked.value = picked.value.size === rows.value.length ? new Set() : new Set(rows.value.map((p: Any) => p.id)) }
 const canOv = (p: Any) => props.canOverride && p.inherited
 async function disable(p: Any): Promise<void> {
   if (!confirm(`在「${props.objectName}」上禁用继承的现象「${p.name}」？本台不再判定，设备组上的定义不变。`)) return
@@ -103,11 +110,13 @@ function changed(): void {
       <span class="flex-1" />
       <button class="btn btn-primary" :disabled="!anchorOptions.length" @click="creating = true">+ 新增现象</button>
     </div>
+    <BatchStatusBar kind="phenomena" :ids="[...picked]" @done="picked = new Set(); emit('changed')" />
     <div v-if="!rows.length" class="empty">暂无现象定义</div>
     <table v-else class="tbl">
-      <thead><tr><th v-if="showInherit" class="w-16 !text-center">来源</th><th>现象</th><th>挂载对象</th><th>判定规则</th><th>角色</th><th>状态</th><th></th></tr></thead>
+      <thead><tr><th v-if="canBatch" class="w-8"><input type="checkbox" title="全选" :checked="picked.size > 0 && picked.size === rows.length" @change="toggleAll" /></th><th v-if="showInherit" class="w-16 !text-center">来源</th><th>现象</th><th>挂载对象</th><th>判定规则</th><th>角色</th><th>状态</th><th></th></tr></thead>
       <tbody>
         <tr v-for="p in rows" :id="`phen-row-${p.id}`" :key="p.id" :class="{ '!bg-brand/15 outline outline-2 outline-brand/60': flash === p.id, 'opacity-50': p.inheritState === '已禁用' }" @click="popup = p.id">
+          <td v-if="canBatch" @click.stop><input type="checkbox" :checked="picked.has(p.id)" @change="togglePick(p.id)" /></td>
           <td v-if="showInherit" @click.stop><InheritBox :checked="p.inherited" :from="p.inheritedFrom" :state="p.inheritState" /></td>
           <td class="min-w-[150px]">
             <div class="font-medium text-fg">{{ p.name }} <span v-if="p.category === '工况'" class="pill pill-info">工况</span></div>

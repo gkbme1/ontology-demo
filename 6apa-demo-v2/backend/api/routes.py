@@ -229,6 +229,131 @@ def validation_run() -> dict[str, Any]:
     return validation.run(get_ctx())
 
 
+# ------------------------------------------------------------------ 发布与版本（需求 SW-060 / 061 / 062）
+@router.get("/releases")
+def releases() -> dict[str, Any]:
+    from backend.v2 import release
+    return release.list_releases()
+
+
+@router.get("/releases/preview")
+def release_preview() -> dict[str, Any]:
+    """发布前预览：工程态当前各类数据的总数 / 生效数（只有生效的现象、导致关系、计算组态进入发布内容）。"""
+    from backend.v2 import release
+    return {"stats": release._stats(release.snapshot(get_ctx()))}
+
+
+@router.post("/releases")
+def release_publish(body: dict = Body(default={})) -> dict[str, Any]:
+    from backend.v2 import release
+    from backend.v2.userdata import UserDataError
+    ctx = get_ctx()
+    try:
+        rec = release.publish(ctx, body.get("note") or "")
+    except UserDataError as exc:
+        raise HTTPException(400, str(exc))
+    st = rec["stats"]
+    ctx.audit.record("发布", "本体版本", rec["version"], rec["version"],
+                     note=f"{rec['note']}；现象 生效 {st['phenomena']['published']}/{st['phenomena']['total']}，"
+                          f"导致关系 生效 {st['links']['published']}/{st['links']['total']}")
+    return rec
+
+
+@router.get("/releases/compare")
+def release_compare(a: str, b: str) -> dict[str, Any]:
+    from backend.v2 import release
+    try:
+        return release.compare(get_ctx(), a, b)
+    except LookupError as exc:
+        raise HTTPException(404, f"未找到版本：{exc}")
+
+
+@router.post("/releases/{version}/rollback")
+def release_rollback(version: str, body: dict = Body(default={})) -> dict[str, Any]:
+    from backend.v2 import release
+    ctx = get_ctx()
+    try:
+        rec = release.rollback(ctx, version, bool(body.get("syncDraft")), body.get("note") or "")
+    except LookupError:
+        raise HTTPException(404, f"未找到版本：{version}")
+    ctx.audit.record("回滚", "本体版本", rec["version"], rec["version"],
+                     note=f"回滚到 {version}{'，工程态编辑数据同步回退' if rec['syncDraft'] else '，工程态编辑数据不变'}")
+    return rec
+
+
+@router.post("/status-batch")
+def status_batch(body: dict = Body(...)) -> dict[str, Any]:
+    from backend.v2 import release
+    from backend.v2.userdata import UserDataError
+    ctx = get_ctx()
+    try:
+        changed = release.batch_status(ctx, body.get("kind") or "", list(body.get("ids") or []), body.get("status") or "")
+    except UserDataError as exc:
+        raise HTTPException(400, str(exc))
+    label = {"phenomena": "现象", "links": "导致关系", "calculations": "计算组态"}[body["kind"]]
+    for c in changed:
+        ctx.audit.record("批量变更状态", label, c["id"], c["name"],
+                         changes=[{"field": "status", "before": c["before"], "after": c["after"]}])
+    return {"changed": len(changed), "items": changed}
+
+
+def _download(content: bytes, filename: str, media: str, extra: Optional[dict] = None):  # noqa: ANN202
+    from urllib.parse import quote
+    from fastapi.responses import Response
+    headers = {"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}",
+               "Access-Control-Expose-Headers": "X-Export-Info"}
+    if extra:
+        headers["X-Export-Info"] = quote(json_dumps(extra))
+    return Response(content=content, media_type=media, headers=headers)
+
+
+def json_dumps(v: Any) -> str:
+    import json
+    return json.dumps(v, ensure_ascii=False)
+
+
+@router.get("/export/excel")
+def export_excel(seg: Optional[str] = None):  # noqa: ANN201
+    """导出本体数据为 Excel（需求 SW-067）：全量或按工艺段。"""
+    from datetime import datetime
+    from backend.v2 import export
+    ctx = get_ctx()
+    try:
+        data, counts = export.excel(ctx, seg)
+    except LookupError:
+        raise HTTPException(404, f"未找到工艺段：{seg}")
+    scope = ctx.hierarchy.segments[seg]["name"] if seg else "全车间"
+    ctx.audit.record("导出", "Excel", seg or "all", f"本体数据 Excel（{scope}）", note="、".join(f"{k} {v}" for k, v in counts.items()))
+    name = f"6APA本体_{scope}_{datetime.now().strftime('%Y%m%d%H%M')}.xlsx"
+    return _download(data, name, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", {"counts": counts})
+
+
+@router.get("/export/ttl")
+def export_ttl(seg: Optional[str] = None):  # noqa: ANN201
+    """导出 TTL（需求 SW-069）：RDF 1.1 Turtle，导出后语法自检。"""
+    from datetime import datetime
+    from backend.v2 import export
+    ctx = get_ctx()
+    if seg and seg not in ctx.hierarchy.segments:
+        raise HTTPException(404, f"未找到工艺段：{seg}")
+    text, check = export.ttl(ctx, seg)
+    scope = ctx.hierarchy.segments[seg]["name"] if seg else "全车间"
+    ctx.audit.record("导出", "TTL", seg or "all", f"本体 TTL（{scope}）",
+                     note=f"节点 {check['nodes']}、关系 {check['edges']}、导致关系 {check['causalLinks']}；语法自检：{check['syntax']}")
+    name = f"6APA本体_{scope}_{datetime.now().strftime('%Y%m%d%H%M')}.ttl"
+    return _download(text.encode("utf-8"), name, "text/turtle; charset=utf-8", check)
+
+
+@router.get("/audit")
+def audit_log(op: str = "", kind: str = "", keyword: str = "", limit: int = 300) -> dict[str, Any]:
+    """操作日志（需求 SW-079）：编辑、导出、发布、回滚、删除等。"""
+    items = [e for e in reversed(get_ctx().audit.data.get("items", []))
+             if (not op or e["op"] == op) and (not kind or e["kind"] == kind)
+             and (not keyword or keyword in f"{e['name']}{e.get('note') or ''}{e['targetId']}")]
+    ops = sorted({e["op"] for e in get_ctx().audit.data.get("items", [])})
+    return {"items": items[:limit], "total": len(items), "ops": ops}
+
+
 @router.get("/documents/{doc_id}")
 def document(doc_id: str) -> dict[str, Any]:
     return _guard(documents.read, doc_id)

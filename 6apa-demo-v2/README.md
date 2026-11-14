@@ -69,6 +69,8 @@ python3 -m backend.tools.export_static --build
    「在本体浏览中打开」按当前视角定位页签（工艺流程 → 拓扑关系、设备与参数 → 参数、现象因果 → 根因影响关系）；
 8. 顶栏搜索：工艺段 / 工序 / 设备组 / 设备 / 位号 / 现象 / 工况 / 工艺参数 / 物料 / 质量指标，**支持拼音首字母**（如 sjg → 水解罐），
    结果按类型分组；参数、物料、指标在全局图谱中定位；
+10. **发布与导出**（105车间 下）：发布前检查与发布内容预览、发布新版本、版本列表、对比（含与工程态当前对比）、回滚（可同步回退工程态）、
+   Excel / TTL 导出（全车间或按工艺段）、操作日志；顶栏显示当前发布版本；现象 / 导致关系列表可勾选批量变更状态；
 9. **一致性校验**（105车间 下）：全量检查判定规则引用、限值待补、因果环路、计算组态绑定、位号映射、工况引用、设备组成员、图纸热区，
    结果分 错误 / 警告 / 提示，点一条跳到问题对象；有错误时提示「不可发布」。
 
@@ -144,3 +146,7 @@ python3 -m backend.tools.build_seed --force     # 覆盖 data/seed/*.json（不�
 | `GET /api/v2/objects/{id}/info` | 基础信息、所属位置、被引用、覆盖项、变更记录 |
 | `GET/PUT /api/v2/procedures/{id}` · `POST /procedures/{id}/causes/{seq}/split` · `POST /procedures/{id}/split-all` | 处置规程查看 / 编辑；可能原因拆成原因现象 + 导致关系 |
 | `GET /api/v2/calc-meta` | 计算组态执行方式、失败处理等枚举 |
+| `GET/POST /api/v2/releases` · `GET /releases/preview` · `GET /releases/compare?a=&b=` · `POST /releases/{v}/rollback` | 发布、版本列表、对比（b 可为 current）、回滚 |
+| `POST /api/v2/status-batch` | 批量变更现象 / 导致关系 / 计算组态的状态 |
+| `GET /api/v2/export/excel?seg=` · `GET /api/v2/export/ttl?seg=` | 导出 Excel / TTL（`X-Export-Info` 头带统计与语法自检结果） |
+| `GET /api/v2/audit?op=&keyword=` | 操作日志 |

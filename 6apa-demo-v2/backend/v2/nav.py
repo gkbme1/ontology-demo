@@ -44,13 +44,14 @@ GLOBAL_SECTIONS = [
     ("global:cond", "工况与根因", "全车间的现象 / 工况定义与根因影响关系（含跨装置的导致关系）"),
     ("global:docs", "文档提取", "规程文档与数据源，以及从中提取进本体的对象"),
     ("global:check", "一致性校验", "全量校验规则引用、根因环路、计算组态绑定、位号映射、图纸映射，结果分错误 / 警告 / 提示"),
+    ("global:release", "发布与导出", "本体版本发布、对比、回滚；Excel / TTL 导出；操作日志"),
 ]
 
 
 def global_nodes(ctx: AppContext) -> list[dict[str, Any]]:
     counts = {"global:calc": len(ctx.calcs.items), "global:algo": len(ctx.algos.items),
               "global:cond": sum(1 for p in ctx.phen.phenomena.values() if ctx.phenomenon_ops(p)),
-              "global:docs": len(documents.REGISTRY), "global:check": None}
+              "global:docs": len(documents.REGISTRY), "global:check": None, "global:release": None}
     return [{"id": k, "label": label, "kind": k, "hint": hint, "count": counts[k]} for k, label, hint in GLOBAL_SECTIONS]
 
 

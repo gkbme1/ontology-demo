@@ -68,6 +68,7 @@ const spec = computed<[string, string]>(() => {
     case 'global:cond': return ['activity', '#dc2626']
     case 'global:docs': return ['file', '#2563eb']
     case 'global:check': return ['grid', '#15803d']
+    case 'global:release': return ['tag', '#b45309']
     case 'equipment': {
       const hit = EQUIP_RULES.find(([re]) => re.test(label))
       return hit ? [hit[1], hit[2]] : ['cube', '#78716c']

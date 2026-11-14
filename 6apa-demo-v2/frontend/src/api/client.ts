@@ -46,6 +46,30 @@ async function request<T>(method: string, path: string, body?: unknown, query?: 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any
 
+/** 下载导出文件（Excel / TTL）：取文件名与 X-Export-Info，触发浏览器保存。 */
+async function download(path: string, query?: Query): Promise<{ filename: string; info: Any }> {
+  if (staticBackend) throw new ApiError(400, '单文件版不支持导出，请在完整版中操作')
+  const res = await fetch(`${BASE}/api/v2${path}${qs(query)}`)
+  if (!res.ok) {
+    let detail = `${res.status}`
+    try { detail = (await res.json()).detail } catch { /* ignore */ }
+    throw new ApiError(res.status, detail)
+  }
+  const cd = res.headers.get('Content-Disposition') ?? ''
+  const filename = decodeURIComponent((cd.match(/filename\*=UTF-8''([^;]+)/) ?? [])[1] ?? 'export')
+  const raw = res.headers.get('X-Export-Info')
+  const info = raw ? JSON.parse(decodeURIComponent(raw)) : {}
+  const blob = await res.blob()
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = filename
+  document.body.appendChild(a)  // 部分浏览器要求链接在文档中，下载才会用 download 指定的文件名
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000)
+  return { filename, info }
+}
+
 export const api = {
   meta: () => request<Any>('GET', '/meta'),
   navSpace: () => request<Any>('GET', '/nav/space'),
@@ -101,5 +125,13 @@ export const api = {
   updateProcedure: (id: string, body: Any) => request<Any>('PUT', `/procedures/${id}`, body),
   splitCause: (id: string, seq: string, body: Any) => request<Any>('POST', `/procedures/${id}/causes/${seq}/split`, body),
   splitAllCauses: (id: string, body: Any) => request<Any>('POST', `/procedures/${id}/split-all`, body),
+  releases: () => request<Any>('GET', '/releases'),
+  releasePreview: () => request<Any>('GET', '/releases/preview'),
+  publishRelease: (body: Any) => request<Any>('POST', '/releases', body),
+  compareReleases: (a: string, b: string) => request<Any>('GET', '/releases/compare', undefined, { a, b }),
+  rollbackRelease: (v: string, body: Any) => request<Any>('POST', `/releases/${v}/rollback`, body),
+  statusBatch: (body: Any) => request<Any>('POST', '/status-batch', body),
+  audit: (q: Query) => request<Any>('GET', '/audit', undefined, q),
+  download: (path: string, q?: Query) => download(path, q),
   resetStore: () => request<Any>('POST', '/admin/reset-store')
 }

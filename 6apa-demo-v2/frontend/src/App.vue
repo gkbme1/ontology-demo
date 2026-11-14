@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** 本体界面：左侧导航树，右侧显示区。 */
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { api } from '@/api/client'
 import { staticBackend } from '@/api/static'
 import { bump, enterSegment, goBack, loadMeta, nav, navHistory, openGlobalGraph, openObject, select } from '@/composables/useNav'
@@ -12,11 +12,16 @@ import GenericProfile from '@/views/GenericProfile.vue'
 import GlobalGraph from '@/views/GlobalGraph.vue'
 import GlobalSections from '@/views/GlobalSections.vue'
 import ConsistencyCheck from '@/views/ConsistencyCheck.vue'
+import ReleaseCenter from '@/views/ReleaseCenter.vue'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any
 
 const keyword = ref('')
+// 页头显示当前发布版本（需求 SW-077 第 5 条、SW-088 第 2 条）
+const currentRelease = ref<Any>(null)
+async function loadRelease(): Promise<void> { try { currentRelease.value = (await api.releases()).current } catch { currentRelease.value = null } }
+watch(() => nav.version, loadRelease)
 const hits = ref<Any[]>([])
 const hitTotal = ref(0)
 const searched = ref(false)
@@ -42,6 +47,7 @@ onMounted(async () => {
     await loadMeta()
     select({ type: 'workshop', id: 'WS-105' }, 'WS-105')
     ready.value = true
+    loadRelease()
   } catch (e) {
     error.value = `连接后端失败：${(e as Error).message}。请先启动后端（python3 -m backend.main，端口 8710）。`
   }
@@ -112,6 +118,10 @@ const kind = (): string => nav.selection.type
       <span v-if="staticBackend" class="pill pill-info" title="离线单文件版：数据为导出时的快照，现象与根因关系的编辑保存在本浏览器">
         单文件版 · 数据快照 {{ staticBackend.info.generatedAt }}
       </span>
+      <button class="pill cursor-pointer" :class="currentRelease ? 'pill-ok' : 'pill-mute'" title="当前发布版本；点击打开「发布与导出」"
+              @click="nav.page = 'browse'; select({ type: 'global:release' }, 'global:release')">
+        {{ currentRelease ? `发布版本 ${currentRelease.version} · ${currentRelease.time.slice(5, 16)}` : '未发布' }}
+      </button>
       <span class="sim-tag" title="试算用的测点数据由内置模拟器生成">试算数据为模拟数据</span>
       <button class="ctl" title="现象 / 根因关系 / 计算组态恢复为种子数据" @click="reset">恢复种子数据</button>
     </header>
@@ -129,6 +139,7 @@ const kind = (): string => nav.selection.type
         <AssetPanel v-else-if="kind() === 'object'" :key="`${nav.selection.id}|${nav.selection.opId}`"
                     :object-id="nav.selection.id!" :op-id="nav.selection.opId" :initial-tab="nav.selection.tab" />
         <ConsistencyCheck v-else-if="kind() === 'global:check'" />
+        <ReleaseCenter v-else-if="kind() === 'global:release'" />
         <GlobalSections v-else-if="kind().startsWith('global:')" :kind="kind()" :op-id="nav.selection.opId" />
         <GenericProfile v-else-if="kind() === 'domain-object'" :object-id="nav.selection.id!" />
         <div v-else-if="kind() === 'domain-pending'" class="empty m-6">「{{ nav.selection.label }}」待建：暂无数据源</div>

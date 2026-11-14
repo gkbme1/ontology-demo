@@ -38,7 +38,7 @@ class HierarchyTest(unittest.TestCase):
         self.assertEqual(ws["label"], "105车间")
         self.assertEqual([s["label"] for s in ws["children"]],
                          ["6A_提取", "6A_脱色", "6A_抽提", "6A_水解", "6A_结晶", "6A_干燥",
-                          "计算组态", "算法库", "工况与根因", "文档提取", "一致性校验"])  # 全局节点挂在车间下、工艺段之后
+                          "计算组态", "算法库", "工况与根因", "文档提取", "一致性校验", "发布与导出"])  # 全局节点挂在车间下、工艺段之后
         self.assertTrue(all("children" not in s for s in ws["children"]))  # 第一屏不出现工序 / 设备
 
     def test_segment_ops_list_devices_and_globals(self):
@@ -47,7 +47,7 @@ class HierarchyTest(unittest.TestCase):
         for op in r["items"]:  # 工序下直接是设备组 / 设备
             self.assertTrue(all(c["kind"] in ("group", "equipment") for c in op["children"]))
         g = client.get("/api/v2/nav/space").json()["globals"]
-        self.assertEqual([x["label"] for x in g], ["计算组态", "算法库", "工况与根因", "文档提取", "一致性校验"])
+        self.assertEqual([x["label"] for x in g], ["计算组态", "算法库", "工况与根因", "文档提取", "一致性校验", "发布与导出"])
         r1 = client.get("/api/v2/nav/segment/SEG-01").json()
         self.assertEqual([o["label"] for o in r1["items"]], ["提取_RSE200", "提取_RSE300", "水洗", "稀硫酸配置", "破乳剂配置"])
 
@@ -376,6 +376,47 @@ class Batch3Test(unittest.TestCase):
         client.delete(f"/api/v2/calculations/{c['id']}")
 
 
+class Batch4Test(unittest.TestCase):
+    """第 4 批：发布、对比、回滚、批量状态、Excel / TTL 导出、操作日志。"""
+
+    def test_publish_compare_rollback(self):
+        r = client.post("/api/v2/status-batch", json={"kind": "phenomena", "ids": ["PH-S11-05"], "status": "生效"}).json()
+        self.assertEqual(r["changed"], 1)
+        v1 = client.post("/api/v2/releases", json={"note": "测试发布"}).json()
+        self.assertGreaterEqual(v1["stats"]["phenomena"]["published"], 1)
+        client.post("/api/v2/status-batch", json={"kind": "phenomena", "ids": ["PH-S11-05"], "status": "停用"})
+        cmp = client.get("/api/v2/releases/compare", params={"a": v1["version"], "b": "current"}).json()
+        phen = next(g for g in cmp["groups"] if g["kind"] == "phenomena")
+        self.assertTrue(any(m["id"] == "PH-S11-05" and any(c["field"] == "status" for c in m["changes"]) for m in phen["modified"]))
+        rb = client.post(f"/api/v2/releases/{v1['version']}/rollback", json={"syncDraft": True}).json()
+        self.assertEqual(rb["rollbackOf"], v1["version"])
+        self.assertEqual(client.get("/api/v2/phenomena/PH-S11-05").json()["status"], "生效")  # 工程态同步回退
+        self.assertEqual(client.get("/api/v2/releases").json()["current"]["version"], rb["version"])
+        ops = client.get("/api/v2/audit").json()["ops"]
+        self.assertTrue({"发布", "回滚", "批量变更状态"} <= set(ops))
+        self.assertEqual(client.post("/api/v2/status-batch", json={"kind": "phenomena", "ids": ["PH-S11-05"], "status": "已确认"}).status_code, 400)
+
+    def test_blocking_only_for_effective(self):
+        r = client.get("/api/v2/validation").json()
+        self.assertTrue(all(not i["blocking"] for i in r["items"] if i["draft"]))
+        self.assertEqual(r["publishable"], r["blocking"] == 0)
+
+    def test_export_excel_and_ttl(self):
+        from io import BytesIO
+        from urllib.parse import unquote
+        from openpyxl import load_workbook
+        r = client.get("/api/v2/export/excel", params={"seg": "SEG-04"})
+        self.assertEqual(r.status_code, 200)
+        wb = load_workbook(BytesIO(r.content), read_only=True)
+        self.assertTrue({"空间层级", "设备", "参数", "现象", "导致关系", "处置步骤"} <= set(wb.sheetnames))
+        t = client.get("/api/v2/export/ttl", params={"seg": "SEG-04"})
+        self.assertIn("owl:TransitiveProperty", t.text)
+        self.assertIn("@zh", t.text)
+        info = __import__("json").loads(unquote(t.headers["x-export-info"]))
+        self.assertTrue(info["syntax"].startswith("通过") or info["syntax"].startswith("未自检"))
+        self.assertIn("导出", client.get("/api/v2/audit").json()["ops"])
+
+
 class DocsAndSearchTest(unittest.TestCase):
     def test_docs(self):
         r = client.get("/api/v2/ops/OP-09/documents").json()
@@ -399,7 +440,7 @@ class DocsAndSearchTest(unittest.TestCase):
     def test_validation(self):
         r = client.get("/api/v2/validation").json()
         self.assertEqual(set(r["counts"]), {"错误", "警告", "提示"})
-        self.assertEqual(r["publishable"], r["counts"]["错误"] == 0)
+        self.assertEqual(r["publishable"], r["blocking"] == 0)  # 只有生效对象上的错误阻止发布
         self.assertIn("判定规则待定义", r["rules"])
         self.assertTrue(all(i["level"] in ("错误", "警告", "提示") for i in r["items"]))
 

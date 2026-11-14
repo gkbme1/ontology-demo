@@ -4,6 +4,8 @@
  * 选中某个结果现象（列表里点结果、图谱里点节点）弹窗查看它由什么导致。
  */
 import StatusPill from '@/components/StatusPill.vue'
+import BatchStatusBar from '@/components/BatchStatusBar.vue'
+import { staticBackend } from '@/api/static'
 import { computed, onMounted, ref } from 'vue'
 import { api } from '@/api/client'
 import { bump } from '@/composables/useNav'
@@ -24,6 +26,10 @@ const editing = ref<Any | null>(null)
 const creating = ref(false)
 const allPhen = ref<Any[]>([])
 const groupByEffect = ref(true)
+// 批量变更状态（列表视图）
+const picked = ref<Set<string>>(new Set())
+const canBatch = !staticBackend
+function togglePick(id: string): void { const s = new Set(picked.value); if (s.has(id)) s.delete(id); else s.add(id); picked.value = s }
 
 onMounted(async () => {
   allPhen.value = (await api.phenomena({})).items
@@ -135,10 +141,13 @@ function changed(): void {
           </table>
         </div>
       </template>
-      <table v-else class="tbl">
-        <thead><tr><th v-if="showInherit" class="w-16 !text-center">来源</th><th>编号</th><th>原因现象</th><th></th><th>结果现象</th><th>机理 / 依据</th><th>置信度</th><th></th></tr></thead>
+      <div v-else class="space-y-2">
+      <BatchStatusBar kind="links" :ids="[...picked]" @done="picked = new Set(); emit('changed')" />
+      <table class="tbl">
+        <thead><tr><th v-if="canBatch" class="w-8"></th><th v-if="showInherit" class="w-16 !text-center">来源</th><th>编号</th><th>原因现象</th><th></th><th>结果现象</th><th>机理 / 依据</th><th>置信度</th><th></th></tr></thead>
         <tbody>
           <tr v-for="l in rows" :key="l.id" @click="popup = l.effect">
+            <td v-if="canBatch" @click.stop><input type="checkbox" :checked="picked.has(l.id)" @change="togglePick(l.id)" /></td>
             <td v-if="showInherit" @click.stop><InheritBox :checked="l.inherited" :from="l.inheritedFrom" /></td>
             <td class="font-mono text-[11px] text-fg-mute">{{ l.id }}</td>
             <td>{{ l.causeName }}<div class="text-[11px] text-fg-mute">{{ l.causeAnchor }}</div></td>
@@ -153,6 +162,7 @@ function changed(): void {
           </tr>
         </tbody>
       </table>
+      </div>
     </template>
 
     <LinkEditor v-if="creating" :phenomena="allPhen" @close="creating = false" @saved="changed" />
