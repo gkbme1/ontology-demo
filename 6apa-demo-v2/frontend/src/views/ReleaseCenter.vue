@@ -6,10 +6,13 @@ import { computed, ref, watch } from 'vue'
 import { api } from '@/api/client'
 import { staticBackend } from '@/api/static'
 import { bump, nav, select } from '@/composables/useNav'
+import { classlibState } from '@/composables/useClassLibBinding'
+import ClassLibUpgrade from '@/components/ClassLibUpgrade.vue'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any
-const tab = ref<'publish' | 'compare' | 'export' | 'audit' | 'know'>('publish')
+const tab = ref<'publish' | 'compare' | 'export' | 'audit' | 'know' | 'classlib'>('publish')
+watch(() => classlibState.openTab, (t) => { if (t) { tab.value = t as 'classlib'; classlibState.openTab = '' } }, { immediate: true })
 const rel = ref<Any>({ items: [], current: null })
 const preview = ref<Any>(null)
 const check = ref<Any>(null)
@@ -104,11 +107,12 @@ watch([auditOp, auditKw], loadAudit)
       <h2 class="text-[16px] font-semibold">发布与导出</h2>
       <span class="pill pill-info">当前发布版本：{{ rel.current ? `${rel.current.version} · ${rel.current.time}` : '未发布' }}</span>
       <span class="flex-1" />
-      <button v-for="[k, l] in [['publish', '版本发布'], ['compare', '版本对比'], ['know', `知识审核${know?.pending ? ' ' + know.pending : ''}`], ['export', '导出'], ['audit', '操作日志']]" :key="k"
+      <button v-for="[k, l] in [['publish', '版本发布'], ['compare', '版本对比'], ['know', `知识审核${know?.pending ? ' ' + know.pending : ''}`], ['classlib', '类库版本'], ['export', '导出'], ['audit', '操作日志']]" :key="k"
               class="asset-tab !py-0.5" :class="{ 'asset-tab-on': tab === k }" @click="tab = k as Any">{{ l }}</button>
     </div>
     <div class="flex-1 overflow-auto px-4 py-3 space-y-3 min-h-0 text-sm">
-      <div v-if="staticBackend" class="empty">单文件版只能查看已导出的版本信息；发布、回滚、导出请在完整版中操作。</div>
+      <ClassLibUpgrade v-if="tab === 'classlib'" />
+      <div v-if="staticBackend && tab !== 'classlib'" class="empty">单文件版只能查看已导出的版本信息；发布、回滚、导出请在完整版中操作。</div>
       <div v-if="msg" class="text-ok text-xs">{{ msg }}</div>
       <div v-if="err" class="text-err text-xs">{{ err }}</div>
 

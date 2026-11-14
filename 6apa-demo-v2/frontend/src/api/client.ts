@@ -168,5 +168,7 @@ export const api = {
   clNewVersion: (base?: string) => request<Any>('POST', '/classlib/versions', { base }),
   clDiff: (a: string, b: string) => request<Any>('GET', '/classlib/diff', undefined, { a, b }),
   clImport: (body: Any) => request<Any>('POST', '/classlib/import', body),
+  clBinding: () => request<Any>('GET', '/classlib/binding'),
+  clUpgradeImpact: (to: string) => request<Any>('GET', '/classlib/upgrade-impact', undefined, { to }),
   resetStore: () => request<Any>('POST', '/admin/reset-store')
 }

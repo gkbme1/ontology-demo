@@ -13,6 +13,7 @@ import GlobalGraph from '@/views/GlobalGraph.vue'
 import GlobalSections from '@/views/GlobalSections.vue'
 import ConsistencyCheck from '@/views/ConsistencyCheck.vue'
 import ReleaseCenter from '@/views/ReleaseCenter.vue'
+import { classlibState, loadBinding } from '@/composables/useClassLibBinding'
 import DevStudio from '@/views/DevStudio.vue'
 import DevHeader from '@/views/dev/DevHeader.vue'
 import RuntimeView from '@/views/RuntimeView.vue'
@@ -23,6 +24,8 @@ type Any = any
 const keyword = ref('')
 const STAGES = [['dev', '开发态'], ['eng', '工程态'], ['run', '运行态']] as const
 function switchStage(k: 'dev' | 'eng' | 'run'): void { if (nav.stage !== k) nav.stage = k }
+watch(() => nav.stage, (s) => { if (s !== 'dev') loadBinding() }, { immediate: true })
+function openClassLibTab(): void { classlibState.openTab = 'classlib'; nav.page = 'browse'; select({ type: 'global:release' }, 'global:release') }
 // 页头显示当前发布版本（需求 SW-077 第 5 条、SW-088 第 2 条）
 const currentRelease = ref<Any>(null)
 async function loadRelease(): Promise<void> { try { currentRelease.value = (await api.releases()).current } catch { currentRelease.value = null } }
@@ -97,7 +100,7 @@ const kind = (): string => nav.selection.type
 
 <template>
   <div class="h-full flex flex-col">
-    <header class="flex items-center gap-4 px-4 h-12 border-b border-line bg-ink-panel2 shrink-0">
+    <header class="flex items-center gap-3 px-4 h-12 border-b border-line bg-ink-panel2 shrink-0 whitespace-nowrap [&>*]:shrink-0">
       <div class="font-semibold tracking-wide"><span class="text-brand">◆</span> 6APA 本体 <span class="text-fg-mute text-xs font-normal">v2 · 105 车间</span></div>
       <!-- 三态切换（需求 SW-088）：开发态（类库）/ 工程态（实例组态）/ 运行态（运行服务） -->
       <div class="flex rounded-md border border-line overflow-hidden text-xs font-medium">
@@ -109,7 +112,7 @@ const kind = (): string => nav.selection.type
         <button class="px-3 py-1.5" :class="nav.page === 'browse' ? 'bg-brand text-white' : 'bg-white text-fg-dim hover:text-brand'" @click="nav.page = 'browse'">本体浏览</button>
         <button class="px-3 py-1.5 border-l border-line" :class="nav.page === 'graph' ? 'bg-brand text-white' : 'bg-white text-fg-dim hover:text-brand'" @click="nav.page = 'graph'">◎ 全局图谱</button>
       </div>
-      <div v-show="nav.stage === 'eng'" class="relative w-[380px]">
+      <div v-show="nav.stage === 'eng'" class="relative w-[380px] !shrink min-w-[160px]">
         <input v-model="keyword" class="inp w-full !py-1.5" placeholder="搜索工艺段 / 工序 / 设备 / 位号 / 现象 / 参数（支持拼音首字母）"
                @input="onSearch" @keydown.esc="hits = []; searched = false" />
         <div v-if="searched" class="absolute z-40 mt-1 w-[520px] panel max-h-[480px] overflow-auto shadow-xl">
@@ -124,11 +127,15 @@ const kind = (): string => nav.selection.type
           </template>
         </div>
       </div>
-      <span class="flex-1" />
+      <span class="flex-1 !shrink" />
       <DevHeader v-if="nav.stage === 'dev'" />
-      <span v-if="staticBackend" class="pill pill-info" title="离线单文件版：数据为导出时的快照，现象与根因关系的编辑保存在本浏览器">
-        单文件版 · 数据快照 {{ staticBackend.info.generatedAt }}
+      <span v-if="staticBackend" class="pill pill-info" :title="`离线单文件版：数据快照 ${staticBackend.info.generatedAt}；现象、根因关系、类库的编辑保存在本浏览器`">
+        单文件版
       </span>
+      <button v-if="nav.stage === 'eng' && classlibState.binding" class="pill cursor-pointer" :class="classlibState.binding.newer.length ? 'pill-warn' : 'pill-info'"
+              title="本工程使用的类库版本；类库发布不会自动更新工程，点击查看 / 切换" @click="openClassLibTab">
+        类库 {{ classlibState.binding.bound.version }}<template v-if="classlibState.binding.newer.length"> · 可升级到 {{ classlibState.binding.newer[classlibState.binding.newer.length - 1].version }}</template>
+      </button>
       <button v-if="nav.stage !== 'dev'" class="pill cursor-pointer" :class="currentRelease ? 'pill-ok' : 'pill-mute'" title="当前发布版本；点击打开「发布与导出」"
               @click="nav.page = 'browse'; select({ type: 'global:release' }, 'global:release')">
         {{ currentRelease ? `发布版本 ${currentRelease.version} · ${currentRelease.time.slice(5, 16)}` : '未发布' }}

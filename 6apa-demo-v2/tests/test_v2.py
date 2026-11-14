@@ -538,6 +538,25 @@ class ClassLibTest(unittest.TestCase):
         prev = client.get(f"/api/v2/classlib/class/{self.CID}/phenomena/{ph['code']}/preview")
         self.assertEqual(prev.status_code, 200, prev.text)
 
+    def test_binding_and_upgrade_impact(self):
+        b = client.get("/api/v2/classlib/binding").json()
+        self.assertEqual(b["bound"]["version"], "v0.1")
+        self.assertEqual(b["newer"], [])
+        d = client.get(f"/api/v2/classlib/class/{self.CID}").json()
+        con = d["parts"]["constraints"][0]
+        client.put(f"/api/v2/classlib/class/{self.CID}/constraints/{con['code']}", json={**con, "note": "改"})
+        client.put(f"/api/v2/classlib/class/{self.CID}/params/P_NEW", json={"code": "P_NEW", "name": "新参数", "category": "计算值"})
+        client.delete(f"/api/v2/classlib/class/{self.CID}/phenomena/{d['parts']['phenomena'][0]['code']}")
+        self.assertEqual(client.get("/api/v2/classlib/upgrade-impact", params={"to": "v0.2"}).status_code, 400)  # 编辑中不能切
+        client.post("/api/v2/classlib/publish", json={"note": "t"})
+        b = client.get("/api/v2/classlib/binding").json()
+        self.assertEqual(b["bound"]["version"], "v0.1")  # 发布不自动更新工程
+        self.assertEqual([v["version"] for v in b["newer"]], ["v0.2"])
+        r = client.get("/api/v2/classlib/upgrade-impact", params={"to": "v0.2"}).json()
+        self.assertEqual((r["counts"]["conflict"], r["counts"]["manual"]), (1, 1))
+        self.assertGreaterEqual(r["counts"]["auto"], 1)
+        self.assertGreater(r["groups"]["conflict"][0]["memberCount"], 0)
+
     def test_export_import(self):
         r = client.get("/api/v2/classlib/export")
         self.assertEqual(r.status_code, 200)

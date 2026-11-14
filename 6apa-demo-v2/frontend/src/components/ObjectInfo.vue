@@ -5,6 +5,7 @@ import { api } from '@/api/client'
 import { staticBackend } from '@/api/static'
 import { enterSegment, nav, openDrawing } from '@/composables/useNav'
 import Modal from './Modal.vue'
+import { classlibState } from '@/composables/useClassLibBinding'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any
@@ -29,6 +30,9 @@ function goDrawing(op: string): void { emit('close'); openDrawing(op, nav.meta?.
           <dt>编码</dt><dd class="font-mono">{{ info.code || '—' }}</dd>
           <dt>类型</dt><dd>{{ info.kind }}</dd>
           <dt>类</dt><dd>{{ info.className || '—' }}<div v-if="info.classPath" class="text-[11px] text-fg-mute">{{ info.classPath.join(' › ') }}</div></dd>
+          <dt>类库版本</dt><dd>{{ classlibState.binding ? `${classlibState.binding.library} ${classlibState.binding.bound.version}` : '—' }}
+            <span v-if="classlibState.binding?.newer?.length" class="pill pill-warn ml-1">可升级到 {{ classlibState.binding.newer[classlibState.binding.newer.length - 1].version }}</span>
+            <div class="text-[11px] text-fg-mute">工程使用的类库版本（「发布与导出 · 类库版本」切换）</div></dd>
           <dt>状态</dt><dd>{{ info.status }}</dd>
           <dt>来源</dt><dd>{{ info.source }}<span v-if="info.confidence" class="text-fg-mute"> · 归属置信度 {{ info.confidence }}</span></dd>
           <dt>测点 / 现象</dt><dd>{{ info.tagCount }} 个 DCS 点 · {{ info.phenomenonCount }} 个现象（含继承）</dd>

@@ -171,7 +171,7 @@ export class ClassLibLocal {
       for (const [sec, label] of Object.entries(SECTIONS)) for (const x of c[sec] ?? []) out.set(`${label}\u0000${x.code}`, [label, x.code, x.name || x.code, x])
       for (const cls of c.classes ?? []) {
         const base: Any = {}
-        for (const [k, v] of Object.entries(cls)) if (!(k in PARTS) && k !== 'caps') base[k] = v
+        for (const [k, v] of Object.entries(cls)) if (!(k in PARTS) && !['caps', 'updatedAt', 'createdAt'].includes(k)) base[k] = v  // 时间戳不算变更
         out.set(`类\u0000${cls.id}`, ['类', cls.id, cls.name, { ...base, caps: cls.caps }])
         for (const [part, label] of Object.entries(PARTS)) {
           for (const x of cls[part] ?? []) out.set(`${label}\u0000${cls.id}/${x.code}`, [label, `${cls.id}/${x.code}`, `${cls.name} › ${x.name || x.code}`, x])
@@ -510,6 +510,62 @@ export class ClassLibLocal {
              log: [...log, '运行环境：单文件版浏览器内置实现（与完整版内置实现一致）'] }
   }
 
+  // ------------------------------------------------------------ 工程绑定的类库版本（与 classlib.binding / upgrade_impact 一致）
+  private binding(): Any {
+    const vs = this.data.versions
+    const bound = this.data.library?.boundVersion ?? vs.find((v: Any) => v.status === '已发布')?.version ?? vs[0].version
+    const idx = Math.max(0, vs.findIndex((v: Any) => v.version === bound))
+    const ed = vs.find((v: Any) => v.status === '编辑中')
+    return { project: '105车间', library: this.data.library.name, bound: this.strip(vs[idx]),
+             newer: vs.slice(idx + 1).filter((v: Any) => v.status === '已发布').map((v: Any) => this.strip(v)),
+             published: vs.filter((v: Any) => v.status === '已发布').map((v: Any) => this.strip(v)), editing: ed ? this.strip(ed) : null }
+  }
+  private upgradeImpact(to: string): Any {
+    const b = this.binding()
+    const frm = b.bound.version
+    if (to === frm) throw err('目标版本就是工程当前使用的版本')
+    const target = this.data.versions.find((v: Any) => v.version === to)
+    if (!target || target.status !== '已发布') throw err('只能切换到已发布的类库版本')
+    const d = this.diff(frm, to)
+    const classes: Record<string, Any> = {}
+    for (const c of [...this.versionContent(to).classes, ...this.versionContent(frm).classes]) classes[c.id] = c
+    const kids: Record<string, string[]> = {}
+    for (const c of Object.values(classes)) if (c.parent) (kids[c.parent] ??= []).push(c.id)
+    const insts = (cid: string): Any[] => {
+      const out: Any[] = []
+      const stack = [cid]
+      while (stack.length) {
+        const x = stack.pop()!
+        if (classes[x]) out.push(...this.instancesOf(classes[x]))
+        stack.push(...(kids[x] ?? []))
+      }
+      return out
+    }
+    const partLabels = new Set(Object.values(PARTS))
+    const conflictTypes = new Set(['约束模板', '现象 / 工况模板', '根因模板'])
+    const groups: Record<string, Any[]> = { auto: [], conflict: [], manual: [] }
+    const affected = new Set<string>()
+    for (const r of d.rows) {
+      const cid = r.type === '类' ? r.id : partLabels.has(r.type) ? r.id.split('/')[0] : null
+      const inst = cid ? insts(cid) : []
+      const row: Any = { ...r, className: cid ? classes[cid]?.name ?? null : null,
+        instances: inst.slice(0, 6).map((i) => ({ id: i.id, name: i.name, members: i.members })),
+        instanceCount: inst.length, memberCount: inst.reduce((s, i) => s + i.members, 0), options: [] }
+      let g = 'auto'
+      if (!cid) row.reason = '全局定义变化（元模型 / 层级 / 关系类型 / 映射规则 / 能力），不直接改动实例数据'
+      else if (!inst.length) row.reason = '该类在本工程没有实例，不影响现有数据'
+      else if (r.change === '新增') row.reason = '新增项，本工程该类的实例将获得此项'
+      else if (r.change === '删除') { g = 'manual'; row.reason = '类库删除了该项，本工程实例仍在使用'; row.options = ['保留为本工程自有', '一并删除'] }
+      else if (r.type === '属性' && String(r.detail ?? '').includes('dtype')) { g = 'manual'; row.reason = '属性数据类型变化，已有实例值需人工转换'; row.options = ['人工确认后转换', '暂不升级此项'] }
+      else if (conflictTypes.has(r.type)) { g = 'conflict'; row.reason = '工程态可能已在设备组 / 设备上覆盖或调整，需选择保留哪一边'; row.options = ['保留工程值', '采用类库值'] }
+      else row.reason = '实例未单独覆盖时直接同步'
+      if (g !== 'auto' || cid) for (const i of inst) affected.add(i.id)
+      groups[g].push(row)
+    }
+    return { project: b.project, from: frm, to, groups, counts: Object.fromEntries(Object.entries(groups).map(([k, v]) => [k, v.length])),
+             affectedGroups: affected.size, diffCounts: d.counts }
+  }
+
   private importPkg(body: Any): Any {
     this.editable()
     const pkg = body.package ?? {}
@@ -570,6 +626,8 @@ export class ClassLibLocal {
     if (path === '/classlib/publish') return this.publish(String(body?.note ?? ''))
     if (path === '/classlib/versions' && method === 'POST') return this.newVersion(body?.base)
     if (path === '/classlib/diff') return this.diff(String(q.a ?? ''), String(q.b ?? 'current'))
+    if (path === '/classlib/binding') return this.binding()
+    if (path === '/classlib/upgrade-impact') return this.upgradeImpact(String(q.to ?? ''))
     if (path === '/classlib/import') return this.importPkg(body ?? {})
     throw new ApiError(404, `未找到接口：${method} ${path}`)
   }

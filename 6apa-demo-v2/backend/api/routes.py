@@ -590,6 +590,21 @@ def classlib_diff(a: str, b: str = "current") -> dict[str, Any]:
     return _cl_guard(_cl().diff, a, b)
 
 
+@router.get("/classlib/binding")
+def classlib_binding() -> dict[str, Any]:
+    """工程态使用的类库版本（只看）：类库发布只是升版，工程在「发布与导出 · 类库版本」手动切换。"""
+    from backend.v2.classlib import binding
+    return binding(_cl())
+
+
+@router.get("/classlib/upgrade-impact")
+def classlib_upgrade_impact(to: str) -> dict[str, Any]:
+    """切换类库版本前的升级影响分析；本 Demo 确认切换后不改工程数据。"""
+    from backend.v2.classlib import upgrade_impact
+    ctx = get_ctx()
+    return _cl_guard(upgrade_impact, _cl(), to, lambda c: _class_instances(ctx, c))
+
+
 @router.get("/classlib/export")
 def classlib_export():  # noqa: ANN201
     """导出类库包（需求 SW-014 第 4 条）：当前版本的类库内容（JSON）。"""

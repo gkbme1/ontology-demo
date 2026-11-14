@@ -136,7 +136,7 @@ class ClassLibrary:
                 for x in c.get(sec) or []:
                     out[(label, x["code"])] = (x.get("name") or x["code"], x)
             for cls in c.get("classes") or []:
-                base = {k: v for k, v in cls.items() if k not in PARTS and k != "caps"}
+                base = {k: v for k, v in cls.items() if k not in PARTS and k not in ("caps", "updatedAt", "createdAt")}  # 时间戳不算变更
                 out[("类", cls["id"])] = (cls["name"], {**base, "caps": cls.get("caps")})
                 for part, label in PARTS.items():
                     for x in cls.get(part) or []:
@@ -370,6 +370,82 @@ class ClassLibrary:
             self.cls(cid)["caps"] = caps
             self.save()
             return caps
+
+
+# ------------------------------------------------------------------ 工程绑定的类库版本（演示：只看、不实际切换）
+PART_LABELS = set(PARTS.values())
+CONFLICT_TYPES = {"约束模板", "现象 / 工况模板", "根因模板"}
+
+
+def binding(lib: ClassLibrary, project: str = "105车间") -> dict[str, Any]:
+    """工程使用的类库版本：工程实例由 v0.1 归纳而来，固定绑定首个已发布版本（library.boundVersion 可指定）。
+    类库发布只是升版，不会自动更新工程；工程在「发布与导出 · 类库版本」里手动切换（本 Demo 确认后不改数据）。"""
+    vs = lib.data["versions"]
+    bound = lib.data["library"].get("boundVersion") or next((v["version"] for v in vs if v["status"] == "已发布"), vs[0]["version"])
+    idx = next((i for i, v in enumerate(vs) if v["version"] == bound), 0)
+    strip = lambda v: {k: x for k, x in v.items() if k != "snapshot"}  # noqa: E731
+    published = [strip(v) for v in vs if v["status"] == "已发布"]
+    return {"project": project, "library": lib.data["library"]["name"], "bound": strip(vs[idx]),
+            "newer": [strip(v) for v in vs[idx + 1:] if v["status"] == "已发布"],
+            "published": published, "editing": next((strip(v) for v in vs if v["status"] == "编辑中"), None)}
+
+
+def upgrade_impact(lib: ClassLibrary, to: str, instances_of: Any) -> dict[str, Any]:
+    """升级影响分析（需求图 4-17）：工程绑定版本 → 目标版本的差异，按「可自动同步 / 冲突 / 需人工处理」分组，并列出受影响的实例。
+    instances_of(cls) → 该类的直接实例（设备组）；抽象类的修改影响全部子类的实例。"""
+    b = binding(lib)
+    frm = b["bound"]["version"]
+    if to == frm:
+        raise ClassLibError("目标版本就是工程当前使用的版本")
+    target = next((v for v in lib.data["versions"] if v["version"] == to), None)
+    if not target or target["status"] != "已发布":
+        raise ClassLibError("只能切换到已发布的类库版本")
+    d = lib.diff(frm, to)
+    classes = {c["id"]: c for c in lib.version_content(to)["classes"]} | {c["id"]: c for c in lib.version_content(frm)["classes"]}
+    kids: dict[str, list[str]] = {}
+    for c in classes.values():
+        if c.get("parent"):
+            kids.setdefault(c["parent"], []).append(c["id"])
+
+    def insts(cid: str) -> list[dict[str, Any]]:
+        out, stack = [], [cid]
+        while stack:
+            x = stack.pop()
+            if x in classes:
+                out += instances_of(classes[x])
+            stack += kids.get(x, [])
+        return out
+
+    groups: dict[str, list[dict[str, Any]]] = {"auto": [], "conflict": [], "manual": []}
+    affected: set[str] = set()
+    for r in d["rows"]:
+        cid = r["id"] if r["type"] == "类" else r["id"].split("/")[0] if r["type"] in PART_LABELS else None
+        inst = insts(cid) if cid else []
+        row = {**r, "className": classes.get(cid, {}).get("name") if cid else None,
+               "instances": [{"id": i["id"], "name": i["name"], "members": i["members"]} for i in inst[:6]],
+               "instanceCount": len(inst), "memberCount": sum(i["members"] for i in inst), "options": []}
+        if not cid:
+            g, row["reason"] = "auto", "全局定义变化（元模型 / 层级 / 关系类型 / 映射规则 / 能力），不直接改动实例数据"
+        elif not inst:
+            g, row["reason"] = "auto", "该类在本工程没有实例，不影响现有数据"
+        elif r["change"] == "新增":
+            g, row["reason"] = "auto", "新增项，本工程该类的实例将获得此项"
+        elif r["change"] == "删除":
+            g, row["reason"] = "manual", "类库删除了该项，本工程实例仍在使用"
+            row["options"] = ["保留为本工程自有", "一并删除"]
+        elif r["type"] == "属性" and "dtype" in (r.get("detail") or ""):
+            g, row["reason"] = "manual", "属性数据类型变化，已有实例值需人工转换"
+            row["options"] = ["人工确认后转换", "暂不升级此项"]
+        elif r["type"] in CONFLICT_TYPES:
+            g, row["reason"] = "conflict", "工程态可能已在设备组 / 设备上覆盖或调整，需选择保留哪一边"
+            row["options"] = ["保留工程值", "采用类库值"]
+        else:
+            g, row["reason"] = "auto", "实例未单独覆盖时直接同步"
+        if g != "auto" or cid:
+            affected |= {i["id"] for i in inst}
+        groups[g].append(row)
+    return {"project": b["project"], "from": frm, "to": to, "groups": groups,
+            "counts": {k: len(v) for k, v in groups.items()}, "affectedGroups": len(affected), "diffCounts": d["counts"]}
 
 
 def _short(v: Any) -> str:
