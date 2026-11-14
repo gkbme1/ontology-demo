@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/** 层级类型与层级模板（需求 SW-002，图 4-6）：模板列表、模板结构（层级顺序，可调整）、预览（取自已引用工程）、层级类型属性。 */
+/** 层级类型与层级模板（需求 SW-002，图 4-6）：模板列表、模板结构（层级顺序，可调整）、预览（取自 105 车间）、层级类型属性。 */
 import { computed, ref, watch } from 'vue'
 import { api } from '@/api/client'
 import { act, canEdit, lib } from '@/composables/useClassLib'
@@ -72,10 +72,10 @@ async function delTpl(): Promise<void> {
   <div class="grid grid-cols-[300px_1fr_360px] gap-4">
     <div class="card self-start">
       <div class="sec-title">层级模板</div>
-      <table class="tbl"><thead><tr><th>模板</th><th>级数</th><th>引用工程</th></tr></thead><tbody>
+      <table class="tbl"><thead><tr><th>模板</th><th>级数</th></tr></thead><tbody>
         <tr v-for="t in tpls" :key="t.code" :class="{ '!bg-brand/10': tplSel === t.code }" @click="tplSel = t.code">
           <td class="font-medium">{{ t.name }}<div class="text-[11px] text-fg-mute font-normal">{{ t.levels.map(typeName).join('—') }}</div></td>
-          <td>{{ t.levels.length }}</td><td>{{ (t.projects ?? []).length }}</td>
+          <td>{{ t.levels.length }}</td>
         </tr>
       </tbody></table>
     </div>
@@ -99,14 +99,14 @@ async function delTpl(): Promise<void> {
         <span class="text-[11px] text-fg-mute">最大深度 8 级</span>
       </div>
       <div v-if="tpl.code === 'TPL_WORKSHOP' && preview">
-        <div class="sec-title mt-2">预览（取自已引用工程）</div>
+        <div class="sec-title mt-2">预览（取自 105 车间）</div>
         <div class="text-xs text-fg-dim mb-1.5">{{ preview.path.join(' › ') }} ›</div>
         <div class="flex flex-wrap items-center gap-1.5">
           <template v-for="(s, i) in preview.subSteps" :key="s"><span class="rounded-full border border-line px-3 py-1 text-xs bg-white">{{ s }}</span><span v-if="i < preview.subSteps.length - 1" class="text-fg-mute">→</span></template>
         </div>
         <div class="text-[11px] text-fg-mute mt-2">节点数：车间 {{ preview.levels.WORKSHOP }} · 工艺段 {{ preview.levels.SECTION }} · 工序 {{ preview.levels.PROCESS }} · 子工序 {{ preview.levels.SUBPROC }}（写在图纸上）</div>
       </div>
-      <div class="text-[11px] text-fg-mute">引用工程：{{ (tpl.projects ?? []).join('、') || '无' }} · 视角：{{ tpl.kind }}</div>
+      <div class="text-[11px] text-fg-mute">视角：{{ tpl.kind }}</div>
     </div>
     <div v-if="typeForm" class="card self-start">
       <div class="flex items-center mb-2"><div class="sec-title !mb-0 flex-1">层级类型属性：{{ typeForm.name || '（新）' }}</div>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 开发态（需求 4.2，图 4-3(a)、4-4～4-17）：左侧功能模块——元模型、层级类型、类库、关系类型、映射规则、能力与算法、类库版本。
+ * 开发态（需求 4.2，图 4-3(a)、4-4～4-17）：左侧功能模块——元模型、层级类型、类库、关系类型、能力与算法（映射规则先屏蔽，页面 dev/MappingRulesPage.vue 保留）、类库版本。
  * 类库可编辑；当前版本「编辑中」时可改，发布后只读（修改须基于已发布版本新建版本）。开发态修改同步到工程态不做。
  */
 import { onMounted } from 'vue'
@@ -9,11 +9,10 @@ import MetaModelPage from './dev/MetaModelPage.vue'
 import HierarchyPage from './dev/HierarchyPage.vue'
 import ClassLibPage from './dev/ClassLibPage.vue'
 import RelationTypesPage from './dev/RelationTypesPage.vue'
-import MappingRulesPage from './dev/MappingRulesPage.vue'
 import CapAlgoPage from './dev/CapAlgoPage.vue'
 import VersionsPage from './dev/VersionsPage.vue'
 
-const PAGES = [['meta', '元模型'], ['hier', '层级类型'], ['class', '类库'], ['rel', '关系类型'], ['map', '映射规则'], ['cap', '能力与算法'], ['ver', '类库版本']] as const
+const PAGES = [['meta', '元模型'], ['hier', '层级类型'], ['class', '类库'], ['rel', '关系类型'], ['cap', '能力与算法'], ['ver', '类库版本']] as const
 onMounted(() => { if (!lib.summary) reloadLib() })
 </script>
 
@@ -35,7 +34,6 @@ onMounted(() => { if (!lib.summary) reloadLib() })
       <HierarchyPage v-else-if="lib.page === 'hier'" />
       <ClassLibPage v-else-if="lib.page === 'class'" />
       <RelationTypesPage v-else-if="lib.page === 'rel'" />
-      <MappingRulesPage v-else-if="lib.page === 'map'" />
       <CapAlgoPage v-else-if="lib.page === 'cap'" />
       <VersionsPage v-else-if="lib.page === 'ver'" />
     </main>

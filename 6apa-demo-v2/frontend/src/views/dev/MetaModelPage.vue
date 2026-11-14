@@ -8,14 +8,12 @@ import DevForm from './DevForm.vue'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any
 const items = ref<Any[]>([])
-const usage = ref<Record<string, number>>({})
 const rels = ref<Any[]>([])
 const sel = ref('')
 const form = ref<Any>(null)
 async function load(): Promise<void> {
   const r = await api.clSection('metaclasses')
   items.value = r.items
-  usage.value = r.usage
   rels.value = (await api.clSection('relationTypes')).items
   if (!sel.value) sel.value = 'MC_EQUIP'
   pick(sel.value)
@@ -54,10 +52,10 @@ watch(() => lib.summary?.current?.version, load)
   <div class="grid grid-cols-[400px_1fr] gap-4">
     <div class="card self-start">
       <div class="sec-title">元类列表 <span class="text-fg-mute font-normal">{{ preset }} 预置 · {{ items.length - preset }} 扩展</span></div>
-      <table class="tbl"><thead><tr><th>元类</th><th>编码</th><th>类</th><th>类型</th></tr></thead><tbody>
+      <table class="tbl"><thead><tr><th>元类</th><th>编码</th><th>类型</th></tr></thead><tbody>
         <tr v-for="m in items" :key="m.code" :class="{ '!bg-brand/10': sel === m.code }" @click="pick(m.code)">
           <td class="font-medium"><i class="inline-block w-2.5 h-2.5 rounded-sm mr-1.5 align-middle" :style="{ background: m.style?.color }" />{{ m.name }}</td>
-          <td class="font-mono text-xs">{{ m.code }}</td><td class="tabular-nums text-xs">{{ usage[m.code] ?? 0 }}</td>
+          <td class="font-mono text-xs">{{ m.code }}</td>
           <td><span class="pill" :class="m.preset ? 'pill-plain' : 'pill-info'">{{ m.preset ? '预置' : '扩展' }}</span></td>
         </tr>
       </tbody></table>
